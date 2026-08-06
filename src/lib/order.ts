@@ -1,0 +1,64 @@
+import type { ServiceCategory, ServiceItem } from '../data/catalog';
+import { parsePrice } from './price';
+
+/** Тогтсон үнэгүй, тохиролцоогоор явдаг категориуд — config.ts дахьтай ижил. */
+export const CUSTOM_PRICE_CATEGORIES: readonly ServiceCategory[] = [
+  'Медаль & Цом',
+  'Хувцас хэвлэл',
+];
+
+export const isCustomPrice = (category: ServiceCategory): boolean =>
+  CUSTOM_PRICE_CATEGORIES.includes(category);
+
+export interface OrderLine {
+  id: number;
+  name: string;
+  category: ServiceCategory;
+  /** Нэгжийн үнэ төгрөгөөр. Тохиролцооны зүйлд хэрэглэгч өөрчилж болно. */
+  unitPrice: number;
+  qty: number;
+}
+
+export const lineFromService = (service: ServiceItem, qty = 1): OrderLine => ({
+  id: service.id,
+  name: service.name,
+  category: service.category,
+  unitPrice: parsePrice(service.price),
+  qty,
+});
+
+export const lineTotal = (line: OrderLine): number => line.unitPrice * line.qty;
+
+export const subtotal = (lines: readonly OrderLine[]): number =>
+  lines.reduce((sum, line) => sum + lineTotal(line), 0);
+
+/** Мөрийг нэмнэ; аль хэдийн байвал зөвхөн тоог нэмэгдүүлнэ. */
+export const addLine = (
+  lines: readonly OrderLine[],
+  next: OrderLine,
+): OrderLine[] => {
+  const existing = lines.find((l) => l.id === next.id);
+  if (!existing) return [...lines, next];
+  return lines.map((l) => (l.id === next.id ? { ...l, qty: l.qty + next.qty } : l));
+};
+
+export const updateLine = (
+  lines: readonly OrderLine[],
+  id: number,
+  patch: Partial<OrderLine>,
+): OrderLine[] => lines.map((l) => (l.id === id ? { ...l, ...patch } : l));
+
+export const removeLine = (lines: readonly OrderLine[], id: number): OrderLine[] =>
+  lines.filter((l) => l.id !== id);
+
+/** Хүргэлтийн суурь хураамж — хотын дотор. */
+export const DELIVERY_FEE = 5000;
+
+export interface CustomerInfo {
+  name: string;
+  phone: string;
+  email: string;
+  note: string;
+}
+
+export type FieldErrors = Partial<Record<keyof CustomerInfo | 'lines', string>>;

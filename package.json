@@ -1,0 +1,34 @@
+{
+  "name": "konica-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "lint": "oxlint src api test",
+    "test": "esbuild test/*.test.ts --bundle --platform=node --format=cjs --out-extension:.js=.cjs --outdir=.tmp --log-level=error && node --test \".tmp/*.test.cjs\"",
+    "verify": "npm run typecheck && npm test && npm run docs:check",
+    "preview": "vite preview",
+    "docs:check": "node scripts/check-diagrams.mjs docs/*.md"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.9.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "jsdom": "^30.0.1",
+    "mermaid": "^11.16.1",
+    "oxlint": "^1.75.0",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~6.0.2",
+    "vite": "^7.3.6"
+  }
+}
