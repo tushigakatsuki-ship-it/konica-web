@@ -10,7 +10,8 @@
  */
 
 import type { BasketItem } from '../state/basket';
-import { renderPrintBlob } from './photoEdit';
+import { ServiceUnavailableError } from './api';
+import { renderPrintBlob } from './photoRender';
 import { sizeOf } from './photoSize';
 
 export interface UploadedFile {
@@ -21,7 +22,6 @@ export interface UploadedFile {
   serviceId: number;
   sizeLabel: string;
   qty: number;
-  finish: string;
 }
 
 export interface UploadResult {
@@ -31,6 +31,8 @@ export interface UploadResult {
 }
 
 export interface UploadProgress {
+  /** `prepare` — хэвлэлийн файл бэлдэж байна; `upload` — сүлжээгээр илгээж байна. */
+  phase: 'prepare' | 'upload';
   /** 0–1 */
   ratio: number;
   done: number;
@@ -44,16 +46,20 @@ const extOf = (type: string): string =>
 const asciiSize = (label: string): string =>
   label.replace(/×/g, 'x').replace(/[^\w.-]/g, '') || 'size';
 
-const loadImage = (src: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Зургийг уншиж чадсангүй.'));
-    image.src = src;
-  });
+/** Дахин оролдох утгатай эсэхийг ялгах. */
+class UploadError extends Error {
+  /** `true` бол давтаад ижил хариу ирнэ — шууд бууж өгнө. */
+  permanent: boolean;
+
+  constructor(message: string, permanent = false) {
+    super(message);
+    this.name = 'UploadError';
+    this.permanent = permanent;
+  }
+}
 
 /** Явцыг мэдэхийн тулд `fetch` биш XHR — `upload.onprogress` зөвхөн энд байдаг. */
-const putWithProgress = (
+const putOnce = (
   url: string,
   blob: Blob,
   onFraction: (fraction: number) => void,
@@ -68,12 +74,51 @@ const putWithProgress = (
     xhr.onload = () =>
       xhr.status >= 200 && xhr.status < 300
         ? resolve()
-        : reject(new Error(`Зураг байршуулж чадсангүй (${xhr.status}).`));
-    xhr.onerror = () => reject(new Error('Сүлжээний алдаа — зураг илгээгдсэнгүй.'));
-    xhr.ontimeout = () => reject(new Error('Зураг илгээх хугацаа хэтэрлээ.'));
+        : reject(
+            new UploadError(
+              `Зураг байршуулж чадсангүй (${xhr.status}).`,
+              // 4xx бол хүсэлт өөрөө буруу — давтаад ижил хариу ирнэ.
+              xhr.status >= 400 && xhr.status < 500,
+            ),
+          );
+    xhr.onerror = () =>
+      reject(new UploadError('Сүлжээний алдаа — зураг илгээгдсэнгүй.'));
+    xhr.ontimeout = () => reject(new UploadError('Зураг илгээх хугацаа хэтэрлээ.'));
     xhr.timeout = 5 * 60_000;
     xhr.send(blob);
   });
+
+/**
+ * Тасарсан байршуулалтыг дахин оролдоно.
+ *
+ * Гар утасны сүлжээ богино хугацаанд тасрах нь энгийн үзэгдэл. Дахин
+ * оролдохгүй бол 20 зурагтай захиалга 19 дэх дээрээ унаж, хэрэглэгч бүхнийг
+ * эхнээс нь давтах хэрэгтэй болно. Presigned URL 20 минут амьдардаг тул
+ * хэдэн секундын хүлээлт асуудалгүй.
+ *
+ * `4xx` (гарын үсэг хүчингүй, хугацаа дууссан) дээр дахин оролдох нь утгагүй —
+ * зөвхөн сүлжээний болон серверийн түр зуурын алдаанд давтана.
+ */
+const putWithProgress = async (
+  url: string,
+  blob: Blob,
+  onFraction: (fraction: number) => void,
+  attempts = 3,
+): Promise<void> => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await putOnce(url, blob, onFraction);
+      return;
+    } catch (error) {
+      const permanent = error instanceof UploadError && error.permanent;
+      if (permanent || attempt >= attempts) throw error;
+
+      // Явцын мөрийг тэглэж, дахин эхлэхийг харуулна.
+      onFraction(0);
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (attempt - 1)));
+    }
+  }
+};
 
 interface Planned {
   blob: Blob;
@@ -84,22 +129,32 @@ interface Planned {
  * Сагснаас байршуулах файлуудыг бэлдэнэ.
  *
  * Зураг бүрээс ХОЁР файл гарна:
- *   `print`    — сонгосон хэмжээний харьцаагаар тайрч, засвар тусгасан, шууд
- *                хэвлэхэд бэлэн JPEG.
- *   `original` — хэрэглэгчийн эх файл. Ажилтан тайралт буруу санагдвал эсвэл
- *                өөр хэмжээгээр дахин хэвлэх шаардлага гарвал энэ хэрэгтэй.
+ *   `print`    — сонгосон хэмжээний харьцаагаар төвөөр нь тайрсан, 300dpi,
+ *                шууд хэвлэхэд бэлэн JPEG.
+ *   `original` — хэрэглэгчийн эх файл. Автомат тайралт чухал хэсгийг таслачихвал
+ *                эсвэл өнгө/гэрэл засах шаардлага гарвал ажилтанд энэ хэрэгтэй.
  */
-export async function planFiles(items: readonly BasketItem[]): Promise<Planned[]> {
+export async function planFiles(
+  items: readonly BasketItem[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<Planned[]> {
   const planned: Planned[] = [];
+  const withPhoto = items.filter((item) => item.value.file).length;
+  let prepared = 0;
 
   for (const [index, item] of items.entries()) {
-    if (!item.value.src) continue;
+    const original = item.value.file;
+    if (!original) continue;
 
     const size = sizeOf(item.service.name);
     const label = `${String(index + 1).padStart(2, '0')}_${asciiSize(size.label)}_${item.value.qty}sh`;
-    const image = await loadImage(item.value.src);
 
-    const print = await renderPrintBlob(image, size, item.value.edits);
+    /*
+     * Задалсан зургийг хадгалахгүй — `renderPrintBlob` дотроо задалж, дуусмагц
+     * `close()` дуудна. 20 зурагтай захиалгад бүгдийг зэрэг задалбал хямд утас
+     * санах ойгүй болно.
+     */
+    const print = await renderPrintBlob(original, size);
     if (print) {
       planned.push({
         blob: print,
@@ -110,26 +165,27 @@ export async function planFiles(items: readonly BasketItem[]): Promise<Planned[]
           serviceId: item.service.id,
           sizeLabel: size.label,
           qty: item.value.qty,
-          finish: item.value.edits.finish,
         },
       });
     }
 
-    const original = item.value.file;
-    if (original) {
-      planned.push({
-        blob: original,
-        meta: {
-          kind: 'original',
-          name: `${label}_original.${extOf(original.type)}`,
-          size: original.size,
-          serviceId: item.service.id,
-          sizeLabel: size.label,
-          qty: item.value.qty,
-          finish: item.value.edits.finish,
-        },
-      });
-    }
+    planned.push({
+      blob: original,
+      meta: {
+        kind: 'original',
+        name: `${label}_original.${extOf(original.type)}`,
+        size: original.size,
+        serviceId: item.service.id,
+        sizeLabel: size.label,
+        qty: item.value.qty,
+      },
+    });
+
+    prepared += 1;
+    onProgress?.(prepared, withPhoto);
+    // Зураг бүрийн дараа хөтөчид зурах завсар өгнө — эс тэгвээс 20 зурагтай
+    // захиалгад интерфейс хэдэн секунд царцсан мэт харагдана.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   return planned;
@@ -139,7 +195,9 @@ export async function uploadBasketPhotos(
   items: readonly BasketItem[],
   onProgress: (progress: UploadProgress) => void,
 ): Promise<UploadResult | null> {
-  const planned = await planFiles(items);
+  const planned = await planFiles(items, (done, total) =>
+    onProgress({ phase: 'prepare', ratio: total === 0 ? 1 : done / total, done, total }),
+  );
   if (planned.length === 0) return null;
 
   const response = await fetch('/api/upload', {
@@ -154,6 +212,16 @@ export async function uploadBasketPhotos(
       })),
     }),
   });
+
+  /*
+   * 503 = зургийн сан хараахан тохируулагдаагүй.
+   *
+   * Энэ бол алдаа биш, тохиргооны төлөв. Дуудагч тал үүнийг барьж аваад
+   * захиалгыг зураггүйгээр үргэлжлүүлнэ — эс тэгвээс R2/NAS холбогдох хүртэл
+   * вэбээр захиалга огт өгөх боломжгүй болно.
+   */
+  if (response.status === 503)
+    throw new ServiceUnavailableError('Зургийн сан түр ажиллахгүй байна.');
 
   const body = (await response.json().catch(() => null)) as {
     uploadId?: string;
@@ -172,6 +240,7 @@ export async function uploadBasketPhotos(
   const sent = new Array<number>(planned.length).fill(0);
   const report = (done: number) =>
     onProgress({
+      phase: 'upload',
       ratio: totalBytes === 0 ? 1 : sent.reduce((a, b) => a + b, 0) / totalBytes,
       done,
       total: planned.length,

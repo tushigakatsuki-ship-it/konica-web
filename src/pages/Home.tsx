@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { CONTACT } from '../data/site';
+import LastOrderBanner from '../components/LastOrderBanner';
 
 function Hero() {
   return (
@@ -108,6 +109,9 @@ export default function Home() {
   return (
     <>
       <Hero />
+      <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
+        <LastOrderBanner />
+      </div>
       <Contact />
     </>
   );

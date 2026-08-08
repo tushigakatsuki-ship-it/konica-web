@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import {
@@ -22,7 +22,14 @@ import {
 } from '../lib/order';
 import { formatCurrency, isValidPhone, vatPortion } from '../lib/price';
 import { sizeOf } from '../lib/photoSize';
-import { submitOrder } from '../lib/api';
+import {
+  ServiceUnavailableError,
+  makeRequestId,
+  submitOrder,
+  type OrderResult,
+} from '../lib/api';
+import { receiptPath, saveReceipt } from '../lib/lastOrder';
+import PaymentPanel from '../components/PaymentPanel';
 import { uploadBasketPhotos, type UploadProgress } from '../lib/upload';
 import { useBasket } from '../state/basket';
 
@@ -62,12 +69,9 @@ export default function Order() {
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<{
-    orderNumber: string;
-    total: number;
-    filesSaved: boolean;
-    photoCount: number;
-  } | null>(null);
+  const [confirmed, setConfirmed] = useState<(OrderResult & { photoCount: number }) | null>(
+    null,
+  );
 
   /** Сагснаас ирсэн зурагтай мөрүүд — ижил үйлчилгээг нэгтгэнэ. */
   const photoLines = useMemo(
@@ -96,7 +100,21 @@ export default function Order() {
   const tax = vat ? vatPortion(base + deliveryFee) : 0;
   const total = base + deliveryFee + tax;
 
-  const photoCount = basket.items.filter((item) => item.value.src).length;
+  const photoCount = basket.items.filter((item) => item.value.file).length;
+
+  /*
+   * Илгээж байх үед хуудас хаахаас сэрэмжлүүлнэ.
+   *
+   * Зураг байршуулах нь хэдэн арван секунд үргэлжилж болно. Хэрэглэгч энэ
+   * зуур табаа хаавал захиалга хагас үлдэж, зураг нь ирээгүй ажлын мөр
+   * үүсэх эрсдэлтэй.
+   */
+  useEffect(() => {
+    if (!sending) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [sending]);
 
   const setField = (key: keyof CustomerInfo, value: string) => {
     setCustomer((c) => ({ ...c, [key]: value }));
@@ -105,11 +123,33 @@ export default function Order() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (sending) return; // давхар дарахаас — сервер талд бас хамгаалалттай
+
     const found = validate(customer, lines);
     setErrors(found);
     setSendError(null);
-    if (Object.keys(found).length > 0) return;
 
+    if (Object.keys(found).length > 0) {
+      /*
+       * Эхний алдаатай талбар руу автоматаар очно.
+       *
+       * Утсан дээр маягт урт байдаг тул алдааны текст дэлгэцээс гадуур үлдэж,
+       * хэрэглэгч «яагаад илгээгдэхгүй байна вэ» гэж эргэлзэх нь түгээмэл.
+       */
+      const firstField = (['name', 'phone', 'email'] as const).find((key) => found[key]);
+      if (firstField) {
+        const element = document.getElementById(firstField);
+        element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        element?.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    /*
+     * Илгээх оролдлого бүрт нэг түлхүүр. Сүлжээ унаж дахин илгээвэл ижил утга
+     * явах тул сервер давхар захиалга үүсгэхгүй.
+     */
+    const requestId = makeRequestId();
     setSending(true);
     try {
       /**
@@ -119,10 +159,38 @@ export default function Order() {
        * мөр хараад, хэрэглэгч рүү залгаж файл гуйх хэрэг гарна. Эсрэг
        * дарааллаар — зураг унавал захиалга огт үүсэхгүй тул хэрэглэгч дахин
        * оролдоод л болно.
+       *
+       * Онцгой тохиолдол: зургийн сан хараахан тохируулагдаагүй бол (503)
+       * захиалгыг ЗОГСООХГҮЙ. Хэрэглэгч буруугүй, ажилтан утсаар холбогдож
+       * зургийг нь авна. Ингэснээр R2/NAS-ыг хожим асаах хүртэл вэб бүрэн
+       * ажиллана.
        */
-      const upload = await uploadBasketPhotos(basket.items, setProgress);
+      let upload = null;
+      try {
+        upload = await uploadBasketPhotos(basket.items, setProgress);
+      } catch (error) {
+        if (!(error instanceof ServiceUnavailableError)) throw error;
+      }
 
-      const result = await submitOrder(customer, lines, { delivery, vat, upload });
+      const result = await submitOrder(customer, lines, {
+        delivery,
+        vat,
+        upload,
+        requestId,
+      });
+
+      /*
+       * Баримтаа хадгална — хэрэглэгч хуудсаа хааж, дараа нь `/zakhialga/<дугаар>`
+       * хаягаар буцаж орж төлбөрөө төлж чадна.
+       */
+      if (result.payment?.tracking) {
+        saveReceipt({
+          orderNumber: result.orderNumber,
+          date: result.payment.tracking.date,
+          uploadId: result.payment.tracking.uploadId,
+        });
+      }
+
       setConfirmed({ ...result, photoCount });
       basket.clear();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -157,30 +225,51 @@ export default function Order() {
             {customer.name}, {customer.phone}
           </p>
 
-          {confirmed.photoCount > 0 && (
-            <p
-              className={`mt-6 rounded-md px-4 py-3 text-sm ${
-                confirmed.filesSaved
-                  ? 'bg-ok/10 text-ink-soft'
-                  : 'bg-accent/10 text-accent-strong'
-              }`}
-            >
-              {confirmed.filesSaved
-                ? `🖼 ${confirmed.photoCount} зураг амжилттай хүлээн авлаа.`
-                : '⚠️ Зураг бүртгэгдэхэд алдаа гарлаа. Утсаар холбогдоно уу.'}
+          {confirmed.photos === 'unavailable' && (
+            <p className="mt-6 rounded-md bg-accent/10 px-4 py-3 text-sm leading-relaxed text-accent-strong">
+              ⚠️ Зураг хүлээн авах систем түр ажиллахгүй байна. Захиалга тань
+              бүртгэгдсэн — ажилтан тань руу залгаж зургийг тань авна.
             </p>
           )}
 
-          <p className="mt-4 text-sm text-muted">
+          {confirmed.payment && (
+            <PaymentPanel
+              payment={confirmed.payment}
+              orderNumber={confirmed.orderNumber}
+              photoCount={confirmed.photos === 'saved' ? confirmed.photoCount : 0}
+            />
+          )}
+
+          <p className="mt-6 text-sm text-muted">
             Асуух зүйл байвал{' '}
             <a href={CONTACT.phoneHref} className="font-semibold text-accent">
               {CONTACT.phone}
             </a>{' '}
             дугаарт холбогдоно уу.
           </p>
-          <Link to="/" className="btn-brand mt-8 w-full sm:w-auto">
-            Нүүр хуудас руу буцах
-          </Link>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            {confirmed.payment?.tracking && (
+              <Link
+                to={receiptPath({
+                  orderNumber: confirmed.orderNumber,
+                  date: confirmed.payment.tracking.date,
+                  uploadId: confirmed.payment.tracking.uploadId,
+                })}
+                className="btn-brand"
+              >
+                Захиалгын төлөв харах
+              </Link>
+            )}
+            <Link to="/" className="btn-outline">
+              Нүүр хуудас
+            </Link>
+          </div>
+          {confirmed.payment?.tracking && (
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              Энэ линкийг хадгалж аваарай — хэзээ ч буцаж орж төлбөр, бэлэн
+              байдлаа шалгаж болно.
+            </p>
+          )}
         </div>
       </>
     );
@@ -231,7 +320,7 @@ export default function Order() {
                       {sizeOf(item.service.name).label} × {item.value.qty}
                     </p>
                     <p className="truncate text-[11px] text-muted">
-                      {item.value.src ? item.value.edits.finish : '⚠️ зураггүй'}
+                      {item.value.fileName ?? '⚠️ зураг ороогүй'}
                     </p>
                   </li>
                 ))}
@@ -469,13 +558,19 @@ export default function Order() {
                 </label>
                 <input
                   id="name"
+                  name="name"
+                  autoComplete="name"
+                  enterKeyHint="next"
+                  aria-invalid={Boolean(errors.name)}
                   value={customer.name}
                   onChange={(e) => setField('name', e.target.value)}
                   className="field"
                   placeholder="Батболд"
                 />
                 {errors.name && (
-                  <p className="mt-1 text-xs text-red-600">{errors.name}</p>
+                  <p role="alert" className="mt-1 text-xs text-red-600">
+                    {errors.name}
+                  </p>
                 )}
               </div>
 
@@ -485,14 +580,23 @@ export default function Order() {
                 </label>
                 <input
                   id="phone"
+                  name="tel"
+                  type="tel"
                   inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={8}
+                  enterKeyHint="next"
+                  aria-invalid={Boolean(errors.phone)}
                   value={customer.phone}
-                  onChange={(e) => setField('phone', e.target.value)}
+                  // Зөвхөн цифр — хэрэглэгч зай, зураас бичсэн ч шалгалтад унахгүй.
+                  onChange={(e) => setField('phone', e.target.value.replace(/\D/g, ''))}
                   className="field"
                   placeholder="99001234"
                 />
                 {errors.phone && (
-                  <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
+                  <p role="alert" className="mt-1 text-xs text-red-600">
+                    {errors.phone}
+                  </p>
                 )}
               </div>
 
@@ -502,14 +606,21 @@ export default function Order() {
                 </label>
                 <input
                   id="email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  enterKeyHint="next"
+                  aria-invalid={Boolean(errors.email)}
                   value={customer.email}
                   onChange={(e) => setField('email', e.target.value)}
                   className="field"
                   placeholder="name@example.com"
                 />
                 {errors.email && (
-                  <p className="mt-1 text-xs text-red-600">{errors.email}</p>
+                  <p role="alert" className="mt-1 text-xs text-red-600">
+                    {errors.email}
+                  </p>
                 )}
               </div>
 
@@ -549,7 +660,11 @@ export default function Order() {
             {progress && (
               <div className="mt-4">
                 <div className="flex justify-between text-xs text-muted">
-                  <span>Зураг илгээж байна…</span>
+                  <span>
+                    {progress.phase === 'prepare'
+                      ? 'Зургийг хэвлэлд бэлдэж байна…'
+                      : 'Зураг илгээж байна…'}
+                  </span>
                   <span>
                     {progress.done}/{progress.total}
                   </span>

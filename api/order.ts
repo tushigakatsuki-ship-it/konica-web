@@ -14,6 +14,9 @@ import {
   type WebOrderManifest,
 } from './_files';
 import { putObject, readR2Config } from './_r2';
+import { pendingPayment, readBankInstructions } from './_payment';
+import { createInvoice, readQPayConfig, type QPayInvoice } from './_qpay';
+import { notify } from './_notify';
 
 /**
  * POST /api/order — вэбийн захиалгыг native app-ын Firebase руу бичнэ.
@@ -31,9 +34,6 @@ const RTDB_URL = (
   process.env.RTDB_URL ?? 'https://printmn-c0d28-default-rtdb.firebaseio.com/pmn'
 ).replace(/\/$/, '');
 const RTDB_AUTH = process.env.RTDB_AUTH ?? '';
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID ?? '';
-
 const REQUEST_TIMEOUT_MS = 15_000;
 /** 60 файлын мэдээлэл ~15KB. Зураг өөрөө энд ирдэггүй (`/api/upload`-ыг үз). */
 const MAX_BODY_BYTES = 64_000;
@@ -57,6 +57,46 @@ function rateLimited(ip: string): boolean {
   if (hits.size > 5_000) hits.clear(); // санах ой хязгааргүй өсөхөөс сэргийлнэ
   return recent.length > MAX_PER_WINDOW;
 }
+
+/**
+ * Давхар захиалгаас хамгаалах (idempotency).
+ *
+ * Бодит тохиолдол: хэрэглэгч «Илгээх» дараад сүлжээ нь удаашрахад дахин дардаг,
+ * эсвэл гар утас сүлжээгээ солиход хүсэлт нь хоёр удаа очдог. Хамгаалалтгүй бол
+ * ижил захиалга Firebase-д ХОЁР удаа бичигдэж, өдрийн касс, ажлын самбар
+ * хоёулаа давхардана — ажилтан хоёр удаа хэвлэх эрсдэлтэй.
+ *
+ * Клиент оролдлого бүрт нэг `requestId` үүсгэж, дахин илгээхдээ ижлийг явуулна.
+ * Сервер тухайн id-г аль хэдийн боловсруулсан бол ШИНЭ захиалга үүсгэхгүй,
+ * өмнөх хариугаа буцаана.
+ *
+ * ⚠️ Edge instance бүр өөрийн санах ойтой тул энэ нь бүрэн баталгаа биш —
+ * хоёр хүсэлт өөр instance рүү унавал хамгаалахгүй. Гэхдээ хамгийн түгээмэл
+ * тохиолдол (нэг хэрэглэгч хэдхэн секундын дотор дахин дарах) нь ихэвчлэн нэг
+ * instance дээр буудаг. Бүрэн баталгаа хэрэгтэй бол Upstash Redis.
+ */
+const IDEMPOTENCY_TTL_MS = 10 * 60_000;
+const seen = new Map<string, { at: number; body: unknown }>();
+
+const rememberedResponse = (requestId: string): unknown | null => {
+  const hit = seen.get(requestId);
+  if (!hit) return null;
+  if (Date.now() - hit.at > IDEMPOTENCY_TTL_MS) {
+    seen.delete(requestId);
+    return null;
+  }
+  return hit.body;
+};
+
+const remember = (requestId: string, body: unknown): void => {
+  if (!requestId) return;
+  seen.set(requestId, { at: Date.now(), body });
+  if (seen.size > 2_000) seen.clear();
+};
+
+/** `req_` угтвартай 8–64 тэмдэгт — клиентээс ирсэн дурын мөрөнд итгэхгүй. */
+const isRequestId = (value: unknown): value is string =>
+  typeof value === 'string' && /^[\w-]{8,64}$/.test(value);
 
 const json = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), {
@@ -93,21 +133,6 @@ async function countTodaysLogs(now: Date): Promise<number | null> {
   }
 }
 
-/** Telegram мэдэгдэл амжилтгүй болсон ч захиалга хадгалагдсан хэвээр байна. */
-async function notify(text: string): Promise<void> {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
-      signal: AbortSignal.timeout(5_000),
-    });
-  } catch {
-    // best-effort
-  }
-}
-
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST')
     return json({ error: 'POST хүсэлт л хүлээн авна.' }, 405);
@@ -129,6 +154,17 @@ export default async function handler(request: Request): Promise<Response> {
     payload = JSON.parse(raw);
   } catch {
     return json({ error: 'Өгөгдөл JSON биш байна.' }, 400);
+  }
+
+  /*
+   * Давтагдсан хүсэлтийг ЭХЛЭЭД шалгана — баталгаажуулалт, Firebase рүү
+   * хандахаас ч өмнө. Ингэснээр давхар дарсан хүсэлт огт ажил үүсгэхгүй.
+   */
+  const rawRequestId = (payload as { requestId?: unknown })?.requestId;
+  const requestId = isRequestId(rawRequestId) ? rawRequestId : '';
+  if (requestId) {
+    const previous = rememberedResponse(requestId);
+    if (previous) return json(previous, 201);
   }
 
   const now = new Date();
@@ -229,12 +265,58 @@ export default async function handler(request: Request): Promise<Response> {
    * Захиалга АЛЬ ХЭДИЙН хадгалагдсан тул энд алдаа гарлаа ч 201 буцаана —
    * хэрэглэгчийг дахин илгээхэд хүргэвэл орлого давхардана.
    */
-  let manifestSaved = true;
+  const env = process.env as Record<string, string | undefined>;
+  const r2 = readR2Config(env);
+
+  /**
+   * Зургийн төлөв гурван утгатай:
+   *   `none`        — зураггүй захиалга
+   *   `saved`       — зураг санд орж, manifest бичигдсэн
+   *   `unavailable` — сан тохируулаагүй эсвэл бичилт унасан
+   *
+   * `unavailable` нь АЛДАА биш: сан хараахан холбогдоогүй байхад ч захиалга
+   * хэвийн үүсэх ёстой. Ажилтан хэрэглэгч рүү залгаж зургийг нь өөр замаар
+   * авна. Ингэснээр R2/NAS-ыг хожим асаах хүртэл вэб бүрэн ажиллана.
+   */
+  let photos: 'none' | 'saved' | 'unavailable' = files.length === 0 ? 'none' : 'saved';
+  let invoice: QPayInvoice | null = null;
+
+  /*
+   * Дансны заавар нь ямар ч сангаас хамаардаггүй тул ҮРГЭЛЖ буцна —
+   * зураггүй захиалганд ч, R2 унтарсан үед ч хэрэглэгч төлж чадна.
+   */
+  const bank = readBankInstructions(env, built.orderNumber, built.total);
+
   if (files.length > 0) {
-    const r2 = readR2Config(process.env as Record<string, string | undefined>);
     if (!r2) {
-      manifestSaved = false;
+      photos = 'unavailable';
     } else {
+      const payment = pendingPayment(built.total);
+
+      /*
+       * QPay нэхэмжлэлийг manifest бичихээс ӨМНӨ үүсгэнэ — `invoiceId`-г
+       * manifest дотор хадгалах ёстой, эс тэгвээс callback ирэхэд аль
+       * нэхэмжлэлийн тухай яриад байгааг шалгах аргагүй болно.
+       */
+      const qpay = readQPayConfig(env);
+      if (qpay) {
+        const origin = new URL(request.url).origin;
+        invoice = await createInvoice(qpay, {
+          orderNumber: built.orderNumber,
+          amount: built.total,
+          description: `Printmn ${built.orderNumber}`,
+          receiver: phone,
+          callbackUrl:
+            `${origin}/api/qpay-callback` +
+            `?order=${encodeURIComponent(built.orderNumber)}` +
+            `&date=${encodeURIComponent(uploadDate)}&u=${encodeURIComponent(uploadId)}`,
+        });
+        if (invoice) {
+          payment.method = 'qpay';
+          payment.invoiceId = invoice.invoiceId;
+        }
+      }
+
       const manifest: WebOrderManifest = {
         orderNumber: built.orderNumber,
         uploadId,
@@ -249,30 +331,53 @@ export default async function handler(request: Request): Promise<Response> {
         total: built.total,
         lines: built.lines.map((l) => ({ name: l.name, qty: l.qty, total: l.total })),
         files,
+        payment,
       };
       try {
-        manifestSaved = await putObject(
-          r2,
-          manifestKey(uploadDate, built.orderNumber, uploadId),
-          JSON.stringify(manifest),
-        );
+        if (
+          !(await putObject(
+            r2,
+            manifestKey(uploadDate, built.orderNumber, uploadId),
+            JSON.stringify(manifest),
+          ))
+        ) {
+          photos = 'unavailable';
+        }
       } catch {
-        manifestSaved = false;
+        photos = 'unavailable';
       }
     }
   }
 
   const photoLine =
-    files.length === 0
+    photos === 'none'
       ? ''
-      : manifestSaved
-        ? `\n🖼 ${photoCount} зураг — /admin дээрээс тат`
-        : '\n⚠️ Зураг ирсэн ч бүртгэгдсэнгүй — утсаар холбогдоно уу';
+      : photos === 'saved'
+        ? `\n🖼 ${photoCount} зураг — ⏳ төлбөр хүлээгдэж байна`
+        : `\n⚠️ ${photoCount} зураг ирсэн ч сан руу орсонгүй — утсаар холбогдоно уу`;
 
   await notify(alertText(built, name, phone) + photoLine);
 
-  return json(
-    { orderNumber: built.orderNumber, total: built.total, filesSaved: manifestSaved },
-    201,
-  );
+  const body = {
+    orderNumber: built.orderNumber,
+    total: built.total,
+    photos,
+    payment: {
+      amount: built.total,
+      qpay: invoice,
+      bank,
+      /**
+       * Төлбөрийн төлвийг автоматаар хянах «түлхүүр».
+       *
+       * `uploadId` нь 16 тэмдэгт санамсаргүй мөр — хэрэглэгч түүгээрээ
+       * `/api/payment` дээр төлвөө шалгана. Мөн `/zakhialga/<дугаар>` төлөв
+       * хуудсанд буцаж орох линкийг үүнээс угсарна. Manifest байхгүй бол
+       * хянах зүйл ч байхгүй тул `null`.
+       */
+      tracking: photos === 'saved' ? { date: uploadDate, uploadId } : null,
+    },
+  };
+
+  remember(requestId, body);
+  return json(body, 201);
 }

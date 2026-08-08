@@ -14,11 +14,20 @@ import {
   validateUploadRequest,
 } from '../api/_files';
 import { ValidationError } from '../api/_shared';
-import { encodeKey, parseKeys, presign, rfc3986, signRequest } from '../api/_r2';
+import {
+  encodeKey,
+  parseKeys,
+  presign,
+  readR2Config,
+  rfc3986,
+  signRequest,
+} from '../api/_r2';
 
 const R2 = {
-  accountId: 'acct123',
+  host: 'acct123.r2.cloudflarestorage.com',
+  protocol: 'https' as const,
   bucket: 'printmn',
+  region: 'auto',
   accessKeyId: 'AKIAEXAMPLE',
   secretAccessKey: 'secret-example-key',
 };
@@ -110,7 +119,6 @@ const goodFile = {
   serviceId: 103,
   sizeLabel: '10×15 см',
   qty: 2,
-  finish: 'Гялгар',
 };
 
 test('зөв файлын жагсаалтыг цэвэрлэж буцаана', () => {
@@ -223,4 +231,71 @@ test('parseKeys нь XML-ээс түлхүүрүүдийг гаргана', () =
     'manifests/2026-08-06/PMN-2.json',
   ]);
   assert.deepEqual(parseKeys('<ListBucketResult/>'), []);
+});
+
+// ── Сангийн тохиргоо ───────────────────────────────────────────────
+
+test('өгөгдөл дутуу бол тохиргоо null', () => {
+  assert.equal(readR2Config({}), null);
+  // Хувьсагч бүрэн ч endpoint/accountId аль нь ч байхгүй.
+  assert.equal(
+    readR2Config({ R2_BUCKET: 'b', R2_ACCESS_KEY_ID: 'k', R2_SECRET_ACCESS_KEY: 's' }),
+    null,
+  );
+});
+
+test('R2_ACCOUNT_ID-аас R2-ийн стандарт хаягийг угсарна', () => {
+  const config = readR2Config({
+    R2_ACCOUNT_ID: 'acct123',
+    R2_BUCKET: 'printmn',
+    R2_ACCESS_KEY_ID: 'k',
+    R2_SECRET_ACCESS_KEY: 's',
+  });
+  assert.deepEqual(config, {
+    host: 'acct123.r2.cloudflarestorage.com',
+    protocol: 'https',
+    bucket: 'printmn',
+    region: 'auto',
+    accessKeyId: 'k',
+    secretAccessKey: 's',
+  });
+});
+
+test('S3_ENDPOINT өгвөл NAS/MinIO руу шилжинэ', () => {
+  // Дэлгүүрийн NAS дээрх MinIO — код өөрчлөхгүйгээр зөвхөн орчны хувьсагчаар.
+  const config = readR2Config({
+    S3_ENDPOINT: 'https://s3.printmn.mn:9000/',
+    S3_REGION: 'us-east-1',
+    R2_ACCOUNT_ID: 'ignored',
+    R2_BUCKET: 'photos',
+    R2_ACCESS_KEY_ID: 'k',
+    R2_SECRET_ACCESS_KEY: 's',
+  })!;
+  assert.equal(config.host, 's3.printmn.mn:9000');
+  assert.equal(config.protocol, 'https');
+  assert.equal(config.region, 'us-east-1');
+});
+
+test('http:// endpoint-ийг хүлээж авна (зөвхөн дотоод сүлжээнд)', () => {
+  const config = readR2Config({
+    S3_ENDPOINT: 'http://192.168.1.50:9000',
+    R2_BUCKET: 'photos',
+    R2_ACCESS_KEY_ID: 'k',
+    R2_SECRET_ACCESS_KEY: 's',
+  })!;
+  assert.equal(config.protocol, 'http');
+  assert.equal(config.host, '192.168.1.50:9000');
+});
+
+test('өөр endpoint/бүс дээр гарын үсэг өөр гарна', async () => {
+  const nas = { ...R2, host: 's3.printmn.mn:9000', region: 'us-east-1' };
+  const a = await presign(R2, 'PUT', 'k/1.jpg', 900, NOW);
+  const b = await presign(nas, 'PUT', 'k/1.jpg', 900, NOW);
+
+  assert.ok(b.startsWith('https://s3.printmn.mn:9000/printmn/k/1.jpg?'));
+  assert.ok(new URL(b).searchParams.get('X-Amz-Credential')?.includes('/us-east-1/s3/'));
+  assert.notEqual(
+    new URL(a).searchParams.get('X-Amz-Signature'),
+    new URL(b).searchParams.get('X-Amz-Signature'),
+  );
 });

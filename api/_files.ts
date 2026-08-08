@@ -6,6 +6,7 @@
  */
 
 import { ValidationError } from './_shared';
+import type { PaymentInfo } from './_payment';
 
 // ── Хязгаарууд ─────────────────────────────────────────────────────
 
@@ -124,7 +125,6 @@ export interface ManifestFile {
   serviceId: number;
   sizeLabel: string;
   qty: number;
-  finish: string;
 }
 
 export interface WebOrderManifest {
@@ -136,6 +136,11 @@ export interface WebOrderManifest {
   total: number;
   lines: { name: string; qty: number; total: number }[];
   files: ManifestFile[];
+  /**
+   * Төлбөрийн төлөв. Хуучин manifest дээр байхгүй байж болзошгүй тул
+   * уншихдаа `isPaid()`-ыг ашиглана (`undefined` = төлөгдөөгүй).
+   */
+  payment?: PaymentInfo;
   /** Ажилтан хэвлэсэн гэж тэмдэглэсэн хугацаа. */
   printedAt?: number;
 }
@@ -185,7 +190,6 @@ export function validateManifestFiles(
       serviceId: Number(file.serviceId) || 0,
       sizeLabel: clean(file.sizeLabel, 30),
       qty: Number.isInteger(qty) && qty > 0 ? qty : 1,
-      finish: clean(file.finish, 20),
     };
   });
 }

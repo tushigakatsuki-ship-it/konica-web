@@ -1,10 +1,15 @@
 /**
- * Cloudflare R2 (S3-тэй нийцтэй) руу хандах AWS SigV4 гарын үсэг.
+ * S3-тэй нийцтэй объект сан руу хандах AWS SigV4 гарын үсэг.
+ *
+ * Анхдагчаар Cloudflare R2 руу ярина, гэхдээ `S3_ENDPOINT` өгвөл ДУРЫН
+ * S3-нийцтэй сан руу шилжинэ: дэлгүүрийн NAS дээрх MinIO, Synology C2, Backblaze
+ * B2, AWS S3. Ингэснээр «үүлэн сан уу, өөрийн төхөөрөмж үү» гэдэг шийдвэрийг
+ * дараа нь ч эргүүлж болно — код өөрчлөгдөхгүй, зөвхөн орчны хувьсагч солигдоно.
  *
  * Яагаад SDK биш вэ: `@aws-sdk/*` нь edge bundle-д хэдэн зуун KB нэмдэг бөгөөд
  * бидэнд ердөө гурван үйлдэл хэрэгтэй — presigned PUT/GET URL үүсгэх, мөн
  * ListObjectsV2 / PutObject-ыг серверээс дуудах. Vercel edge runtime WebCrypto-той
- * тул бүгдийг 150 орчим мөрөнд багтаана.
+ * тул бүгдийг 200 орчим мөрөнд багтаана.
  *
  * ⚠️ `R2_SECRET_ACCESS_KEY` бол бүрэн эрх. Зөвхөн серверийн орчинд амьдарна —
  * `VITE_` угтвартай нэрээр ХЭЗЭЭ Ч бүү тавь.
@@ -12,7 +17,6 @@
 
 const ALGORITHM = 'AWS4-HMAC-SHA256';
 const SERVICE = 's3';
-const REGION = 'auto';
 const UNSIGNED = 'UNSIGNED-PAYLOAD';
 /** Хоосон биеийн SHA-256 — GET/HEAD хүсэлтэд хэрэглэнэ. */
 const EMPTY_SHA256 =
@@ -21,23 +25,46 @@ const EMPTY_SHA256 =
 const encoder = new TextEncoder();
 
 export interface R2Config {
-  accountId: string;
+  /** Схемгүй хост: `acct.r2.cloudflarestorage.com`, `s3.printmn.mn:9000`. */
+  host: string;
+  /** Дотоод сүлжээнд туршихад л `http` — интернэтэд ЗААВАЛ `https`. */
+  protocol: 'https' | 'http';
   bucket: string;
+  /** R2 үргэлж `auto`; MinIO/AWS-д тохируулсан бүсээ өгнө. */
+  region: string;
   accessKeyId: string;
   secretAccessKey: string;
 }
 
 export const readR2Config = (env: Record<string, string | undefined>): R2Config | null => {
-  const accountId = env.R2_ACCOUNT_ID ?? '';
   const bucket = env.R2_BUCKET ?? '';
   const accessKeyId = env.R2_ACCESS_KEY_ID ?? '';
   const secretAccessKey = env.R2_SECRET_ACCESS_KEY ?? '';
-  if (!accountId || !bucket || !accessKeyId || !secretAccessKey) return null;
-  return { accountId, bucket, accessKeyId, secretAccessKey };
+  if (!bucket || !accessKeyId || !secretAccessKey) return null;
+
+  // `S3_ENDPOINT` давуу эрхтэй; байхгүй бол R2-ийн стандарт хаягийг угсарна.
+  const raw = (env.S3_ENDPOINT ?? '').trim();
+  const accountId = env.R2_ACCOUNT_ID ?? '';
+  if (!raw && !accountId) return null;
+
+  const protocol = raw.startsWith('http://') ? 'http' : 'https';
+  const host = raw
+    ? raw.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+    : `${accountId}.r2.cloudflarestorage.com`;
+
+  return {
+    host,
+    protocol,
+    bucket,
+    region: env.S3_REGION ?? 'auto',
+    accessKeyId,
+    secretAccessKey,
+  };
 };
 
-export const endpointHost = (config: R2Config): string =>
-  `${config.accountId}.r2.cloudflarestorage.com`;
+export const endpointHost = (config: R2Config): string => config.host;
+
+const origin = (config: R2Config): string => `${config.protocol}://${config.host}`;
 
 // ── Криптографийн туслахууд ────────────────────────────────────────
 
@@ -84,9 +111,10 @@ export const amzDates = (now: Date): { amzDate: string; dateStamp: string } => {
 const signingKey = async (
   secret: string,
   dateStamp: string,
+  region: string,
 ): Promise<ArrayBuffer> => {
   let key: ArrayBuffer | Uint8Array = encoder.encode(`AWS4${secret}`);
-  for (const part of [dateStamp, REGION, SERVICE, 'aws4_request']) {
+  for (const part of [dateStamp, region, SERVICE, 'aws4_request']) {
     key = await hmac(key, part);
   }
   return key as ArrayBuffer;
@@ -114,13 +142,13 @@ export async function presign(
   expiresIn: number,
   now: Date = new Date(),
 ): Promise<string> {
-  const host = endpointHost(config);
+  const host = config.host;
   const { amzDate, dateStamp } = amzDates(now);
-  const credential = `${config.accessKeyId}/${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
+  const scope = `${dateStamp}/${config.region}/${SERVICE}/aws4_request`;
 
   const params: Record<string, string> = {
     'X-Amz-Algorithm': ALGORITHM,
-    'X-Amz-Credential': credential,
+    'X-Amz-Credential': `${config.accessKeyId}/${scope}`,
     'X-Amz-Date': amzDate,
     'X-Amz-Expires': String(expiresIn),
     'X-Amz-SignedHeaders': 'host',
@@ -138,16 +166,16 @@ export async function presign(
     UNSIGNED,
   ].join('\n');
 
-  const stringToSign = [
-    ALGORITHM,
-    amzDate,
-    `${dateStamp}/${REGION}/${SERVICE}/aws4_request`,
-    await sha256Hex(canonicalRequest),
-  ].join('\n');
+  const stringToSign = [ALGORITHM, amzDate, scope, await sha256Hex(canonicalRequest)].join('\n');
 
-  const signature = hex(await hmac(await signingKey(config.secretAccessKey, dateStamp), stringToSign));
+  const signature = hex(
+    await hmac(
+      await signingKey(config.secretAccessKey, dateStamp, config.region),
+      stringToSign,
+    ),
+  );
 
-  return `https://${host}${path}?${query}&X-Amz-Signature=${signature}`;
+  return `${origin(config)}${path}?${query}&X-Amz-Signature=${signature}`;
 }
 
 // ── 2. Серверээс хийх гарын үсэгтэй хүсэлт (Authorization толгой) ──
@@ -173,8 +201,9 @@ export async function signRequest(
   } = {},
 ): Promise<SignedRequest> {
   const now = options.now ?? new Date();
-  const host = endpointHost(config);
+  const host = config.host;
   const { amzDate, dateStamp } = amzDates(now);
+  const scope = `${dateStamp}/${config.region}/${SERVICE}/aws4_request`;
   const payloadHash = options.body ? await sha256Hex(options.body) : EMPTY_SHA256;
 
   const headers: Record<string, string> = {
@@ -197,23 +226,21 @@ export async function signRequest(
     payloadHash,
   ].join('\n');
 
-  const stringToSign = [
-    ALGORITHM,
-    amzDate,
-    `${dateStamp}/${REGION}/${SERVICE}/aws4_request`,
-    await sha256Hex(canonicalRequest),
-  ].join('\n');
+  const stringToSign = [ALGORITHM, amzDate, scope, await sha256Hex(canonicalRequest)].join('\n');
 
   const signature = hex(
-    await hmac(await signingKey(config.secretAccessKey, dateStamp), stringToSign),
+    await hmac(
+      await signingKey(config.secretAccessKey, dateStamp, config.region),
+      stringToSign,
+    ),
   );
 
   return {
-    url: `https://${host}${path}${query ? `?${query}` : ''}`,
+    url: `${origin(config)}${path}${query ? `?${query}` : ''}`,
     headers: {
       ...headers,
       Authorization:
-        `${ALGORITHM} Credential=${config.accessKeyId}/${dateStamp}/${REGION}/${SERVICE}/aws4_request, ` +
+        `${ALGORITHM} Credential=${config.accessKeyId}/${scope}, ` +
         `SignedHeaders=${signedHeaders.join(';')}, Signature=${signature}`,
     },
   };

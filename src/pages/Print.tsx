@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
+import LastOrderBanner from '../components/LastOrderBanner';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
-import { isEdited } from '../lib/photoEdit';
 import { fitBox, recommendedPixels, sizeOf } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
@@ -56,17 +56,21 @@ export default function Print() {
     setEditorFor(null);
   };
 
-  const withoutPhoto = basket.items.filter((item) => !item.value.src).length;
+  const withoutPhoto = basket.items.filter((item) => !item.value.file).length;
 
   return (
     <>
       <PageHero
         eyebrow="Хэвлэл"
         title="Хэмжээгээ сонгоод зургаа оруул"
-        subtitle="Хэмжээ бүрийн үнэ шууд харагдана. Хэмжээ дээрээ дарж зургаа оруулаад тэндээ тайрч, эргүүлж, өнгийг нь тохируулна."
+        subtitle="Хэмжээ бүрийн үнэ шууд харагдана. Хэмжээ дээрээ дараад зургаа оруулж, хэдэн ширхэг хэвлэхээ л сонгоно."
       />
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
+        <div className="mb-6 empty:hidden">
+          <LastOrderBanner />
+        </div>
+
         {/* Табууд — утсан дээр хэвтээ гүйлгэнэ */}
         <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
@@ -191,9 +195,7 @@ export default function Print() {
                             </button>
                           </div>
                           <p className="truncate text-[11px] text-muted">
-                            {item.value.src ? item.value.edits.finish : '⚠️ зураггүй'}
-                            {item.value.fileName && ` · ${item.value.fileName}`}
-                            {isEdited(item.value.edits) && ' · засвартай'}
+                            {item.value.fileName ?? '⚠️ зураг ороогүй'}
                           </p>
 
                           <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -230,7 +232,7 @@ export default function Print() {
                             }
                             className="mt-1.5 text-xs font-semibold text-brand-500 hover:underline"
                           >
-                            {item.value.src ? 'Зураг засах →' : 'Зураг нэмэх →'}
+                            {item.value.file ? 'Зураг засах →' : 'Зураг нэмэх →'}
                           </button>
                         </div>
                       </li>
@@ -282,14 +284,14 @@ export default function Print() {
                 text: 'Карт бүр дээр тухайн хэмжээнд тохирох пикселийн доод хэмжээг бичсэн байгаа.',
               },
               {
-                icon: '🎨',
-                title: 'Өнгө',
-                text: 'sRGB профайл. Хэт харанхуй зургийг засварын хэсэгт гэрэлтүүлгээр нь тохируулна.',
-              },
-              {
                 icon: '✂️',
                 title: 'Тайралт',
-                text: 'Хүрээн доторх зүйл л хэвлэгдэнэ. Ирмэг дээрх чухал хэсгийг чирж дотогш аваарай.',
+                text: 'Зураг цаасны харьцаанд төвөөрөө багтана. Урьдчилсан харагдац дээрх зүйл л хэвлэгдэнэ.',
+              },
+              {
+                icon: '🎨',
+                title: 'Өнгө',
+                text: 'sRGB профайл. Хэт харанхуй эсвэл бүдэг зургийг ажилтан утсаар тохирч засаж өгнө.',
               },
             ].map((tip) => (
               <div key={tip.title} className="rounded-lg bg-brand-50/60 p-5 sm:p-6">

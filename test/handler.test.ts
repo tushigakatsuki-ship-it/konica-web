@@ -243,7 +243,6 @@ test('өөр байршуулалтын түлхүүр агуулсан захи
             serviceId: 103,
             sizeLabel: '10×15 см',
             qty: 1,
-            finish: 'Гялгар',
           },
         ],
       }),
@@ -254,7 +253,7 @@ test('өөр байршуулалтын түлхүүр агуулсан захи
   assert.match(body.error, /хаяг буруу/);
 });
 
-test('R2 тохируулаагүй үед захиалга хадгалагдаж, filesSaved=false ирнэ', async () => {
+test('зургийн сан тохируулаагүй ч захиалга хэвийн үүсч, photos=unavailable ирнэ', async () => {
   captured = [];
   const response = await handler(
     post(
@@ -270,18 +269,25 @@ test('R2 тохируулаагүй үед захиалга хадгалагда
             serviceId: 103,
             sizeLabel: '10×15 см',
             qty: 1,
-            finish: 'Гялгар',
           },
         ],
       }),
     ),
   );
 
-  // Зураг бүртгэгдээгүй ч захиалга алдагдахгүй — хэрэглэгчийг дахин илгээхэд
-  // хүргэвэл орлого давхардана.
+  /*
+   * Хамгийн чухал шалгалт: R2/NAS хараахан холбогдоогүй байхад ч захиалга
+   * ҮҮСЭХ ёстой. Эс тэгвээс сан асаах хүртэл вэбээр огт захиалга авах
+   * боломжгүй болно.
+   */
   assert.equal(response.status, 201);
-  const body = (await response.json()) as { filesSaved: boolean };
-  assert.equal(body.filesSaved, false);
+  const body = (await response.json()) as {
+    photos: string;
+    payment: { tracking: unknown } | null;
+  };
+  assert.equal(body.photos, 'unavailable');
+  // Manifest байхгүй тул төлбөрийн төлвийг автоматаар хянах боломжгүй.
+  assert.equal(body.payment?.tracking, null);
 
   const patch = captured.find((c) => c.method === 'PATCH');
   const worklog = Object.entries(patch?.body ?? {}).find(([path]) =>
@@ -290,8 +296,62 @@ test('R2 тохируулаагүй үед захиалга хадгалагда
   assert.match((worklog?.[1] as { note: string }).note, /1 зураг вэбээр ирсэн/);
 });
 
-test('зураггүй захиалга filesSaved=true', async () => {
+test('зураггүй захиалга photos=none', async () => {
   const response = await handler(post(validBody));
-  const body = (await response.json()) as { filesSaved: boolean };
-  assert.equal(body.filesSaved, true);
+  const body = (await response.json()) as { photos: string };
+  assert.equal(body.photos, 'none');
+});
+
+test('дансны заавар нь зургийн сангаас хамаарахгүй үргэлж буцна', async () => {
+  process.env.BANK_NAME = 'Хаан банк';
+  process.env.BANK_ACCOUNT = '5001234567';
+
+  const response = await handler(post(validBody));
+  const body = (await response.json()) as {
+    payment: { bank: { account: string; reference: string } | null; amount: number };
+    orderNumber: string;
+  };
+
+  assert.equal(body.payment.bank?.account, '5001234567');
+  // Гүйлгээний утга нь ЗААВАЛ захиалгын дугаар — эс тэгвээс аль захиалгынх
+  // болохыг таних боломжгүй.
+  assert.equal(body.payment.bank?.reference, body.orderNumber);
+
+  delete process.env.BANK_NAME;
+  delete process.env.BANK_ACCOUNT;
+});
+
+/* ── Давхар захиалгаас хамгаалах ──────────────────────────────────── */
+
+test('ижил requestId-тай хоёр дахь хүсэлт ШИНЭ захиалга үүсгэхгүй', async () => {
+  captured = [];
+  const requestId = 'req-abc12345-double-submit';
+  const body = { ...validBody, requestId };
+
+  const first = (await (await handler(post(body))).json()) as { orderNumber: string };
+  const patchesAfterFirst = captured.filter((c) => c.method === 'PATCH').length;
+
+  const second = (await (await handler(post(body))).json()) as { orderNumber: string };
+  const patchesAfterSecond = captured.filter((c) => c.method === 'PATCH').length;
+
+  // Хамгийн чухал нь: Firebase рүү дахин бичээгүй байх. Эс тэгвээс өдрийн касс
+  // болон ажлын самбар давхардаж, ажилтан хоёр удаа хэвлэх эрсдэлтэй.
+  assert.equal(patchesAfterSecond, patchesAfterFirst);
+  assert.equal(second.orderNumber, first.orderNumber);
+});
+
+test('өөр requestId бол тусдаа захиалга', async () => {
+  const a = (await (
+    await handler(post({ ...validBody, requestId: 'req-first-00000001' }))
+  ).json()) as { orderNumber: string };
+  const b = (await (
+    await handler(post({ ...validBody, requestId: 'req-second-0000002' }))
+  ).json()) as { orderNumber: string };
+
+  assert.notEqual(a.orderNumber, b.orderNumber);
+});
+
+test('хэлбэр нь буруу requestId-г үл тоомсорлоно (захиалга хэвийн үүснэ)', async () => {
+  const response = await handler(post({ ...validBody, requestId: 'x' }));
+  assert.equal(response.status, 201);
 });

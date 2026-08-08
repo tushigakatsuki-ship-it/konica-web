@@ -19,8 +19,16 @@ interface AdminFile {
   size: number;
   sizeLabel: string;
   qty: number;
-  finish: string;
-  url: string;
+  /** Төлбөр баталгаажаагүй бол сервер линк ОГТ буцаадаггүй. */
+  url: string | null;
+}
+
+interface AdminPayment {
+  status: 'pending' | 'paid';
+  amount: number;
+  method: 'qpay' | 'manual' | null;
+  paidAt?: number;
+  note?: string;
 }
 
 interface AdminOrder {
@@ -32,8 +40,11 @@ interface AdminOrder {
   total: number;
   lines: { name: string; qty: number; total: number }[];
   files: AdminFile[];
+  payment?: AdminPayment;
   printedAt?: number;
 }
+
+const isPaid = (order: AdminOrder): boolean => order.payment?.status === 'paid';
 
 const mb = (bytes: number): string => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 
@@ -97,7 +108,9 @@ export default function Admin() {
    * татах нь 20 зурагтай захиалганд ажиллахгүй.
    */
   const downloadAll = async (order: AdminOrder, kind?: 'print' | 'original') => {
-    const wanted = kind ? order.files.filter((f) => f.kind === kind) : order.files;
+    const wanted = (kind ? order.files.filter((f) => f.kind === kind) : order.files).filter(
+      (f): f is AdminFile & { url: string } => Boolean(f.url),
+    );
     if (wanted.length === 0) return;
 
     setBusy(order.manifestKey);
@@ -122,25 +135,29 @@ export default function Admin() {
     }
   };
 
-  const togglePrinted = async (order: AdminOrder) => {
+  /** Захиалгын аль нэг талбарыг сервер дээр өөрчлөөд хариуг нь тусгана. */
+  const patchOrder = async (order: AdminOrder, body: Record<string, unknown>) => {
     setBusy(order.manifestKey);
     try {
       const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-admin-token': token },
-        body: JSON.stringify({
-          action: 'mark',
-          manifestKey: order.manifestKey,
-          printed: !order.printedAt,
-        }),
+        body: JSON.stringify({ ...body, manifestKey: order.manifestKey }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error ?? 'Хадгалж чадсангүй.');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error ?? 'Хадгалж чадсангүй.');
+
       setOrders(
         (list) =>
           list?.map((o) =>
             o.manifestKey === order.manifestKey
-              ? { ...o, printedAt: body.printedAt ?? undefined }
+              ? {
+                  ...o,
+                  printedAt: result.printedAt ?? undefined,
+                  payment: result.payment ?? o.payment,
+                  // Төлбөр баталгаажсаны дараа сервер шинэ линкүүд буцаадаг.
+                  files: (result.files as AdminFile[] | undefined) ?? o.files,
+                }
               : o,
           ) ?? null,
       );
@@ -150,6 +167,16 @@ export default function Admin() {
       setBusy(null);
     }
   };
+
+  /**
+   * Гараар төлбөр баталгаажуулах — данс руу шилжүүлэг орсныг ажилтан харсан үед.
+   * QPay-ээр төлсөн бол callback өөрөө тэмдэглэсэн байна.
+   */
+  const setPaid = (order: AdminOrder, paid: boolean) =>
+    patchOrder(order, { action: 'pay', paid });
+
+  const togglePrinted = (order: AdminOrder) =>
+    patchOrder(order, { action: 'mark', printed: !order.printedAt });
 
   // ── Нэвтрэх ──────────────────────────────────────────────────────
   if (!token) {
@@ -237,6 +264,16 @@ export default function Admin() {
               <div className="min-w-0">
                 <p className="text-base font-black">
                   {order.orderNumber}
+                  {isPaid(order) ? (
+                    <span className="ml-2 rounded-sm bg-ok/15 px-2 py-0.5 text-[11px] font-bold text-ok-strong">
+                      төлсөн
+                      {order.payment?.method === 'qpay' && ' · QPay'}
+                    </span>
+                  ) : (
+                    <span className="ml-2 rounded-sm bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-accent-strong">
+                      ⏳ төлбөр хүлээгдэж байна
+                    </span>
+                  )}
                   {order.printedAt && (
                     <span className="ml-2 rounded-sm bg-ok/15 px-2 py-0.5 text-[11px] font-bold text-ok-strong">
                       хэвлэсэн
@@ -257,35 +294,67 @@ export default function Admin() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busy === order.manifestKey}
-                  onClick={() => void downloadAll(order, 'print')}
-                  className="btn-accent !px-4 !py-2 !text-xs"
-                >
-                  ⬇ Хэвлэх файлууд
-                </button>
-                <button
-                  type="button"
-                  disabled={busy === order.manifestKey}
-                  onClick={() => void downloadAll(order)}
-                  className="btn-outline !px-4 !py-2 !text-xs"
-                >
-                  Бүгд ZIP
-                </button>
-                <button
-                  type="button"
-                  disabled={busy === order.manifestKey}
-                  onClick={() => void togglePrinted(order)}
-                  className="btn-outline !px-4 !py-2 !text-xs"
-                >
-                  {order.printedAt ? '↩ Буцаах' : '✓ Хэвлэсэн'}
-                </button>
+                {isPaid(order) ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busy === order.manifestKey}
+                      onClick={() => void downloadAll(order, 'print')}
+                      className="btn-accent !px-4 !py-2 !text-xs"
+                    >
+                      ⬇ Хэвлэх файлууд
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === order.manifestKey}
+                      onClick={() => void downloadAll(order)}
+                      className="btn-outline !px-4 !py-2 !text-xs"
+                    >
+                      Бүгд ZIP
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === order.manifestKey}
+                      onClick={() => void togglePrinted(order)}
+                      className="btn-outline !px-4 !py-2 !text-xs"
+                    >
+                      {order.printedAt ? '↩ Буцаах' : '✓ Хэвлэсэн'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy === order.manifestKey}
+                    onClick={() => void setPaid(order, true)}
+                    className="btn-accent !px-4 !py-2 !text-xs"
+                  >
+                    ✓ Төлбөр орсон
+                  </button>
+                )}
               </div>
             </div>
 
+            {isPaid(order) && order.payment?.method === 'manual' && (
+              <button
+                type="button"
+                disabled={busy === order.manifestKey}
+                onClick={() => void setPaid(order, false)}
+                className="mt-2 text-xs text-muted hover:text-ink"
+              >
+                Төлбөрийн тэмдэглэгээг буцаах
+              </button>
+            )}
+
             {busy === order.manifestKey && (
               <p className="mt-3 text-xs text-muted">Ажиллаж байна…</p>
+            )}
+
+            {!isPaid(order) && (
+              <p className="mt-3 rounded-md bg-accent/10 px-3 py-2.5 text-xs leading-relaxed text-accent-strong">
+                🔒 {order.files.filter((f) => f.kind === 'print').length} зураг ирсэн ч
+                төлбөр баталгаажаагүй тул татах боломжгүй. Данс руу шилжүүлэг орсныг
+                хараад «Төлбөр орсон» дарна уу. QPay-ээр төлсөн бол автоматаар нээгдэнэ.
+              </p>
             )}
 
             <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
@@ -299,34 +368,40 @@ export default function Admin() {
                   );
                   return (
                     <li key={file.key} className="card p-2">
-                      <a href={file.url} download={file.name} className="block">
-                        <img
-                          src={file.url}
-                          alt={file.name}
-                          loading="lazy"
-                          className="aspect-square w-full rounded-sm bg-brand-50 object-cover"
-                        />
-                      </a>
+                      {file.url ? (
+                        <a href={file.url} download={file.name} className="block">
+                          <img
+                            src={file.url}
+                            alt={file.name}
+                            loading="lazy"
+                            className="aspect-square w-full rounded-sm bg-brand-50 object-cover"
+                          />
+                        </a>
+                      ) : (
+                        <span className="grid aspect-square w-full place-items-center rounded-sm bg-brand-50 text-2xl">
+                          <span aria-hidden>🔒</span>
+                        </span>
+                      )}
                       <p className="mt-1.5 text-xs font-bold">
                         {file.sizeLabel} × {file.qty}
                       </p>
-                      <p className="text-[11px] text-muted">
-                        {file.finish} · {mb(file.size)}
-                      </p>
-                      <div className="mt-1 flex gap-2 text-[11px] font-semibold">
-                        <a href={file.url} download={file.name} className="text-brand-500">
-                          Хэвлэх
-                        </a>
-                        {original && (
-                          <a
-                            href={original.url}
-                            download={original.name}
-                            className="text-muted hover:text-ink"
-                          >
-                            Эх
+                      <p className="text-[11px] text-muted">{mb(file.size)}</p>
+                      {file.url && (
+                        <div className="mt-1 flex gap-2 text-[11px] font-semibold">
+                          <a href={file.url} download={file.name} className="text-brand-500">
+                            Хэвлэх
                           </a>
-                        )}
-                      </div>
+                          {original?.url && (
+                            <a
+                              href={original.url}
+                              download={original.name}
+                              className="text-muted hover:text-ink"
+                            >
+                              Эх
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

@@ -4,6 +4,8 @@ import {
   type WebOrderManifest,
 } from './_files';
 import { getObject, listKeys, presign, putObject, readR2Config } from './_r2';
+import { isPaid } from './_payment';
+import { notify, paidText } from './_notify';
 
 /**
  * /api/admin — ажилтны хуудсыг тэжээнэ.
@@ -67,9 +69,15 @@ export default async function handler(request: Request): Promise<Response> {
   const r2 = readR2Config(process.env as Record<string, string | undefined>);
   if (!r2) return json({ error: 'Зургийн сан тохируулагдаагүй байна.' }, 503);
 
-  // ── Хэвлэсэн гэж тэмдэглэх ───────────────────────────────────────
+  // ── Тэмдэглэх: хэвлэсэн / төлбөр орсон ───────────────────────────
   if (request.method === 'POST') {
-    let body: { action?: string; manifestKey?: string; printed?: boolean };
+    let body: {
+      action?: string;
+      manifestKey?: string;
+      printed?: boolean;
+      paid?: boolean;
+      note?: string;
+    };
     try {
       body = JSON.parse(await request.text());
     } catch {
@@ -77,20 +85,76 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const key = String(body.manifestKey ?? '');
-    if (body.action !== 'mark' || !parseManifestKey(key))
+    if (!parseManifestKey(key) || (body.action !== 'mark' && body.action !== 'pay'))
       return json({ error: 'Хүсэлт буруу байна.' }, 400);
 
     const raw = await getObject(r2, key);
     if (!raw) return json({ error: 'Захиалга олдсонгүй.' }, 404);
 
     const manifest = JSON.parse(raw) as WebOrderManifest;
-    if (body.printed) manifest.printedAt = Date.now();
-    else delete manifest.printedAt;
 
-    const ok = await putObject(r2, key, JSON.stringify(manifest));
-    return ok
-      ? json({ printedAt: manifest.printedAt ?? null }, 200)
-      : json({ error: 'Хадгалж чадсангүй.' }, 502);
+    if (body.action === 'pay') {
+      /*
+       * Гараар баталгаажуулах — данс руу шилжүүлэг хийсэн тохиолдолд.
+       * QPay-ээр төлөгдсөн бол `paidAt` аль хэдийн тавигдсан байна.
+       */
+      const amount = manifest.payment?.amount ?? manifest.total;
+      manifest.payment = body.paid
+        ? {
+            ...(manifest.payment ?? { amount, method: null }),
+            status: 'paid',
+            method: manifest.payment?.method ?? 'manual',
+            paidAt: Date.now(),
+            note: String(body.note ?? '').slice(0, 200) || undefined,
+          }
+        : { ...(manifest.payment ?? { amount, method: null }), status: 'pending', paidAt: undefined };
+    } else if (body.printed) {
+      manifest.printedAt = Date.now();
+    } else {
+      delete manifest.printedAt;
+    }
+
+    if (!(await putObject(r2, key, JSON.stringify(manifest))))
+      return json({ error: 'Хадгалж чадсангүй.' }, 502);
+
+    /*
+     * Гараар баталгаажуулсныг мөн Telegram руу мэдэгдэнэ — нэг ажилтан
+     * дансаа шалгаж тэмдэглэхэд нөгөө нь хэвлэж эхлэх боломжтой болно.
+     */
+    if (body.action === 'pay' && body.paid) {
+      await notify(
+        paidText({
+          orderNumber: manifest.orderNumber,
+          amount: manifest.payment?.amount ?? manifest.total,
+          photoCount: manifest.files.filter((file) => file.kind === 'print').length,
+          customer: manifest.customer.name,
+          phone: manifest.customer.phone,
+          method: manifest.payment?.method ?? 'manual',
+        }),
+      );
+    }
+
+    /*
+     * Төлбөр саяхан баталгаажсан бол тухайн захиалгын татах линкүүдийг
+     * шууд буцаана — ажилтан хуудсаа дахин ачаалах шаардлагагүй.
+     */
+    const files = isPaid(manifest.payment)
+      ? await Promise.all(
+          manifest.files.map(async (file) => ({
+            ...file,
+            url: await presign(r2, 'GET', file.key, GET_EXPIRES_SEC),
+          })),
+        )
+      : manifest.files.map((file) => ({ ...file, url: null }));
+
+    return json(
+      {
+        printedAt: manifest.printedAt ?? null,
+        payment: manifest.payment ?? null,
+        files,
+      },
+      200,
+    );
   }
 
   if (request.method !== 'GET') return json({ error: 'GET эсвэл POST.' }, 405);
@@ -112,10 +176,20 @@ export default async function handler(request: Request): Promise<Response> {
         if (!raw) return null;
         try {
           const manifest = JSON.parse(raw) as WebOrderManifest;
+
+          /*
+           * ⚠️ Төлбөр баталгаажаагүй бол татах линк ОГТ үүсгэхгүй.
+           *
+           * Түгжээг интерфейсийн түвшинд («товчийг идэвхгүй болгох») тавьвал
+           * DevTools нээсэн хэн ч тойрч гарна. Тиймээс линк нь сервер дээр,
+           * үүсгэх үе шат дээрээ таслагдана — төлөөгүй захиалгын зураг руу
+           * хүрэх ямар ч хаяг браузерт ирэхгүй.
+           */
+          const paid = isPaid(manifest.payment);
           const files = await Promise.all(
             manifest.files.map(async (file) => ({
               ...file,
-              url: await presign(r2, 'GET', file.key, GET_EXPIRES_SEC),
+              url: paid ? await presign(r2, 'GET', file.key, GET_EXPIRES_SEC) : null,
             })),
           );
           return { ...manifest, manifestKey: key, files };
