@@ -14,8 +14,11 @@ import {
   SHEET,
   applyBackground,
   backgroundMask,
+  autoWhiteBalance,
   fitBackdrop,
+  PURPOSES,
   type Backdrop,
+  type PurposeKey,
   cmToPx,
   cropForFace,
   featherMask,
@@ -24,6 +27,7 @@ import {
   type IdSize,
 } from '../lib/idPhoto';
 import { detectFace, type FaceResult } from '../lib/faceDetect';
+import { modelReady, segmentWithModel } from '../lib/segment';
 import { decodeImage } from '../lib/photoRender';
 
 /**
@@ -82,13 +86,25 @@ export default function IdPhotoStudio() {
   const [clamped, setClamped] = useState(false);
   /** Дэвсгэр жигд бус тул хавтгайн загварт итгээгүй. */
   const [messyBackdrop, setMessyBackdrop] = useState(false);
+  /** Зургийн зорилго — баримтад засвар хаалттай. */
+  const [purposeKey, setPurposeKey] = useState<PurposeKey>('document');
+  /** U²-Net загвар суулгагдсан эсэх. Байхгүй бол силуэт ажиллана. */
+  const [hasModel, setHasModel] = useState(false);
+  /** Хамгийн сүүлд аль хөдөлгүүр ажиллав. */
+  const [engine, setEngine] = useState<'silhouette' | 'u2net'>('silhouette');
   const [busy, setBusy] = useState(false);
 
   const layout = useMemo(() => sheetLayout(size), [size]);
   const background = BACKGROUNDS.find((b) => b.key === bgKey) ?? BACKGROUNDS[0];
   const removeBg = background.rgb !== null;
 
+  const purpose = PURPOSES.find((p) => p.key === purposeKey) ?? PURPOSES[0];
+
   useEffect(() => setCopies(layout.count), [layout.count]);
+  // Загварыг арын дэвсгэрт шалгана — байхгүй бол интерфейс тайван үлдэнэ.
+  useEffect(() => {
+    void modelReady().then(setHasModel);
+  }, []);
   useEffect(() => () => closeRef.current?.(), []);
 
   /** Илэрсэн нүүрээс сонгосон хэмжээний дагуу хүрээг дахин тооцно. */
@@ -108,7 +124,7 @@ export default function IdPhotoStudio() {
 
   /** Зургийн тайрсан хэсгийг canvas дээр буулгаж, дэвсгэрийг солино. */
   const drawPhoto = useCallback(
-    (canvas: HTMLCanvasElement, outH: number): void => {
+    async (canvas: HTMLCanvasElement, outH: number): Promise<void> => {
       const source = sourceRef.current;
       if (!source || !crop) return;
 
@@ -136,9 +152,29 @@ export default function IdPhotoStudio() {
       const backdrop = fitBackdrop(image.data, outW, outH);
       backdropRef.current = backdrop;
 
-      const mask = backgroundMask(image.data, outW, outH, tolerance, undefined, { backdrop });
+      /*
+       * U²-Net загвар суулгагдсан бол түүнийг эхэлж оролдоно. Буржгар үс,
+       * нимгэн шилний ирмэгийг силуэтийн аргаас хамаагүй сайн барина.
+       *
+       * Загвар байхгүй, эсвэл ямар нэг алдаа гарвал `null` буцаана —
+       * силуэт ажилласаар. Ажилтан хэзээ ч зогсохгүй.
+       */
+      let mask = await segmentWithModel(image.data, outW, outH);
+      setEngine(mask ? 'u2net' : 'silhouette');
+      mask ??= backgroundMask(image.data, outW, outH, tolerance, undefined, { backdrop });
+
       // Радиус нь хэмжээтэй хамт өснө — 300dpi дээр 1px зөөлрөлт хангалтгүй.
       const soft = featherMask(mask, outW, outH, Math.max(1, Math.round(outH / 200)));
+
+      /*
+       * Цагаан баланс — дэвсгэрийг саарал карт болгож ашиглана.
+       *
+       * Дэвсгэр СОЛИГДОХООС ӨМНӨ хийх ёстой: солигдсоны дараа лавлагаа
+       * алга болно. Энэ нь үүсгэгч бус засвар тул баримтад ч зөвшөөрөгдөнө
+       * (`Purpose.allowRetouch` нь ЦАРАЙ өөрчлөх засварыг хаадаг).
+       */
+      autoWhiteBalance(image.data, soft);
+
       applyBackground(image.data, soft, background.rgb);
       ctx.putImageData(image, 0, 0);
     },
@@ -146,8 +182,11 @@ export default function IdPhotoStudio() {
   );
 
   useEffect(() => {
-    if (crop && previewRef.current) drawPhoto(previewRef.current, PREVIEW_H);
-    setMessyBackdrop(backdropRef.current?.uniform === false);
+    if (crop && previewRef.current) {
+      void drawPhoto(previewRef.current, PREVIEW_H).then(() => {
+        setMessyBackdrop(backdropRef.current?.uniform === false);
+      });
+    }
   }, [crop, drawPhoto]);
 
   /* ── Зураг оруулах → бүтэн урсгал ─────────────────────────────── */
@@ -232,7 +271,7 @@ export default function IdPhotoStudio() {
     setBusy(true);
     try {
       const photo = document.createElement('canvas');
-      drawPhoto(photo, cmToPx(size.h));
+      await drawPhoto(photo, cmToPx(size.h));
 
       const sheet = document.createElement('canvas');
       sheet.width = cmToPx(SHEET.w);
@@ -427,12 +466,63 @@ export default function IdPhotoStudio() {
                 Нүүр илэрч, стандартын дагуу таслагдлаа.
               </p>
             )}
+
+            {/*
+              * Аль хөдөлгүүр ажилласныг ил хэлнэ. Ажилтан үр дүн муу гарвал
+              * шалтгааныг таамаглах шаардлагагүй байх ёстой.
+              */}
+            {stage === 'ready' && removeBg && (
+              <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                Дэвсгэр салгалт:{' '}
+                <span className="font-semibold text-ink-soft">
+                  {engine === 'u2net' ? 'U²-Net загвар' : 'дүрсийн хүрээ'}
+                </span>
+                {engine === 'silhouette' && hasModel && ' (загвар ачаалагдсангүй)'}
+                {!hasModel && ' — загвар суулгаагүй'}
+              </p>
+            )}
           </div>
 
           {/* ── Тохиргоо ───────────────────────────────────────── */}
           <div className="space-y-6">
+            {/*
+              * Зорилго — техникийн биш, ЭРХ ЗҮЙН сонголт.
+              *
+              * Бичиг баримтын зураг бол хүнийг таних баримт. Царай, хувцсыг
+              * өөрчилсөн зураг тавих нь баримт гуйвуулсан хэрэг бөгөөд эрсдэл
+              * нь дэлгүүр дээр буудаг. Тиймээс энэ сонголт эхэнд байна.
+              */}
             <div>
-              <h2 className="text-sm font-bold">1. Хэмжээ</h2>
+              <h2 className="text-sm font-bold">1. Зорилго</h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {PURPOSES.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setPurposeKey(item.key)}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      item.key === purpose.key
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-brand-50 text-ink-soft hover:bg-brand-100'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted">{purpose.hint}</p>
+
+              {!purpose.allowRetouch && (
+                <p className="mt-2 flex items-start gap-2 rounded-md bg-brand-50 p-3 text-[11px] leading-relaxed text-ink-soft">
+                  <IconCheck className="mt-px size-4 shrink-0 text-ok-strong" />
+                  Тайралт, дэвсгэр солих, цагаан баланс л хийгдэнэ. Эдгээр нь
+                  хүний царайны бүтцийг өөрчилдөггүй.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-sm font-bold">2. Хэмжээ</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 {ID_SIZES.map((item) => (
                   <button
@@ -455,7 +545,7 @@ export default function IdPhotoStudio() {
             </div>
 
             <div>
-              <h2 className="text-sm font-bold">2. Дэвсгэр</h2>
+              <h2 className="text-sm font-bold">3. Дэвсгэр</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 {BACKGROUNDS.map((item) => (
                   <button
@@ -516,7 +606,7 @@ export default function IdPhotoStudio() {
             </div>
 
             <div>
-              <h2 className="text-sm font-bold">3. Хуудас</h2>
+              <h2 className="text-sm font-bold">4. Хуудас</h2>
               <dl className="mt-2 rounded-md bg-brand-50/70 px-3 py-2.5 text-xs">
                 <div className="flex justify-between py-0.5">
                   <dt className="text-muted">Цаас</dt>

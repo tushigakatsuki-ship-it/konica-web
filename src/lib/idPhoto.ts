@@ -768,3 +768,110 @@ export function cropForFace(
     clamped: tooBig || moved,
   };
 }
+
+/* ── Зорилго: баримт эсэх ─────────────────────────────────────────
+ *
+ * Энэ ялгаа нь техникийн биш, ЭРХ ЗҮЙН. Иргэний үнэмлэх, гадаад паспортын
+ * зураг бол хүнийг таних баримт. Царай, хувцсыг өөрчилсөн зураг тавих нь
+ * баримтыг гуйвуулсан хэрэг — эрсдэл нь зураг авсан дэлгүүр дээр буудаг.
+ *
+ * CV, LinkedIn, самбарын зурагт ижил засвар огт асуудалгүй, ашигтай ч.
+ *
+ * Тиймээс ялгаа нь ЗАГВАРТ биш, ХЭРЭГЛЭЭНД байна — код нь энэ ялгааг
+ * албадан барина.
+ * ────────────────────────────────────────────────────────────────── */
+
+export type PurposeKey = 'document' | 'general';
+
+export interface Purpose {
+  key: PurposeKey;
+  label: string;
+  hint: string;
+  /**
+   * Царай, хувцсыг ӨӨРЧИЛДӨГ засварыг зөвшөөрөх эсэх.
+   *
+   * ⚠️ Баримтад `false`. Үүнийг тойрч гарах зам байх ёсгүй — шинэ засвар
+   * нэмэх бүрд энэ тугийг шалгана.
+   */
+  allowRetouch: boolean;
+}
+
+export const PURPOSES: readonly Purpose[] = [
+  {
+    key: 'document',
+    label: 'Бичиг баримт',
+    hint: 'Иргэний үнэмлэх, гадаад паспорт, виз. Царай өөрчлөх засвар хаалттай.',
+    allowRetouch: false,
+  },
+  {
+    key: 'general',
+    label: 'Энгийн зураг',
+    hint: 'CV, самбар, хувийн хэрэглээ. Засвар зөвшөөрөгдөнө.',
+    allowRetouch: true,
+  },
+];
+
+/**
+ * Дэвсгэрийг САРААЛ КАРТ болгон өнгөний хазайлтыг арилгана.
+ *
+ * ── Яагаад энэ нь баримтад ч аюулгүй вэ ──────────────────────────
+ *
+ * Энэ бол **үүсгэгч бус** засвар. GFPGAN, CodeFormer зэрэг нь байхгүй
+ * нарийвчлалыг ЗОХИОДОГ — нүдний хэлбэр, сорви, арьсны бүтэц өөрчлөгдөнө.
+ * Энд тийм зүйл болохгүй: суваг бүрт ганц тогтмол коэффициент үржүүлнэ.
+ * Хүний царайны БҮТЭЦ хөндөгдөхгүй, зөвхөн гэрлийн өнгө засагдана.
+ *
+ * Гэрэл зурагт «саарал карт»-аар цагаан балансыг тааруулдаг зарчим яг энэ.
+ * Бидэнд карт бэлэн байгаа: дэвсгэр нь СААРАЛ БАЙХ ЁСТОЙ гэдгийг мэднэ
+ * (дэлгүүрийн шаардлага «цагаан эсвэл цайвар цэнхэр дэвсгэр»).
+ *
+ * Коэффициентийг хатуу хязгаарласан: маск буруу гарсан үед зургийг
+ * сүйтгэхээс сэргийлнэ.
+ */
+export function autoWhiteBalance(
+  data: Uint8ClampedArray,
+  mask: Uint8Array,
+  maxGain = 1.35,
+): { gain: [number, number, number]; applied: boolean } {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let n = 0;
+
+  for (let p = 0; p < mask.length; p += 1) {
+    if (mask[p] < 250) continue;
+    const i = p * 4;
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    n += 1;
+  }
+
+  // Дэвсгэр хэт бага бол лавлагаа найдваргүй — хөндөхгүй.
+  if (n < mask.length * 0.05) return { gain: [1, 1, 1], applied: false };
+
+  r /= n;
+  g /= n;
+  b /= n;
+  const target = (r + g + b) / 3;
+
+  const clamp = (v: number) => Math.min(maxGain, Math.max(1 / maxGain, v));
+  const gain: [number, number, number] = [
+    clamp(target / Math.max(1, r)),
+    clamp(target / Math.max(1, g)),
+    clamp(target / Math.max(1, b)),
+  ];
+
+  // Хазайлт мэдэгдэхүйц биш бол хөндөхгүй — шаардлагагүй засвар хийхгүй.
+  const drift = Math.max(...gain.map((v) => Math.abs(v - 1)));
+  if (drift < 0.01) return { gain: [1, 1, 1], applied: false };
+
+  for (let p = 0; p < mask.length; p += 1) {
+    const i = p * 4;
+    data[i] = Math.round(data[i] * gain[0]);
+    data[i + 1] = Math.round(data[i + 1] * gain[1]);
+    data[i + 2] = Math.round(data[i + 2] * gain[2]);
+  }
+
+  return { gain, applied: true };
+}

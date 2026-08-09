@@ -6,6 +6,8 @@ import {
   ID_SIZES,
   SHEET,
   applyBackground,
+  autoWhiteBalance,
+  PURPOSES,
   backgroundMask,
   borderColor,
   cmToPx,
@@ -500,4 +502,79 @@ test('зөөлөн ирмэг хэсэгчилсэн alpha өгнө — үс б�
     values.some((v) => v > 0 && v < 255),
     'шилжилтийн зурваст хэсэгчилсэн alpha алга',
   );
+});
+
+/* ── Цагаан баланс — үүсгэгч БУС засвар ──────────────────────────── */
+
+test('дэвсгэрийг саарал карт болгож өнгөний хазайлтыг арилгана', () => {
+  /*
+   * Дэвсгэр нь СААРАЛ БАЙХ ЁСТОЙ гэдгийг мэдэж байгаа тул түүнийг гэрэл
+   * зургийн «саарал карт» болгон ашиглаж болно. Энэ бол сурах бичгийн
+   * цагаан балансын арга — үүсгэгч загвар огт хэрэггүй.
+   */
+  const w = 20;
+  const h = 20;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const mask = new Uint8Array(w * h);
+
+  for (let p = 0; p < w * h; p += 1) {
+    const i = p * 4;
+    // Дэвсгэр нь шар туяатай: цэнхэр суваг дутуу.
+    data[i] = 240;
+    data[i + 1] = 230;
+    data[i + 2] = 190;
+    data[i + 3] = 255;
+    mask[p] = 255;
+  }
+
+  const before = data[2];
+  const { gain, applied } = autoWhiteBalance(data, mask);
+
+  assert.equal(applied, true, 'хазайлтыг олоогүй');
+  assert.ok(gain[2] > gain[0], 'цэнхэр сувгийг өсгөх ёстой');
+  assert.ok(data[2] > before, 'цэнхэр суваг өсөөгүй');
+});
+
+test('дэвсгэр хэт бага бол өнгийг ХӨНДӨХГҮЙ', () => {
+  /*
+   * Маск буруу гарсан үед лавлагаа найдваргүй. Тийм үед засвар хийвэл
+   * зургийг сүйтгэнэ — юу ч хийхгүй нь дээр.
+   */
+  const w = 20;
+  const h = 20;
+  const data = new Uint8ClampedArray(w * h * 4).fill(200);
+  const mask = new Uint8Array(w * h);
+  mask[0] = 255;
+
+  const { applied } = autoWhiteBalance(data, mask);
+  assert.equal(applied, false, 'найдваргүй лавлагаагаар засвар хийсэн');
+});
+
+test('коэффициент хатуу хязгаартай — зургийг сүйтгэхгүй', () => {
+  const w = 20;
+  const h = 20;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const mask = new Uint8Array(w * h).fill(255);
+
+  for (let p = 0; p < w * h; p += 1) {
+    const i = p * 4;
+    // Хэт туйлширсан хазайлт — коэффициент 200 гарах ёстой ч хязгаарлагдана.
+    data[i] = 250;
+    data[i + 1] = 250;
+    data[i + 2] = 1;
+    data[i + 3] = 255;
+  }
+
+  const { gain } = autoWhiteBalance(data, mask, 1.35);
+  assert.ok(Math.max(...gain) <= 1.35 + 1e-9, `хязгаар давсан: ${Math.max(...gain)}`);
+  assert.ok(Math.min(...gain) >= 1 / 1.35 - 1e-9, `хязгаар давсан: ${Math.min(...gain)}`);
+});
+
+test('баримтын горим засварыг хаана', () => {
+  const doc = PURPOSES.find((p) => p.key === 'document');
+  const general = PURPOSES.find((p) => p.key === 'general');
+
+  assert.ok(doc && general);
+  assert.equal(doc.allowRetouch, false, 'баримтад царай өөрчлөх засвар нээлттэй');
+  assert.equal(general.allowRetouch, true);
 });

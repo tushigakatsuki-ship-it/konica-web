@@ -244,3 +244,102 @@ test('зам бүр рүү орох гарц байна — хаягдсан х�
     `эдгээр хуудас руу орох холбоос байхгүй: ${orphans.join(', ')}`,
   );
 });
+
+test('арилжаанд хориотой загвар кодод ороогүй', () => {
+  /*
+   * ⚠️ ЭРХ ЗҮЙН ТҮГЖЭЭ — гүйцэтгэлийн биш.
+   *
+   * Дэлгүүр бол ХУДАЛДААНЫ байгууллага. Дараах загварууд нь худалдааны
+   * хэрэглээнд хориотой бөгөөд «сайхан ажиллаж байна» гэдэг нь ашиглах
+   * үндэслэл болохгүй:
+   *
+   *   • CodeFormer      — S-Lab License 1.0, арилжаа хориотой
+   *   • IDM-VTON        — CC BY-NC-SA 4.0, тусад нь лиценз шаардана
+   *   • InsightFace-ийн БЭЛЭН ЖИН — судалгааны зориулалт
+   *     (код нь MIT; хориотой нь жин. Энэ ялгаа амархан алдагддаг)
+   *
+   * Одоо ашиглаж буй U²-Net нь Apache 2.0 — цэвэр.
+   */
+  const banned = ['codeformer', 'idm-vton', 'idmvton', 'tryondiffusion', 'buffalo_l', 'gfpgan'];
+
+  const walk = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const entry of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) out.push(...walk(rel));
+      else if (/\.tsx?$/.test(entry.name)) out.push(rel);
+    }
+    return out;
+  };
+
+  for (const file of walk('src')) {
+    const lower = read(file).toLowerCase();
+    for (const name of banned) {
+      // Тайлбар дотор дурдах нь зүгээр — ашиглах нь биш.
+      const stripped = lower.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      assert.ok(!stripped.includes(name), `${file} дотор ${name} — арилжаанд хориотой`);
+    }
+  }
+
+  const pkg = JSON.parse(read('package.json')) as { dependencies?: Record<string, string> };
+  for (const dep of Object.keys(pkg.dependencies ?? {})) {
+    for (const name of banned) {
+      assert.ok(!dep.toLowerCase().includes(name), `хамаарал ${dep} — арилжаанд хориотой`);
+    }
+  }
+});
+
+test('баримтын горимд царай өөрчлөх засвар ХААЛТТАЙ', () => {
+  /*
+   * Иргэний үнэмлэх, паспортын зураг бол хүнийг таних баримт. Царай,
+   * хувцсыг өөрчилсөн зураг тавих нь баримт гуйвуулсан хэрэг бөгөөд
+   * эрсдэл нь зураг авсан дэлгүүр дээр буудаг.
+   *
+   * Энэ туг нь шинэ засвар нэмэх бүрд шалгагдах цорын ганц газар.
+   */
+  const src = read('src/lib/idPhoto.ts');
+  assert.match(src, /key:\s*'document'[\s\S]*?allowRetouch:\s*false/, 'баримтад засвар нээлттэй');
+  assert.match(src, /key:\s*'general'[\s\S]*?allowRetouch:\s*true/, 'энгийн зурагт засвар хаалттай');
+
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+  assert.ok(studio.includes('allowRetouch'), 'интерфейс тугийг хэрэглээгүй');
+  // Анхдагч нь баримт байх ёстой — санамсаргүй сонголт эрсдэлгүй тал руу.
+  assert.match(studio, /useState<PurposeKey>\('document'\)/, 'анхдагч горим баримт биш');
+});
+
+test('ONNX нь ДИНАМИК import — үндсэн багцад ороогүй', () => {
+  /*
+   * `onnxruntime-web` нь маш том. Статик import хийвэл ажилтны хэрэгслийн
+   * chunk хэдэн зуун KB болж, загвар суулгаагүй дэлгүүр ч татаж эхэлнэ.
+   */
+  const src = read('src/lib/segment.ts');
+  assert.ok(
+    !/^import .*onnxruntime-web/m.test(src),
+    'onnxruntime-web статикаар импортлогдсон',
+  );
+  assert.ok(src.includes("await import('onnxruntime-web')"), 'динамик import алга');
+
+  // Загвар байгаа эсэхийг ЭХЛЭЭД шалгана — байхгүй бол ort огт татагдахгүй.
+  const load = src.slice(src.indexOf('async function loadSession'));
+  assert.ok(
+    load.indexOf("method: 'HEAD'") < load.indexOf("import('onnxruntime-web')"),
+    'загварыг шалгахаас өмнө ort татагдана',
+  );
+
+  for (const file of ['src/pages/IdPhotoStudio.tsx', 'src/main.tsx', 'src/App.tsx']) {
+    assert.ok(!read(file).includes('onnxruntime'), `${file} ort-г шууд импортолсон`);
+  }
+});
+
+test('загвар байхгүй үед хэрэгсэл ажилласаар байна', () => {
+  /*
+   * Загвар нь ЗААВАЛ БИШ сайжруулалт. Сүлжээ тасарсан, WASM дэмжигдээгүй,
+   * файл эвдэрсэн — аль нь ч ажилтныг зогсоох ёсгүй.
+   */
+  const src = read('src/lib/segment.ts');
+  const catches = src.match(/catch\s*{\s*(\/\*[\s\S]*?\*\/\s*)?return null;/g) ?? [];
+  assert.ok(catches.length >= 2, `алдааг залгих хамгаалалт дутуу: ${catches.length}`);
+
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+  assert.match(studio, /mask \?\?= backgroundMask/, 'силуэт руу буцах зам алга');
+});
