@@ -1,11 +1,5 @@
-import {
-  isDateStamp,
-  isOrderNumber,
-  isUploadId,
-  manifestKey,
-  type WebOrderManifest,
-} from './_files';
-import { getObject, putObject, readR2Config } from './_r2';
+import { isDateStamp, isOrderNumber, isUploadId } from './_files';
+import { getStore } from './_store';
 import { isPaid } from './_payment';
 import { isInvoicePaid, readQPayConfig } from './_qpay';
 import { notify, paidText } from './_notify';
@@ -24,7 +18,7 @@ import { notify, paidText } from './_notify';
  * шалгалтад унаад юу ч өөрчлөгдөхгүй.
  *
  * QPay давтан мэдэгдэл илгээж болзошгүй тул үйлдэл нь давталтад тэсвэртэй:
- * аль хэдийн төлөгдсөн manifest-ыг дахин бичихгүй.
+ * аль хэдийн төлөгдсөн захиалгыг дахин бичихгүй.
  */
 
 export const config = { runtime: 'edge' };
@@ -46,39 +40,30 @@ export default async function handler(request: Request): Promise<Response> {
     return ok({ error: 'Хүсэлт буруу байна.' }, 400);
 
   const env = process.env as Record<string, string | undefined>;
-  const r2 = readR2Config(env);
+  const store = getStore(env);
   const qpay = readQPayConfig(env);
-  if (!r2 || !qpay) return ok({ error: 'Сервер тохируулагдаагүй байна.' }, 503);
+  if (!store || !qpay) return ok({ error: 'Сервер тохируулагдаагүй байна.' }, 503);
 
-  const key = manifestKey(date, orderNumber, uploadId);
-  const raw = await getObject(r2, key);
-  if (!raw) return ok({ error: 'Захиалга олдсонгүй.' }, 404);
-
-  let manifest: WebOrderManifest;
-  try {
-    manifest = JSON.parse(raw) as WebOrderManifest;
-  } catch {
-    return ok({ error: 'Захиалга уншигдсангүй.' }, 500);
-  }
+  const order = await store.get(date, orderNumber, uploadId);
+  if (!order) return ok({ error: 'Захиалга олдсонгүй.' }, 404);
 
   // Давхар мэдэгдэл — юу ч хийхгүй, гэхдээ QPay-д амжилттай гэж хариулна.
-  if (isPaid(manifest.payment)) return ok({ status: 'paid' });
+  if (isPaid(order.payment)) return ok({ status: 'paid' });
 
-  const invoiceId = manifest.payment?.invoiceId;
+  const invoiceId = order.payment?.invoiceId;
   if (!invoiceId) return ok({ error: 'Нэхэмжлэл байхгүй.' }, 400);
 
-  const amount = manifest.payment?.amount ?? manifest.total;
-  if (!(await isInvoicePaid(qpay, invoiceId, amount)))
-    return ok({ status: 'pending' });
+  const amount = order.payment?.amount ?? order.total;
+  if (!(await isInvoicePaid(qpay, invoiceId, amount))) return ok({ status: 'pending' });
 
-  manifest.payment = {
-    ...(manifest.payment ?? { amount, method: 'qpay' }),
-    status: 'paid',
-    method: 'qpay',
-    paidAt: Date.now(),
-  };
-
-  const saved = await putObject(r2, key, JSON.stringify(manifest));
+  const saved = await store.update(order.ref, {
+    payment: {
+      ...(order.payment ?? { amount, method: 'qpay' }),
+      status: 'paid',
+      method: 'qpay',
+      paidAt: Date.now(),
+    },
+  });
   if (!saved) return ok({ error: 'Хадгалж чадсангүй.' }, 502);
 
   /*
@@ -88,11 +73,11 @@ export default async function handler(request: Request): Promise<Response> {
    */
   await notify(
     paidText({
-      orderNumber: manifest.orderNumber,
+      orderNumber: order.orderNumber,
       amount,
-      photoCount: manifest.files.filter((file) => file.kind === 'print').length,
-      customer: manifest.customer.name,
-      phone: manifest.customer.phone,
+      photoCount: order.files.filter((file) => file.kind === 'print').length,
+      customer: order.customer.name,
+      phone: order.customer.phone,
       method: 'qpay',
     }),
   );

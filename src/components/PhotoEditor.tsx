@@ -95,9 +95,20 @@ export default function PhotoEditor({
     }
   };
 
+  /**
+   * Зураггүйгээр сагсанд нэмэхийг зөвшөөрөхгүй.
+   *
+   * Өмнө нь «зураггүй ч захиалж болно» гэж үздэг байсан нь бодит байдалд
+   * ажилтанд хэвлэх юмгүй ажлын мөр үүсгээд, хэрэглэгч рүү залгаж файл гуйх
+   * ажил нэмдэг байв. Зураг сонгох нь энэ цонхны цорын ганц зорилго учир
+   * хоосон хадгалахыг бүрмөсөн хаав.
+   */
+  const ready = Boolean(file && preview && !error && !loading);
+
   const save = useCallback(() => {
-    onSave({ qty, file: error ? null : file, fileName, preview, natural });
-  }, [error, file, fileName, natural, onSave, preview, qty]);
+    if (!ready || !file) return;
+    onSave({ qty, file, fileName, preview, natural });
+  }, [file, fileName, natural, onSave, preview, qty, ready]);
 
   /** 200dpi-аас доош бол хэвлэхэд мэдэгдэхүйц бүдэг гарна. */
   const lowRes =
@@ -285,17 +296,18 @@ export default function PhotoEditor({
 
           <button
             type="button"
-            onClick={save}
+            onClick={ready ? save : () => fileInput.current?.click()}
             disabled={loading}
-            className="btn-accent mt-3 w-full"
+            className={ready ? 'btn-accent mt-3 w-full' : 'btn-brand mt-3 w-full'}
           >
-            {editing ? 'Хадгалах' : 'Сагсанд нэмэх'}
+            {loading
+              ? 'Уншиж байна…'
+              : ready
+                ? editing
+                  ? 'Хадгалах'
+                  : 'Сагсанд нэмэх'
+                : '🖼️ Эхлээд зургаа сонгоно уу'}
           </button>
-          {!preview && !loading && (
-            <p className="mt-2 text-center text-[11px] text-muted">
-              Зураггүй ч захиалж болно — файлаа дараа нь ирүүлж болно.
-            </p>
-          )}
         </div>
       </div>
     </div>

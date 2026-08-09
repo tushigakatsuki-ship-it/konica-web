@@ -8,12 +8,10 @@ import {
 import {
   isDateStamp,
   isUploadId,
-  manifestKey,
   validateManifestFiles,
   type ManifestFile,
-  type WebOrderManifest,
 } from './_files';
-import { putObject, readR2Config } from './_r2';
+import { getStore } from './_store';
 import { pendingPayment, readBankInstructions } from './_payment';
 import { createInvoice, readQPayConfig, type QPayInvoice } from './_qpay';
 import { notify } from './_notify';
@@ -266,7 +264,7 @@ export default async function handler(request: Request): Promise<Response> {
    * хэрэглэгчийг дахин илгээхэд хүргэвэл орлого давхардана.
    */
   const env = process.env as Record<string, string | undefined>;
-  const r2 = readR2Config(env);
+  const store = getStore(env);
 
   /**
    * Зургийн төлөв гурван утгатай:
@@ -288,7 +286,7 @@ export default async function handler(request: Request): Promise<Response> {
   const bank = readBankInstructions(env, built.orderNumber, built.total);
 
   if (files.length > 0) {
-    if (!r2) {
+    if (!store) {
       photos = 'unavailable';
     } else {
       const payment = pendingPayment(built.total);
@@ -317,7 +315,7 @@ export default async function handler(request: Request): Promise<Response> {
         }
       }
 
-      const manifest: WebOrderManifest = {
+      const saved = await store.save({
         orderNumber: built.orderNumber,
         uploadId,
         date: uploadDate,
@@ -332,20 +330,8 @@ export default async function handler(request: Request): Promise<Response> {
         lines: built.lines.map((l) => ({ name: l.name, qty: l.qty, total: l.total })),
         files,
         payment,
-      };
-      try {
-        if (
-          !(await putObject(
-            r2,
-            manifestKey(uploadDate, built.orderNumber, uploadId),
-            JSON.stringify(manifest),
-          ))
-        ) {
-          photos = 'unavailable';
-        }
-      } catch {
-        photos = 'unavailable';
-      }
+      });
+      if (!saved) photos = 'unavailable';
     }
   }
 

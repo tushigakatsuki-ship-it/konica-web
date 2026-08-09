@@ -1,24 +1,18 @@
-import {
-  isDateStamp,
-  isOrderNumber,
-  isUploadId,
-  manifestKey,
-  type WebOrderManifest,
-} from './_files';
-import { getObject, putObject, readR2Config } from './_r2';
+import { isDateStamp, isOrderNumber, isUploadId } from './_files';
+import { getStore } from './_store';
 import { isPaid } from './_payment';
 import { isInvoicePaid, readQPayConfig } from './_qpay';
 import { notify, paidText } from './_notify';
 
 /**
- * GET /api/payment?order=…&date=…&u=… — хэрэглэгч төлбөрийнхөө төлвийг шалгана.
+ * GET /api/payment?order=…&date=…&u=… — захиалгын төлөв.
  *
  * Нэвтрэлт нь `uploadId`: 16 тэмдэгт санамсаргүй мөр бөгөөд зөвхөн захиалга
- * өгсөн хүнд буцаагдсан. Түүнгүйгээр манифест уншигдахгүй тул дугаараа таасан
- * ч өөр хүний захиалгыг харах боломжгүй.
+ * өгсөн хүнд буцаагдсан. Түүнгүйгээр хадгалалт өгөгдөл буцаадаггүй тул
+ * дугаараа таасан ч өөр хүний захиалгыг харах боломжгүй.
  *
- * Хариунд захиалагчийн нэр, утас зэрэг хувийн мэдээллийг ОГТ оруулахгүй —
- * зөвхөн төлбөрийн төлөв.
+ * Хариунд и-мэйл, тайлбар зэрэг шаардлагагүй хувийн мэдээллийг ОРУУЛАХГҮЙ —
+ * линк хуваалцагдвал ч зөвхөн төлбөрийн төлөв, дүн харагдана.
  */
 
 export const config = { runtime: 'edge' };
@@ -55,47 +49,30 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: 'Хүсэлт буруу байна.' }, 400);
 
   const env = process.env as Record<string, string | undefined>;
-  const r2 = readR2Config(env);
-  if (!r2) return json({ error: 'Сервер тохируулагдаагүй байна.' }, 503);
+  const store = getStore(env);
+  if (!store) return json({ error: 'Сервер тохируулагдаагүй байна.' }, 503);
 
-  const key = manifestKey(date, orderNumber, uploadId);
-  const raw = await getObject(r2, key);
-  if (!raw) return json({ error: 'Захиалга олдсонгүй.' }, 404);
+  const order = await store.get(date, orderNumber, uploadId);
+  if (!order) return json({ error: 'Захиалга олдсонгүй.' }, 404);
 
-  let manifest: WebOrderManifest;
-  try {
-    manifest = JSON.parse(raw) as WebOrderManifest;
-  } catch {
-    return json({ error: 'Захиалга уншигдсангүй.' }, 500);
-  }
+  const photoCount = order.files.filter((file) => file.kind === 'print').length;
 
-  const photoCount = manifest.files.filter((file) => file.kind === 'print').length;
-
-  /**
-   * Захиалгын товч тойм.
-   *
-   * `uploadId`-г мэдэж байгаа хүн бол захиалагч өөрөө тул түүнд өөрийнх нь
-   * захиалгын хураангуйг харуулах нь зөв. Гэхдээ шаардлагагүй хувийн
-   * мэдээллийг (и-мэйл, тайлбар) буцаахгүй — линк хуваалцагдвал ч.
-   */
+  /** Захиалгын товч тойм — захиалагч өөрөө харах мэдээлэл. */
   const summary = {
-    orderNumber: manifest.orderNumber,
-    createdAt: manifest.createdAt,
-    amount: manifest.payment?.amount ?? manifest.total,
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+    amount: order.payment?.amount ?? order.total,
     photoCount,
-    lines: manifest.lines,
-    printedAt: manifest.printedAt ?? null,
+    lines: order.lines,
+    printedAt: order.printedAt ?? null,
   };
 
   // Аль хэдийн төлөгдсөн бол QPay-г дэмий зовоохгүй.
-  if (isPaid(manifest.payment))
-    return json(
-      { status: 'paid', paidAt: manifest.payment?.paidAt ?? null, ...summary },
-      200,
-    );
+  if (isPaid(order.payment))
+    return json({ status: 'paid', paidAt: order.payment?.paidAt ?? null, ...summary }, 200);
 
   const qpay = readQPayConfig(env);
-  const invoiceId = manifest.payment?.invoiceId;
+  const invoiceId = order.payment?.invoiceId;
   const now = Date.now();
 
   if (qpay && invoiceId && (lastCheck.get(invoiceId) ?? 0) + CHECK_EVERY_MS < now) {
@@ -103,13 +80,13 @@ export default async function handler(request: Request): Promise<Response> {
     if (lastCheck.size > 2_000) lastCheck.clear();
 
     if (await isInvoicePaid(qpay, invoiceId, summary.amount)) {
-      manifest.payment = {
-        ...(manifest.payment ?? { amount: summary.amount, method: 'qpay' }),
-        status: 'paid',
-        method: 'qpay',
+      const payment = {
+        ...(order.payment ?? { amount: summary.amount, method: 'qpay' as const }),
+        status: 'paid' as const,
+        method: 'qpay' as const,
         paidAt: now,
       };
-      await putObject(r2, key, JSON.stringify(manifest));
+      await store.update(order.ref, { payment });
 
       /*
        * Callback хоцорсон эсвэл ирээгүй тохиолдолд төлбөрийг ЭНД анх мэдэж
@@ -117,11 +94,11 @@ export default async function handler(request: Request): Promise<Response> {
        */
       await notify(
         paidText({
-          orderNumber: manifest.orderNumber,
+          orderNumber: order.orderNumber,
           amount: summary.amount,
           photoCount,
-          customer: manifest.customer.name,
-          phone: manifest.customer.phone,
+          customer: order.customer.name,
+          phone: order.customer.phone,
           method: 'qpay',
         }),
       );

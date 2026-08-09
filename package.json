@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "oxlint src api test",
-    "test": "esbuild test/*.test.ts --bundle --platform=node --format=cjs --out-extension:.js=.cjs --outdir=.tmp --log-level=error && node --test \".tmp/*.test.cjs\"",
+    "test": "node -e \"require('node:fs').rmSync('.tmp',{recursive:true,force:true})\" && esbuild test/*.test.ts --bundle --platform=node --format=cjs --out-extension:.js=.cjs --outdir=.tmp --log-level=error && node --test \".tmp/*.test.cjs\"",
     "verify": "npm run typecheck && npm test && npm run docs:check",
     "preview": "vite preview",
     "docs:check": "node scripts/check-diagrams.mjs docs/*.md"

@@ -3,35 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import LastOrderBanner from '../components/LastOrderBanner';
-import SectionTitle from '../components/SectionTitle';
 import { byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
-import { fitBox, recommendedPixels, sizeOf } from '../lib/photoSize';
+import { fitBox, sizeOf } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
 
 const TABS: readonly { key: ServiceCategory; label: string; hint: string }[] = [
-  {
-    key: 'Угаалт',
-    label: 'Зураг угаалт',
-    hint: 'Konica Minolta лабораторын өнгө. 6×9-өөс 50×100 хүртэлх бүх хэмжээ.',
-  },
-  {
-    key: 'Засвар',
-    label: 'Засвартай зураг',
-    hint: 'Хуучирсан, урагдсан, бүдгэрсэн зургийг сэргээж, өнгөт болгож хэвлэнэ.',
-  },
-  {
-    key: 'Хэвлэл',
-    label: 'Фото цаас',
-    hint: '200гр фото цаасан дээрх шууд хэвлэл — А4, А3 хэмжээгээр.',
-  },
+  { key: 'Угаалт', label: 'Зураг угаалт', hint: 'Konica Minolta лабораторын өнгө.' },
+  { key: 'Засвар', label: 'Засвартай зураг', hint: 'Хуучирсан зургийг сэргээж хэвлэнэ.' },
+  { key: 'Хэвлэл', label: 'Фото цаас', hint: '200гр фото цаас — А4, А3.' },
 ];
 
-/** Хугацааны товч заавар — томрох тусам удаан. */
-const leadTime = (area: number): string => {
-  if (area <= 200) return 'Тухайн өдөртөө';
-  if (area <= 1200) return '24 цаг';
-  return '48 цаг';
+/**
+ * Хамгийн их захиалагддаг хэмжээнүүд.
+ *
+ * Угаалтын категорид 12 хэмжээ байдаг бөгөөд бүгдийг зэрэг харуулбал утсан
+ * дээр хоёр дэлгэц дүүрэн жагсаалт болж, хэрэглэгч алийг нь сонгохоо мэдэхгүй
+ * зогсдог. Ихэнх хүн 10×15 эсвэл 13×18 авдаг тул эхлээд тэднийг харуулж,
+ * бусдыг нь «Бүх хэмжээ» товчны цаана нуув.
+ */
+const POPULAR_IDS: Partial<Record<ServiceCategory, readonly number[]>> = {
+  Угаалт: [103, 104, 102, 107], // 10×15, 13×18, 9×12, 20×30
+  Засвар: [202, 203, 206], // 10×15, 13×18, 20×30
 };
 
 export default function Print() {
@@ -39,11 +32,25 @@ export default function Print() {
   const basket = useBasket();
 
   const [tab, setTab] = useState<ServiceCategory>('Угаалт');
+  const [showAll, setShowAll] = useState(false);
   const [editorFor, setEditorFor] = useState<
     { service: ServiceItem; itemKey?: string } | null
   >(null);
 
-  const services = useMemo(() => byCategory(tab), [tab]);
+  const all = useMemo(() => byCategory(tab), [tab]);
+
+  /** Түгээмэл хэмжээнүүд — жагсаалтын дарааллаар нь эрэмбэлнэ. */
+  const popular = useMemo(() => {
+    const ids = POPULAR_IDS[tab];
+    if (!ids) return all;
+    const found = ids
+      .map((id) => all.find((service) => service.id === id))
+      .filter((service): service is ServiceItem => Boolean(service));
+    return found.length > 0 ? found : all;
+  }, [all, tab]);
+
+  const services = showAll ? all : popular;
+  const hiddenCount = all.length - popular.length;
 
   const editing = editorFor?.itemKey
     ? basket.items.find((item) => item.key === editorFor.itemKey)
@@ -55,8 +62,6 @@ export default function Print() {
     else basket.add(editorFor.service, value);
     setEditorFor(null);
   };
-
-  const withoutPhoto = basket.items.filter((item) => !item.value.file).length;
 
   return (
     <>
@@ -94,56 +99,66 @@ export default function Print() {
           {TABS.find((t) => t.key === tab)?.hint}
         </p>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_340px]">
+        <div className="mt-5 grid gap-8 lg:grid-cols-[1fr_340px]">
           {/* ── Хэмжээний сонголт ─────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3">
-            {services.map((service) => {
-              const size = sizeOf(service.name);
-              const box = fitBox(size, 56, 56);
-              const count = basket.countFor(service.id);
-              const price = parsePrice(service.price);
+          <div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+              {services.map((service) => {
+                const size = sizeOf(service.name);
+                const box = fitBox(size, 48, 48);
+                const count = basket.countFor(service.id);
+                const price = parsePrice(service.price);
 
-              return (
-                <button
-                  key={service.id}
-                  type="button"
-                  onClick={() => setEditorFor({ service })}
-                  className={`card relative flex flex-col items-center p-3 text-center transition-colors sm:p-4 ${
-                    count > 0
-                      ? 'border-brand-500 bg-brand-50/50'
-                      : 'hover:border-brand-200 hover:bg-brand-50/40'
-                  }`}
-                >
-                  {count > 0 && (
-                    <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-brand-500 text-[11px] font-black text-white">
-                      {count}
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => setEditorFor({ service })}
+                    className={`card relative flex flex-col items-center p-3 text-center transition-colors sm:p-4 ${
+                      count > 0
+                        ? 'border-brand-500 bg-brand-50/50'
+                        : 'hover:border-brand-200 hover:bg-brand-50/40'
+                    }`}
+                  >
+                    {count > 0 && (
+                      <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-brand-500 text-[11px] font-black text-white">
+                        {count}
+                      </span>
+                    )}
+
+                    {/*
+                     * Зөвхөн хэмжээ, үнэ хоёр. Нягтрал, хугацаа зэрэг дэлгэрэнгүйг
+                     * зураг сонгох цонх дотор харуулна — картан дээр байвал 12
+                     * картын текст утсан дээр нүд гүйцэхгүй ханан мэт болдог.
+                     */}
+                    <span className="grid h-14 place-items-center">
+                      <span
+                        aria-hidden
+                        style={{ width: box.width, height: box.height }}
+                        className="block rounded-[3px] border-2 border-brand-400 bg-white"
+                      />
                     </span>
-                  )}
 
-                  <span className="grid h-16 place-items-center">
-                    <span
-                      aria-hidden
-                      style={{ width: box.width, height: box.height }}
-                      className="block rounded-[3px] border-2 border-brand-400 bg-white"
-                    />
-                  </span>
+                    <span className="mt-2 text-base font-bold">{size.label}</span>
+                    <span className="mt-0.5 text-sm font-bold text-brand-500">
+                      {formatCurrency(price)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-                  <span className="mt-2 text-sm font-bold">{size.label}</span>
-                  <span className="mt-0.5 text-sm font-bold text-brand-500">
-                    {formatCurrency(price)}
-                  </span>
-                  <span className="mt-1 text-[11px] leading-tight text-muted">
-                    {recommendedPixels(size)}
-                    <br />
-                    {leadTime(size.w * size.h)}
-                  </span>
-
-                  <span className="mt-2.5 w-full rounded-md bg-accent px-2 py-1.5 text-xs font-bold text-white">
-                    Зураг оруулах
-                  </span>
-                </button>
-              );
-            })}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="btn-outline mt-4 w-full !py-3 !text-sm"
+              >
+                {showAll
+                  ? '↑ Түгээмэл хэмжээг харуулах'
+                  : `Бүх хэмжээ харах (${all.length}) ↓`}
+              </button>
+            )}
           </div>
 
           {/* ── Сагс ──────────────────────────────────────────── */}
@@ -232,7 +247,7 @@ export default function Print() {
                             }
                             className="mt-1.5 text-xs font-semibold text-brand-500 hover:underline"
                           >
-                            {item.value.file ? 'Зураг засах →' : 'Зураг нэмэх →'}
+                            Зураг солих →
                           </button>
                         </div>
                       </li>
@@ -245,13 +260,6 @@ export default function Print() {
                 <span>Нийт</span>
                 <span className="text-brand-500">{formatCurrency(basket.total)}</span>
               </div>
-
-              {withoutPhoto > 0 && (
-                <p className="mt-3 rounded-md bg-accent/10 px-3 py-2 text-xs text-accent-strong">
-                  {withoutPhoto} мөрөнд зураг ороогүй байна. Зураггүй захиалж болох ч
-                  файлаа дараа нь ирүүлэх шаардлагатай.
-                </p>
-              )}
 
               <button
                 type="button"
@@ -270,18 +278,23 @@ export default function Print() {
           </aside>
         </div>
 
-        {/* Анхаарах зүйл */}
-        <section className="mt-16 sm:mt-24">
-          <SectionTitle
-            title="Анхаарах зүйл"
-            subtitle="Хамгийн сайн үр дүнд хүрэхийн тулд"
-          />
-          <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
+        {/*
+          * Заавруудыг анхдагчаар хураасан.
+          *
+          * Хэрэглэгчийн 95% нь зургаа сонгоод л явдаг — тэдэнд эдгээр текст
+          * зөвхөн хуудсыг уртасгаж, гүйлгэх зайг нэмдэг. Хэрэгтэй хүн нь дарж
+          * нээнэ. `<details>` бол JS-гүй, хайлтын системд ч уншигдана.
+          */}
+        <details className="mt-10 rounded-lg border border-hairline sm:mt-16">
+          <summary className="cursor-pointer px-4 py-3.5 text-sm font-bold marker:text-brand-500">
+            Анхаарах зүйл — нягтрал, тайралт, өнгө
+          </summary>
+          <div className="grid gap-4 border-t border-hairline p-4 sm:grid-cols-3">
             {[
               {
                 icon: '📐',
                 title: 'Нягтрал',
-                text: 'Карт бүр дээр тухайн хэмжээнд тохирох пикселийн доод хэмжээг бичсэн байгаа.',
+                text: 'Зураг сонгоход тухайн хэмжээнд тохирох пикселийн доод хэмжээг харуулж, багадвал сануулна.',
               },
               {
                 icon: '✂️',
@@ -294,16 +307,16 @@ export default function Print() {
                 text: 'sRGB профайл. Хэт харанхуй эсвэл бүдэг зургийг ажилтан утсаар тохирч засаж өгнө.',
               },
             ].map((tip) => (
-              <div key={tip.title} className="rounded-lg bg-brand-50/60 p-5 sm:p-6">
-                <span className="text-2xl" aria-hidden>
+              <div key={tip.title} className="rounded-md bg-brand-50/60 p-4">
+                <span className="text-xl" aria-hidden>
                   {tip.icon}
                 </span>
-                <h3 className="mt-3 text-base font-bold">{tip.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{tip.text}</p>
+                <h3 className="mt-2 text-sm font-bold">{tip.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{tip.text}</p>
               </div>
             ))}
           </div>
-        </section>
+        </details>
       </div>
 
       {/* Утсан дээрх доод мөр */}

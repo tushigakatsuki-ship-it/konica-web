@@ -8,17 +8,14 @@ import { BasketProvider } from './state/basket';
  * Нүүр хуудсаас бусдыг тусад нь ачаална.
  *
  * Анх орж ирсэн хүнд хэрэгтэй нь Hero + холбоо барих хоёр л. Каталог (17KB),
- * захиалгын маягт, зургийн код, ажилтны хуудас — бүгд эхний ачаалалтаас хасагдаж
- * ~20KB gzip буурна. Утасны сүлжээнд байт хэмнэхээс илүү чухал нь JS задлах,
+ * захиалгын маягт, зургийн код — бүгд эхний ачаалалтаас хасагдаж ~20KB gzip
+ * буурна. Утасны сүлжээнд байт хэмнэхээс илүү чухал нь JS задлах,
  * ажиллуулах хугацаа богиносох явдал.
- *
- * `/admin` нь үйлчлүүлэгчид хэзээ ч хэрэггүй — тусдаа байх нь бүр ч зөв.
  */
 const Print = lazy(() => import('./pages/Print'));
 const Order = lazy(() => import('./pages/Order'));
 const OrderStatus = lazy(() => import('./pages/OrderStatus'));
 const IdPhoto = lazy(() => import('./pages/IdPhoto'));
-const Admin = lazy(() => import('./pages/Admin'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /** Хуудас солигдох агшинд харагдах — байрлалаа барьж, үсрэлт үүсгэхгүй. */
@@ -72,9 +69,6 @@ export default function App() {
               <Route path="tseej-zurag" element={<IdPhoto />} />
               <Route path="*" element={<NotFound />} />
             </Route>
-
-            {/* Ажилтны хуудас — хэрэглэгчийн толгой/хөлгүй. */}
-            <Route path="admin" element={<Admin />} />
           </Routes>
         </Suspense>
       </BasketProvider>

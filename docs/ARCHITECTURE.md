@@ -116,7 +116,8 @@ sequenceDiagram
 ## 2.1 Зургийн зам — браузераас зургийн машин хүртэл
 
 Хэрэглэгчийн зураг **Firebase рүү огт ордоггүй**. Cloudflare R2 (S3-тэй
-нийцтэй) руу браузераас **шууд** очиж, ажилтан `/admin`-аас татаж авдаг.
+нийцтэй) руу браузераас **шууд** очиж, ажилтан `/api/admin`-аар татаж авдаг.
+Вэб дээр ажилтны интерфейс БАЙХГҮЙ — тэр нь native app-ын менежерийн хэсэгт.
 
 ```mermaid
 sequenceDiagram
@@ -127,7 +128,7 @@ sequenceDiagram
     participant R2 as Cloudflare R2
     participant A as /api/order
     participant F as Firebase RTDB
-    actor S as Ажилтан
+    actor S as Ажилтан (native app)
     participant Ad as /api/admin
 
     U->>W: Хэмжээ сонгож зургаа оруулна
@@ -159,7 +160,7 @@ sequenceDiagram
     Ad->>R2: manifest бүрийг унших
     alt Төлөгдсөн
         Ad-->>S: Захиалгууд + presigned GET (1 цаг)
-        S->>R2: Зургуудыг татаж ZIP болгоно
+        S->>R2: Зургуудыг татаж авна
         S->>S: Зургийн машинд оруулж хэвлэнэ
     else Төлөөгүй
         Ad-->>S: Захиалга харагдана, линк ОГТ үүсэхгүй
@@ -405,6 +406,108 @@ erDiagram
 - **`INVENTORY` ба `SERVICES` тусдаа.** Эхнийх нь агуулахын үлдэгдэлтэй бараа,
   хоёр дахь нь үйлчилгээний үнэ. Вэб зөвхөн `SERVICES`-ийг ашигладаг.
 - **`TIMESETTINGS` ганц бичлэг** — жагсаалт биш, `/pmn/timesettings` шууд объект.
+
+---
+
+## 5.1 Вэб захиалгын өгөгдлийн загвар
+
+Вэбийн зураг, төлбөрийн мэдээлэл нь Firebase-д ОРДОГГҮЙ (rules нь native
+app-ын мэдэлд). Одоо энэ нь R2 дээрх JSON manifest, ирээдүйд Postgres.
+
+Аль ч тохиолдолд **логик загвар нь ижил** — тиймээс `api/_store/` доор порт
+(интерфейс) гаргаж, handler-ууд зөвхөн түүнийг мэддэг болгосон.
+
+```mermaid
+erDiagram
+    WEB_ORDER ||--o{ WEB_ORDER_LINE : "мөрүүд"
+    WEB_ORDER ||--o{ WEB_ORDER_FILE : "зурагнууд"
+    WEB_ORDER ||--|| WEB_PAYMENT : "төлбөр"
+    WEB_ORDER_FILE }o--|| OBJECT_STORAGE : "storage_key"
+    WEB_ORDER }o--o{ SERVICES : "service_id (сул холбоо)"
+
+    WEB_ORDER {
+        bigserial id PK
+        text order_number UK "PMN-260806-4821"
+        text upload_id "16 тэмдэгт нууц түлхүүр"
+        date order_date "Улаанбаатарын огноо"
+        timestamptz created_at
+        text customer_name
+        text customer_phone "индекстэй — утсаар хайх"
+        text customer_email
+        text customer_note
+        integer total "бүхэл төгрөг"
+        timestamptz printed_at "NULL = хэвлээгүй"
+        text request_id UK "давхар захиалгаас"
+    }
+
+    WEB_ORDER_LINE {
+        bigserial id PK
+        bigint order_id FK
+        integer service_id "catalog.ts"
+        text name "хуулбар — түүх гажихгүй"
+        integer qty
+        integer unit_price
+        integer total
+    }
+
+    WEB_ORDER_FILE {
+        bigserial id PK
+        bigint order_id FK
+        text storage_key UK "объект сан дахь зам"
+        enum kind "print эсвэл original"
+        text file_name
+        bigint size_bytes
+        text size_label "10x15 см"
+        integer qty
+    }
+
+    WEB_PAYMENT {
+        bigint order_id PK "FK → WEB_ORDER"
+        enum status "pending эсвэл paid"
+        integer amount
+        enum method "qpay эсвэл manual"
+        text invoice_id UK "QPay нэхэмжлэл"
+        timestamptz paid_at
+        text note
+    }
+
+    OBJECT_STORAGE {
+        text key PK "R2, S3 эсвэл MinIO"
+        bytes jpeg "хэдэн MB"
+    }
+```
+
+Бүтэн DDL: [`docs/schema.sql`](./schema.sql).
+
+### Яагаад зураг өгөгдлийн санд ордоггүй вэ
+
+Хэдэн MB-ийн JPEG-ийг Postgres-д хийвэл нөөцлөлт, репликаци огцом үнэтэй,
+удаан болно. Мөн вэб нь presigned URL-ээр браузераас ШУУД байршуулдаг тул
+файл сервер дундуур огт өнгөрдөггүй — өгөгдлийн сан руу хийх гэвэл энэ давуу
+талыг алдана. Хүснэгтэд зөвхөн `storage_key` үлдэнэ.
+
+### Постгрес рүү шилжих алхмууд
+
+| # | Алхам |
+| --- | --- |
+| 1 | `psql "$DATABASE_URL" -f docs/schema.sql` |
+| 2 | `api/_store/postgres.ts` дотор `WebOrderStore`-ыг хэрэгжүүлнэ |
+| 3 | `api/_store/index.ts` дээр `if (env.DATABASE_URL) return createPostgresStore(env)` |
+| 4 | Хуучин manifest-уудыг нэг удаагийн script-ээр `INSERT` хийнэ |
+| 5 | R2 нь ЗУРГИЙН ФАЙЛД хэвээр үлдэнэ — зөвхөн `manifests/` угтвар хэрэггүй болно |
+
+Handler-ууд (`order`, `admin`, `payment`, `qpay-callback`) болон тестүүд
+өөрчлөгдөхгүй.
+
+### Хэзээ шилжих вэ — R2-ийн хязгаарууд
+
+| Шинж тэмдэг | Шалтгаан |
+| --- | --- |
+| «Утсаар нь хайж олооч» | Объект санд хайлт байхгүй |
+| Өдөрт 200+ захиалга, admin удаашрах | Өдөр бүрээр `ListObjectsV2` + объект бүрийг тусад нь унших |
+| Өдрийн/сарын орлогын тайлан хэрэгтэй | Нэгтгэл (`GROUP BY`) хийх боломжгүй |
+| Хоёр ажилтан зэрэг тэмдэглэхэд алдагдах | Атомик шинэчлэл байхгүй — сүүлийнх нь дардаг |
+| Idempotency бүрэн баталгаа хэрэгтэй | Одоо edge instance-ийн санах ойд; SQL дээр `UNIQUE` индекс болно |
 
 ---
 

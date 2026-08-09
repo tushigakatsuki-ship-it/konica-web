@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
-import {
-  SERVICES,
-  SERVICE_CATEGORIES,
-  type ServiceCategory,
-} from '../data/catalog';
 import { CONTACT } from '../data/site';
 import {
   DELIVERY_FEE,
   addLine,
-  isCustomPrice,
   lineFromService,
   lineTotal,
-  removeLine,
   subtotal,
-  updateLine,
   type CustomerInfo,
   type FieldErrors,
   type OrderLine,
@@ -46,22 +38,13 @@ const validate = (
     errors.phone = '8 оронтой дугаар оруулна уу (жишээ: 99001234).';
   if (customer.email && !/^\S+@\S+\.\S+$/.test(customer.email))
     errors.email = 'И-мэйл хаяг буруу байна.';
-  if (lines.length === 0) errors.lines = 'Дор хаяж нэг үйлчилгээ сонгоно уу.';
+  if (lines.length === 0) errors.lines = 'Дор хаяж нэг зураг сонгоно уу.';
   return errors;
 };
 
 export default function Order() {
-  const [params, setParams] = useSearchParams();
   const basket = useBasket();
 
-  const categoryParam = params.get('category') as ServiceCategory | null;
-  const active: ServiceCategory =
-    categoryParam && SERVICE_CATEGORIES.includes(categoryParam)
-      ? categoryParam
-      : SERVICE_CATEGORIES[0];
-
-  const [query, setQuery] = useState('');
-  const [extra, setExtra] = useState<OrderLine[]>([]);
   const [customer, setCustomer] = useState<CustomerInfo>(EMPTY_CUSTOMER);
   const [delivery, setDelivery] = useState(false);
   const [vat, setVat] = useState(false);
@@ -73,8 +56,14 @@ export default function Order() {
     null,
   );
 
-  /** Сагснаас ирсэн зурагтай мөрүүд — ижил үйлчилгээг нэгтгэнэ. */
-  const photoLines = useMemo(
+  /**
+   * Захиалгын мөрүүд нь ЗӨВХӨН сагсны зурагнаас гарна.
+   *
+   * Өмнө нь энд каталогийн бүх үйлчилгээг хайж нэмэх хэсэг байсан. Вэбийн
+   * зорилго зөвхөн зураг хүлээн авах болсон тул хассан — өргөмжлөл, медаль
+   * зэрэг ажлыг утсаар эсвэл дэлгүүр дээр захиалдаг.
+   */
+  const lines = useMemo(
     () =>
       basket.items.reduce<OrderLine[]>(
         (acc, item) => addLine(acc, lineFromService(item.service, item.value.qty)),
@@ -82,18 +71,6 @@ export default function Order() {
       ),
     [basket.items],
   );
-
-  const lines = useMemo(
-    () => extra.reduce<OrderLine[]>((acc, line) => addLine(acc, line), [...photoLines]),
-    [extra, photoLines],
-  );
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return SERVICES.filter((s) =>
-      q ? s.name.toLowerCase().includes(q) : s.category === active,
-    );
-  }, [active, query]);
 
   const base = subtotal(lines);
   const deliveryFee = delivery ? DELIVERY_FEE : 0;
@@ -126,6 +103,16 @@ export default function Order() {
     if (sending) return; // давхар дарахаас — сервер талд бас хамгаалалттай
 
     const found = validate(customer, lines);
+
+    /*
+     * Сүүлчийн хамгаалалт: зураггүй мөр сагсанд орох ёсгүй (`PhotoEditor` үүнийг
+     * хаадаг). Хэрэв ямар нэг замаар орсон бол илгээхийн оронд буцаана —
+     * ажилтанд хэвлэх юмгүй ажлын мөр очихоос сэргийлнэ.
+     */
+    if (basket.items.some((item) => !item.value.file)) {
+      found.lines = 'Зураггүй мөр байна. Түүнийг хасах эсвэл зураг нэмнэ үү.';
+    }
+
     setErrors(found);
     setSendError(null);
 
@@ -320,187 +307,53 @@ export default function Order() {
                       {sizeOf(item.service.name).label} × {item.value.qty}
                     </p>
                     <p className="truncate text-[11px] text-muted">
-                      {item.value.fileName ?? '⚠️ зураг ороогүй'}
+                      {item.value.fileName}
                     </p>
                   </li>
                 ))}
               </ul>
             )}
           </section>
-
-          {/* ── Нэмэлт үйлчилгээ ─────────────────────────────── */}
-          <section className="mt-10">
-            <h2 className="text-xl font-bold">2. Нэмэлт үйлчилгээ</h2>
-            <p className="mt-1 text-sm text-muted">
-              Өргөмжлөл, медаль, фудболк гэх мэт зурагнаас өөр ажил байвал энэ хэсгээс.
-            </p>
-
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Үйлчилгээ хайх… (жишээ: өргөмжлөл)"
-              className="field mt-4"
-            />
-
-            {!query && (
-              <div className="-mx-4 mt-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-                <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
-                  {SERVICE_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setParams({ category: cat })}
-                      className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                        cat === active
-                          ? 'bg-brand-500 text-white'
-                          : 'bg-brand-50 text-ink-soft hover:bg-brand-100'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <ul className="mt-6 divide-y divide-hairline rounded-lg border border-hairline">
-              {visible.map((service) => (
-                <li
-                  key={service.id}
-                  className="flex items-center gap-3 px-3 py-3 hover:bg-brand-50/50 sm:gap-4 sm:px-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{service.name}</p>
-                    <p className="text-xs text-muted">
-                      {service.category}
-                      {isCustomPrice(service.category) && ' · тохиролцоогоор'}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm font-bold text-brand-500">
-                    {service.price}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExtra((ls) => addLine(ls, lineFromService(service)));
-                      setErrors((e) => ({ ...e, lines: undefined }));
-                    }}
-                    className="shrink-0 rounded-sm bg-accent px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-strong"
-                  >
-                    + Нэмэх
-                  </button>
-                </li>
-              ))}
-              {visible.length === 0 && (
-                <li className="px-4 py-10 text-center text-sm text-muted">
-                  Тохирох үйлчилгээ олдсонгүй.
-                </li>
-              )}
-            </ul>
-          </section>
         </div>
 
         {/* ── Сагс + маягт ────────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="lg:sticky lg:top-24 lg:self-start">
           <div className="card p-4 sm:p-5">
-            <h2 className="text-lg font-bold sm:text-xl">3. Таны захиалга</h2>
+            <h2 className="text-lg font-bold sm:text-xl">2. Таны захиалга</h2>
 
             {lines.length === 0 ? (
               <p className="mt-4 rounded-md bg-brand-50 px-4 py-6 text-center text-sm text-muted">
                 Одоогоор хоосон байна.
               </p>
             ) : (
-              <ul className="mt-4 space-y-4">
-                {lines.map((line) => {
-                  const fromPhotos = photoLines.some((p) => p.id === line.id);
-                  return (
-                    <li key={line.id} className="border-b border-hairline pb-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium">
-                          {line.name}
-                          {fromPhotos && (
-                            <span className="ml-1 text-[11px] text-muted">🖼</span>
-                          )}
-                        </p>
-                        {!fromPhotos && (
-                          <button
-                            type="button"
-                            aria-label="Хасах"
-                            onClick={() => setExtra((ls) => removeLine(ls, line.id))}
-                            className="shrink-0 text-muted hover:text-ink"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="mt-2 flex items-center gap-2">
-                        {fromPhotos ? (
-                          <span className="text-sm text-muted">{line.qty} ш</span>
-                        ) : (
-                          <div className="flex items-center rounded-sm border border-hairline">
-                            <button
-                              type="button"
-                              aria-label="Хорогдуулах"
-                              onClick={() =>
-                                setExtra((ls) =>
-                                  updateLine(ls, line.id, {
-                                    qty: Math.max(1, line.qty - 1),
-                                  }),
-                                )
-                              }
-                              className="px-2.5 py-1 text-sm"
-                            >
-                              −
-                            </button>
-                            <span className="w-9 text-center text-sm font-semibold">
-                              {line.qty}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label="Нэмэгдүүлэх"
-                              onClick={() =>
-                                setExtra((ls) =>
-                                  updateLine(ls, line.id, { qty: line.qty + 1 }),
-                                )
-                              }
-                              className="px-2.5 py-1 text-sm"
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
-
-                        {isCustomPrice(line.category) && !fromPhotos ? (
-                          <label className="flex flex-1 items-center gap-1">
-                            <span className="sr-only">Тохиролцсон нэгж үнэ</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={100}
-                              value={line.unitPrice}
-                              onChange={(e) =>
-                                setExtra((ls) =>
-                                  updateLine(ls, line.id, {
-                                    unitPrice: Number(e.target.value) || 0,
-                                  }),
-                                )
-                              }
-                              className="w-full rounded-sm border border-hairline px-2 py-1 text-right text-sm"
-                            />
-                            <span className="text-sm text-muted">₮</span>
-                          </label>
-                        ) : (
-                          <span className="flex-1 text-right text-sm font-bold">
-                            {formatCurrency(lineTotal(line))}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+              <ul className="mt-4 space-y-2 text-sm">
+                {lines.map((line) => (
+                  <li key={line.id} className="flex justify-between gap-3">
+                    <span className="min-w-0 text-muted">
+                      {line.name} × {line.qty}
+                    </span>
+                    <span className="shrink-0 font-semibold">
+                      {formatCurrency(lineTotal(line))}
+                    </span>
+                  </li>
+                ))}
               </ul>
+            )}
+
+            {/*
+              * Тоо, хэмжээг ЭНД засдаггүй.
+              *
+              * Мөр бүр нь тодорхой зурагтай хосолсон учир энд тоог өөрчилвөл
+              * аль зургийг нь хэвлэхээ ойлгохгүй болно. Засах шаардлагатай бол
+              * «Зураг засах» товчоор /hevlel руу буцна.
+              */}
+            {lines.length > 0 && (
+              <Link
+                to="/hevlel"
+                className="mt-3 block text-center text-xs font-semibold text-brand-500 hover:underline"
+              >
+                Зураг, тоо ширхэг засах →
+              </Link>
             )}
 
             <div className="mt-4 space-y-2">
@@ -549,7 +402,7 @@ export default function Order() {
           </div>
 
           <div className="card mt-6 p-4 sm:p-5">
-            <h2 className="text-lg font-bold sm:text-xl">4. Холбоо барих мэдээлэл</h2>
+            <h2 className="text-lg font-bold sm:text-xl">3. Холбоо барих мэдээлэл</h2>
 
             <div className="mt-4 space-y-4">
               <div>

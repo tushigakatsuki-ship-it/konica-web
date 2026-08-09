@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
@@ -42,12 +41,16 @@ export default function IdPhoto() {
               ))}
             </ul>
 
-            <Link
-              to="/zakhialga?category=%D0%A6%D1%8D%D1%8D%D0%B6%20%D0%B7%D1%83%D1%80%D0%B0%D0%B3"
-              className="btn-accent mt-6 w-full sm:w-auto"
-            >
-              Захиалга өгөх →
-            </Link>
+            {/*
+              * Цээж зургийг онлайнаар захиалдаггүй — хүн ирж зураг авахуулах
+              * шаардлагатай. Тиймээс энд захиалгын товч биш, залгах товч.
+              */}
+            <a href={CONTACT.phoneHref} className="btn-accent mt-6 w-full sm:w-auto">
+              📞 {CONTACT.phone} — залгах
+            </a>
+            <p className="mt-3 text-sm text-muted">
+              Цаг захиалахгүйгээр {CONTACT.hours} хооронд шууд ирээд авахуулна.
+            </p>
           </div>
 
           <aside className="card h-fit p-5 sm:p-6">
