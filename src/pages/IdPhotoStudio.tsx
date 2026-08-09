@@ -14,7 +14,8 @@ import {
   SHEET,
   applyBackground,
   backgroundMask,
-  borderColor,
+  fitBackdrop,
+  type Backdrop,
   cmToPx,
   cropForFace,
   featherMask,
@@ -67,6 +68,8 @@ export default function IdPhotoStudio() {
   const frameRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<CanvasImageSource & { width: number; height: number }>(null);
   const closeRef = useRef<(() => void) | null>(null);
+  /** Хамгийн сүүлд тааруулсан дэвсгэрийн загвар — оношилгоонд. */
+  const backdropRef = useRef<Backdrop | null>(null);
 
   const [size, setSize] = useState<IdSize>(ID_SIZES[0]);
   const [bgKey, setBgKey] = useState(BACKGROUNDS[0].key);
@@ -77,6 +80,8 @@ export default function IdPhotoStudio() {
   /** Тайрах хүрээ — автоматаар тооцоод, ажилтан чирж засаж болно. */
   const [crop, setCrop] = useState<CropRect | null>(null);
   const [clamped, setClamped] = useState(false);
+  /** Дэвсгэр жигд бус тул хавтгайн загварт итгээгүй. */
+  const [messyBackdrop, setMessyBackdrop] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const layout = useMemo(() => sheetLayout(size), [size]);
@@ -122,8 +127,16 @@ export default function IdPhotoStudio() {
       if (!background.rgb) return;
 
       const image = ctx.getImageData(0, 0, outW, outH);
-      const bg = borderColor(image.data, outW, outH);
-      const mask = backgroundMask(image.data, outW, outH, tolerance, bg);
+
+      /*
+       * Дэвсгэрийг ганц өнгө биш, ОРОН ЗАЙН загвараар барина. Студийн
+       * гэрэлтүүлэг нэг талаас тусдаг тул нөгөө тал нь тогтмол өнгөний
+       * хязгаараас хэтэрч, «дутуу арилдаг» байсан.
+       */
+      const backdrop = fitBackdrop(image.data, outW, outH);
+      backdropRef.current = backdrop;
+
+      const mask = backgroundMask(image.data, outW, outH, tolerance, undefined, { backdrop });
       // Радиус нь хэмжээтэй хамт өснө — 300dpi дээр 1px зөөлрөлт хангалтгүй.
       const soft = featherMask(mask, outW, outH, Math.max(1, Math.round(outH / 200)));
       applyBackground(image.data, soft, background.rgb);
@@ -134,6 +147,7 @@ export default function IdPhotoStudio() {
 
   useEffect(() => {
     if (crop && previewRef.current) drawPhoto(previewRef.current, PREVIEW_H);
+    setMessyBackdrop(backdropRef.current?.uniform === false);
   }, [crop, drawPhoto]);
 
   /* ── Зураг оруулах → бүтэн урсгал ─────────────────────────────── */
@@ -399,7 +413,15 @@ export default function IdPhotoStudio() {
               </p>
             )}
 
-            {stage === 'ready' && face?.confidence === 'high' && !clamped && (
+            {messyBackdrop && removeBg && stage === 'ready' && (
+              <p className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 p-3 text-[11px] leading-relaxed text-accent-strong">
+                <IconAlert className="mt-px size-4 shrink-0" />
+                Дэвсгэр жигд биш байна. Дэвсгэр салгалт дутуу гарах магадлалтай
+                — «Хэвээр» сонгоод гараар засах нь хурдан байж болно.
+              </p>
+            )}
+
+            {stage === 'ready' && face?.confidence === 'high' && !clamped && !messyBackdrop && (
               <p className="mt-4 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
                 <IconCheck className="mt-px size-4 shrink-0 text-ok-strong" />
                 Нүүр илэрч, стандартын дагуу таслагдлаа.

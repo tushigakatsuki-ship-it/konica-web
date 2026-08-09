@@ -10,6 +10,7 @@ import {
   borderColor,
   cmToPx,
   featherMask,
+  fitBackdrop,
   sheetLayout,
 } from '../src/lib/idPhoto';
 
@@ -296,4 +297,207 @@ test('доод ирмэгийг биe эзэлсэн ч дэвсгэрийн ө�
   const mask = backgroundMask(data, w, h, 40);
   const bodyPixel = Math.round(h * 0.8) * w + Math.round(w / 2);
   assert.equal(mask[bodyPixel], 0, 'биеийг дэвсгэр гэж үзсэн');
+});
+
+/* ─────────────────────────────────────────────────────────────────
+ * Дэвсгэр салгах загвар
+ *
+ * Бодит гомдол: «зарим хэсгийг дутуу арилгаж байна». Шалтгаан нь тэвчээр
+ * бага байсандаа биш — дэвсгэрийг ГАНЦ тогтмол өнгө гэж үзэж байсанд.
+ * Доорх тестүүд гурван бодит тохиолдлыг барина.
+ * ───────────────────────────────────────────────────────────────── */
+
+/** Нэг талаас гэрэлтсэн дэвсгэр дээр эллипс «толгой» зурна. */
+const makeScene = (opts: {
+  w: number;
+  h: number;
+  /** Зүүнээс баруун тийш дэвсгэрийн гэрлийн уналт. */
+  falloff?: number;
+  /** Толгойн доторх дэвсгэр өнгөтэй нүх (үсний завсар). */
+  pocket?: { x: number; y: number; r: number };
+}) => {
+  const { w, h, falloff = 0, pocket } = opts;
+  const data = new Uint8ClampedArray(w * h * 4);
+  const cx = w / 2;
+  const cy = h * 0.45;
+  const rx = w * 0.28;
+  const ry = h * 0.34;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const bgv = 250 - Math.round((x / (w - 1)) * falloff);
+      const inHead = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+      const inPocket =
+        pocket !== undefined && (x - pocket.x) ** 2 + (y - pocket.y) ** 2 <= pocket.r ** 2;
+
+      let v: [number, number, number];
+      if (inHead && !inPocket) v = [120, 85, 70];
+      else v = [bgv, bgv, bgv];
+
+      data[i] = v[0];
+      data[i + 1] = v[1];
+      data[i + 2] = v[2];
+      data[i + 3] = 255;
+    }
+  }
+  return data;
+};
+
+test('нэг талаас гэрэлтсэн дэвсгэрийг бүтнээр арилгана', () => {
+  /*
+   * Студийн гэрэлтүүлэг нэг талаас тусдаг тул нөгөө тал 50 нэгжээр бараан.
+   * Тогтмол өнгөний загвар (дундаж ≈ 225) дээр баруун ирмэг нь 200 болж,
+   * зөрүү нь 25·√3 ≈ 43 — тэвчээр 40 дээр ГАРНА. Яг тэр хэсэг «дутуу
+   * арилдаг». Хавтгайн загвар үүнийг шингээх ёстой.
+   */
+  const w = 120;
+  const h = 160;
+  const data = makeScene({ w, h, falloff: 50 });
+
+  const backdrop = fitBackdrop(data, w, h);
+  assert.ok(backdrop.uniform, 'ирмэг жигд гэж танигдаагүй');
+  assert.ok(backdrop.spread > 30, `налууг олоогүй: ${backdrop.spread.toFixed(1)}`);
+
+  const mask = backgroundMask(data, w, h, 40);
+
+  // Хамгийн бараан булан — хуучин загвар яг эндээс алддаг байсан.
+  for (const [x, y] of [
+    [w - 2, h - 2],
+    [w - 2, 2],
+    [w - 6, Math.round(h / 2)],
+  ]) {
+    assert.equal(mask[y * w + x], 255, `дэвсгэр дутуу арилсан: (${x}, ${y})`);
+  }
+
+  // Толгой хэвээрээ.
+  assert.equal(mask[Math.round(h * 0.45) * w + Math.round(w / 2)], 0, 'толгойг идсэн');
+});
+
+test('тогтмол өнгөний загвар яг тэр зурагт алддаг — жишээ нь бодит', () => {
+  /*
+   * Дээрх тест нь зөвхөн шинэ загвар ажиллаж байгааг харуулна. Энэ нь
+   * ХУУЧИН загвар үнэхээр алддаг байсныг батална — эс тэгвээс дээрх тест
+   * юу ч хамгаалахгүй, зүгээр л ногоон байна.
+   */
+  const w = 120;
+  const h = 160;
+  const data = makeScene({ w, h, falloff: 50 });
+
+  const flat = backgroundMask(data, w, h, 40, borderColor(data, w, h), {
+    fillPockets: false,
+  });
+
+  let missed = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = Math.round(w * 0.8); x < w; x += 1) {
+      if (flat[y * w + x] !== 255) missed += 1;
+    }
+  }
+  assert.ok(missed > 100, `тогтмол загвар алдаагүй бол тест утгагүй: ${missed}`);
+});
+
+test('нимгэн хаалтаар тусгаарлагдсан завсрыг нөхнө', () => {
+  /*
+   * Үерийн дүүргэлт зөвхөн зургийн ирмэгээс эхэлдэг тул үсний хооронд
+   * ХАРАГДАЖ БУЙ гадна дэвсгэр хөндөгдөхгүй үлддэг. Хэрэглэгчид энэ нь
+   * «дутуу арилсан толбо» болж харагдана.
+   *
+   * Гол шинж нь ХААЛТ НИМГЭН байх — үсний ширхэг. Тиймээс энд толгойн
+   * оройноос 3 пикселийн хаалтаар тусгаарлагдсан завсар зурав.
+   */
+  const w = 240;
+  const h = 320;
+  const pocket = { x: 120, y: 42, r: 4 };
+  const data = makeScene({ w, h, pocket });
+  const p = pocket.y * w + pocket.x;
+
+  const without = backgroundMask(data, w, h, 40, undefined, { fillPockets: false });
+  assert.equal(without[p], 0, 'завсар анхнаасаа арилсан бол тест утгагүй');
+
+  const filled = backgroundMask(data, w, h, 40);
+  assert.equal(filled[p], 255, 'нимгэн хаалттай завсар нөхөгдөөгүй');
+
+  // Толгой өөрөө хэвээрээ.
+  assert.equal(filled[Math.round(h * 0.45) * w + Math.round(w / 2)], 0, 'толгойг идсэн');
+});
+
+test('нүүрний ГҮНД байгаа цайвар толбыг хөндөхгүй', () => {
+  /*
+   * Энэ бол өмнөх тестийн ХОС. Нүдний цагаан, цамцны толбо нь завсартай
+   * яг адилхан: жижиг, хаалттай, дэвсгэртэй ижил өнгөтэй. Өнгө, хэмжээ
+   * хоёроор ялгах БОЛОМЖГҮЙ.
+   *
+   * Ялгарах шинж нь геометр: завсар нь нимгэн хаалтын цаана, дэвсгэрээс
+   * хэдхэн пикселийн зайд. Нүд бол нүүрний гүнд. Хэрэв энэ хамгаалалт
+   * алдвал хэвлэсэн зураг дээр хүний нүд цоорно.
+   */
+  const w = 240;
+  const h = 320;
+  const deep = { x: 120, y: 140, r: 4 };
+  const data = makeScene({ w, h, pocket: deep });
+  const p = deep.y * w + deep.x;
+
+  const filled = backgroundMask(data, w, h, 40);
+  assert.equal(filled[p], 0, 'нүүрний гүн дэх толбыг дэвсгэр гэж үзсэн');
+});
+
+test('ирмэг эмх замбараагүй бол хавтгайд итгэхгүй', () => {
+  /*
+   * Гэрийн орчинд ирмэг дээр тавилга, хана, хээ орно. Тийм өгөгдөлд
+   * хавтгай тааруулбал зураг руу буруу экстраполяци хийж, хүн рүү
+   * «дэвсгэр» гэсэн таамаглал тарааж болзошгүй. Тогтмол өнгө рүү буцна.
+   */
+  const w = 100;
+  const h = 100;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const noisy = (x * 37 + y * 91) % 255;
+      data[i] = noisy;
+      data[i + 1] = 255 - noisy;
+      data[i + 2] = (x * 13) % 255;
+      data[i + 3] = 255;
+    }
+  }
+
+  const backdrop = fitBackdrop(data, w, h);
+  assert.equal(backdrop.uniform, false, 'эмх замбараагүй ирмэгийг жигд гэж үзсэн');
+  assert.ok(backdrop.residual > 24);
+});
+
+test('зөөлөн ирмэг хэсэгчилсэн alpha өгнө — үс бүтнээр таслагддаггүй', () => {
+  /*
+   * Буржгар үс, нимгэн шилний ирмэг нь үнэндээ хагас тунгалаг. Хатуу
+   * хоёртын маск нь тэдгээрийг бүтнээр авах эсвэл бүтнээр орхих хоёрын
+   * аль нэгийг л хийдэг — хоёулаа муу.
+   */
+  const w = 60;
+  const h = 20;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      // Цагаанаас бараан руу 60 пикселд жигд шилжинэ.
+      const v = Math.round(250 - (x / (w - 1)) * 200);
+      data[i] = v;
+      data[i + 1] = v;
+      data[i + 2] = v;
+      data[i + 3] = 255;
+    }
+  }
+
+  const bg = { r: 250, g: 250, b: 250 };
+  const mask = backgroundMask(data, w, h, 30, bg, { step: 40, soft: 40 });
+
+  const row = Math.round(h / 2) * w;
+  const values = Array.from({ length: w }, (_, x) => mask[row + x]);
+
+  assert.equal(values[0], 255, 'цэвэр дэвсгэр бүрэн арилаагүй');
+  assert.equal(values[w - 1], 0, 'бараан тал хөндөгдсөн');
+  assert.ok(
+    values.some((v) => v > 0 && v < 255),
+    'шилжилтийн зурваст хэсэгчилсэн alpha алга',
+  );
 });
