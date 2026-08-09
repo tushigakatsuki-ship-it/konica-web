@@ -1,9 +1,10 @@
+import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
 import { PRIMARY_PHONE } from '../data/site';
 import { formatCurrency, parsePrice } from '../lib/price';
-import { IconCheck, IconPhone } from '../components/icons';
+import { IconCheck, IconCrop, IconPhone } from '../components/icons';
 
 const REQUIREMENTS = [
   'Цагаан эсвэл цайвар цэнхэр дэвсгэр',
@@ -52,6 +53,20 @@ export default function IdPhoto() {
             <p className="mt-3 text-sm text-muted">
               Цаг захиалахгүйгээр ажлын цагт шууд ирээд авахуулна.
             </p>
+
+            {/*
+              * Ажилтны хэрэгсэл рүү холбоос.
+              *
+              * Үйлчлүүлэгчид хэрэггүй ч энэ хуудас нь цээж зурагтай холбоотой
+              * цорын ганц газар тул ажилтан эндээс олох нь хамгийн энгийн.
+              * Цэсэнд ороогүй, хайлтын системд индексэлдэггүй.
+              */}
+            <Link
+              to="/tseej-zurag/avtomat"
+              className="mt-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-brand-500"
+            >
+              <IconCrop className="size-3.5" /> Ажилтны хэрэгсэл — автомат бэлтгэл
+            </Link>
           </div>
 
           <aside className="card h-fit p-5 sm:p-6">

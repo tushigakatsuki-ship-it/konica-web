@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import LastOrderBanner from '../components/LastOrderBanner';
@@ -104,9 +104,29 @@ export default function Print() {
             ))}
           </div>
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-muted">
-          {TABS.find((t) => t.key === tab)?.hint}
-        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <p className="text-sm leading-relaxed text-muted">
+            {TABS.find((t) => t.key === tab)?.hint}
+          </p>
+
+          {/*
+            * Ажилтны хэрэгсэл рүү орох гарц.
+            *
+            * Хэвлэлийн цэсний хажууд байрлана — ажилтан өдөржин энэ хуудсан
+            * дээр байдаг тул хамгийн ойрхон нь энэ. Үйлчлүүлэгчийн урсгалаас
+            * зориуд бүдэг өнгөөр, тусад нь салгасан.
+            *
+            * Нууц өгөгдөл байхгүй тул хамгаалалт хэрэггүй: хэрэгсэл бүрэн
+            * офлайн ажилладаг, сервер рүү юу ч илгээдэггүй.
+            */}
+          <Link
+            to="/tseej-zurag/avtomat"
+            className="inline-flex shrink-0 items-center gap-1.5 self-start text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+          >
+            <IconCrop className="size-3.5" />
+            Ажилтны хэрэгсэл — цээж зураг автоматаар
+          </Link>
+        </div>
 
         <div className="mt-5 grid gap-8 lg:grid-cols-[1fr_340px]">
           {/* ── Хэмжээний сонголт ─────────────────────────────── */}

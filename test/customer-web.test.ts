@@ -146,3 +146,101 @@ test('дэвсгэр зураг солигдох нь хүртээмж, гүйц
   // Зураг байхгүй үед хуудас эвдрэх ёсгүй.
   assert.ok(hero.includes('HERO_IMAGES.length === 0'));
 });
+
+/* ── Ажилтны хэрэгсэл ──────────────────────────────────────────────── */
+
+test('цээж зургийн хэрэгсэл нь захиалгын мэдээлэлд огт хүрэхгүй', () => {
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+
+  /*
+   * Энэ хуудас нь «ажилтны хуудас» биш — офлайн ажилладаг хэрэгсэл.
+   * Захиалгын жагсаалт, токен, сервер рүү илгээх зүйл ОГТ байх ёсгүй:
+   * бүх боловсруулалт браузер дотор canvas дээр хийгдэнэ.
+   */
+  assert.ok(!studio.includes('fetch('), 'сервер рүү хүсэлт явуулж байна');
+  assert.ok(!studio.includes('x-admin-token'));
+  assert.ok(!studio.includes('/api/'));
+
+  // Хэрэглэгчид үүнийг тодорхой хэлсэн байх ёстой.
+  assert.ok(studio.includes('сервер рүү'));
+});
+
+test('хэрэгслийн хязгаарлалтыг нуугаагүй', () => {
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+
+  /*
+   * Гурван хязгаарлалтыг ЗААВАЛ интерфейс дээр хэлнэ — нуувал ажилтан муу
+   * үр дүнд гайхаж, хэрэгсэлд итгэхээ болино.
+   */
+  assert.match(studio, /жигд дэвсгэр/i, 'илрүүлэлтийн хязгаар');
+  assert.ok(studio.includes('«Хэвээр»'), 'гараар засах гарц');
+  assert.ok(studio.includes('MediaPipe'), 'сайжруулах зам');
+  assert.ok(studio.includes('зориуд таслахгүй'), 'нүүр олдоогүй үеийн зарчим');
+});
+
+test('хэрэгсэл цэсэнд ороогүй, индексэлдэггүй', () => {
+  const app = read('src/App.tsx');
+  assert.ok(app.includes('tseej-zurag/avtomat'));
+
+  const nav = read('src/data/site.ts');
+  assert.ok(!nav.includes('avtomat'), 'ажилтны хэрэгсэл цэсэнд орсон байна');
+
+  const vercel = JSON.parse(read('vercel.json')) as {
+    headers: { source: string; headers: { key: string; value: string }[] }[];
+  };
+  const rule = vercel.headers.find((h) => h.source === '/tseej-zurag/avtomat');
+  assert.ok(rule, 'noindex дүрэм алга');
+  assert.ok(rule.headers.some((h) => h.value.includes('noindex')));
+});
+
+test('зам бүр рүү орох гарц байна — хаягдсан хуудас байхгүй', () => {
+  /*
+   * ЯАГААД ЭНЭ ТЕСТ ХЭРЭГТЭЙ ВЭ
+   *
+   * `/tseej-zurag`-ыг цэснээс хассаны дараа түүн рүү заасан ганц ч холбоос
+   * үлдээгүй. Хуудас ажилласаар, тест бүгд ногоон, typecheck цэвэр — гэвч
+   * хэрэглэгч ч, ажилтан ч хаягийг гараар бичихээс өөр аргагүй болсон.
+   *
+   * Цэснээс зүйл хасах нь ердийн зүйл. Тэгэхдээ хасахдаа өөр гарц үлдээсэн
+   * эсэхийг хэн ч сануулдаггүй. Энэ тест л сануулна.
+   */
+  const app = read('src/App.tsx');
+
+  /*
+   * `<Navigate>` замуудыг алгасна: хуучин хаягийг шинэ рүү чиглүүлэх зорилготой
+   * тул тэдгээр рүү зориуд холбоос тавьдаггүй (`/zurag-ugaalt` → `/hevlel`).
+   */
+  const routes = [...app.matchAll(/<Route\s+path="([^"*:]+)"[^>]*?element=\{([^}]*)\}/g)]
+    .filter((m) => !m[2].includes('Navigate'))
+    .map((m) => m[1])
+    .filter((p) => p !== '' && p !== '/');
+
+  assert.ok(routes.length >= 4, `зам олдсонгүй: ${routes.length}`);
+
+  // `src/` доторх БҮХ файлаас холбоосуудыг цуглуулна.
+  const links = new Set<string>();
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel);
+      else if (/\.tsx?$/.test(entry.name)) {
+        for (const m of read(rel).matchAll(/(?:to|href|navigate\()\s*[=(]?\s*['"`]\/([^'"`?#]*)/g)) {
+          links.add(m[1].replace(/\/$/, ''));
+        }
+      }
+    }
+  };
+  walk('src');
+
+  const orphans = routes.filter((route) => {
+    const clean = route.replace(/^\//, '').replace(/\/$/, '');
+    // Динамик сегменттэй зам (`:дугаар`) нь загвараар таарна.
+    return ![...links].some((l) => l === clean || l.startsWith(`${clean}/`));
+  });
+
+  assert.deepEqual(
+    orphans,
+    [],
+    `эдгээр хуудас руу орох холбоос байхгүй: ${orphans.join(', ')}`,
+  );
+});
