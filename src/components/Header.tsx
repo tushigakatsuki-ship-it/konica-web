@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { NAV } from '../data/site';
+import { NAV, PRIMARY_PHONE } from '../data/site';
 import { IconClose, IconMenu, IconPhone, IconPrinter } from '../components/icons';
 
 const linkBase =
@@ -39,7 +39,27 @@ export default function Header() {
           <span className="text-xl font-extrabold tracking-tight">Printmn</span>
         </Link>
 
+        {/*
+          * Утасны дугаар толгойд.
+          *
+          * Зургийн газарт ирдэг хүсэлтийн дийлэнх нь «энэ хэмжээ байна уу»,
+          * «хэзээ бэлэн болох вэ» гэсэн богино асуулт — тэднийг вэб дээр
+          * тэнүүчлүүлэхээс залгуулах нь хурдан. Тиймээс дугаар нь эхний
+          * дэлгэц дээр, дарахад шууд залгагддаг байх ёстой.
+          */}
         <nav className="hidden items-center gap-1 md:flex">
+          <a
+            href={PRIMARY_PHONE.href}
+            className="mr-2 flex items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover:bg-brand-50"
+          >
+            <IconPhone className="size-4 text-brand-500" />
+            <span className="leading-tight">
+              <span className="block text-sm font-bold">{PRIMARY_PHONE.label}</span>
+              {PRIMARY_PHONE.note && (
+                <span className="block text-[11px] text-muted">{PRIMARY_PHONE.note}</span>
+              )}
+            </span>
+          </a>
           <a
             href={pathname === '/' ? '#kholboo' : '/#kholboo'}
             className={`${linkBase} text-ink-soft`}
@@ -59,15 +79,25 @@ export default function Header() {
           ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Цэс"
-          aria-expanded={open}
-          className="grid size-11 place-items-center rounded-md border border-hairline md:hidden"
-        >
-          {open ? <IconClose className="size-5" /> : <IconMenu className="size-5" />}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          {/* Утсан дээр дугаарыг цэс нээхгүйгээр шууд дарж болно. */}
+          <a
+            href={PRIMARY_PHONE.href}
+            aria-label={`${PRIMARY_PHONE.label} руу залгах`}
+            className="grid size-11 place-items-center rounded-md border border-hairline text-brand-500"
+          >
+            <IconPhone className="size-5" />
+          </a>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Цэс"
+            aria-expanded={open}
+            className="grid size-11 place-items-center rounded-md border border-hairline"
+          >
+            {open ? <IconClose className="size-5" /> : <IconMenu className="size-5" />}
+          </button>
+        </div>
       </div>
 
       {open && (
@@ -77,8 +107,11 @@ export default function Header() {
               <IconPrinter className="size-4" /> {item.label}
             </NavLink>
           ))}
-          <a href="/#kholboo" onClick={close} className={`${mobileLink} mb-1`}>
+          <a href="/#kholboo" onClick={close} className={mobileLink}>
             <IconPhone className="size-4" /> Холбоо барих
+          </a>
+          <a href={PRIMARY_PHONE.href} className={`${mobileLink} mb-1 text-brand-500`}>
+            <IconPhone className="size-4" /> {PRIMARY_PHONE.label}
           </a>
         </nav>
       )}

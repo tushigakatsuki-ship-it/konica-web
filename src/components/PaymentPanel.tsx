@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CONTACT } from '../data/site';
+import { PRIMARY_PHONE } from '../data/site';
 import { formatCurrency } from '../lib/price';
 import type { PaymentDetails } from '../lib/api';
 import { IconAlert, IconCheckCircle, IconClock } from './icons';
@@ -219,8 +219,8 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
         {!payment.qpay && !payment.bank && (
           <p className="text-sm text-muted">
             Төлбөрийн мэдээллийг{' '}
-            <a href={CONTACT.phoneHref} className="font-semibold text-accent">
-              {CONTACT.phone}
+            <a href={PRIMARY_PHONE.href} className="font-semibold text-accent">
+              {PRIMARY_PHONE.label}
             </a>{' '}
             дугаараас тодруулна уу.
           </p>

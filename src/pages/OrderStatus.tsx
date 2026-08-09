@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
-import { CONTACT } from '../data/site';
+import { PRIMARY_PHONE } from '../data/site';
 import { fetchOrderStatus, type OrderStatus } from '../lib/api';
 import { clearReceipt, saveReceipt } from '../lib/lastOrder';
 import { formatCurrency } from '../lib/price';
@@ -103,8 +103,8 @@ export default function OrderStatusPage() {
           <p className="text-sm leading-relaxed text-muted">{error}</p>
           <p className="mt-4 text-sm text-muted">
             Асуух зүйл байвал{' '}
-            <a href={CONTACT.phoneHref} className="font-semibold text-accent">
-              {CONTACT.phone}
+            <a href={PRIMARY_PHONE.href} className="font-semibold text-accent">
+              {PRIMARY_PHONE.label}
             </a>{' '}
             дугаарт холбогдоно уу.
           </p>
@@ -245,8 +245,8 @@ export default function OrderStatusPage() {
           шалгаж болно.
           <br />
           Асуух зүйл байвал{' '}
-          <a href={CONTACT.phoneHref} className="font-semibold text-accent">
-            {CONTACT.phone}
+          <a href={PRIMARY_PHONE.href} className="font-semibold text-accent">
+            {PRIMARY_PHONE.label}
           </a>
         </p>
       </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
-import { CONTACT } from '../data/site';
+import { PRIMARY_PHONE } from '../data/site';
 import {
   DELIVERY_FEE,
   addLine,
@@ -238,8 +238,8 @@ export default function Order() {
 
           <p className="mt-6 text-sm text-muted">
             Асуух зүйл байвал{' '}
-            <a href={CONTACT.phoneHref} className="font-semibold text-accent">
-              {CONTACT.phone}
+            <a href={PRIMARY_PHONE.href} className="font-semibold text-accent">
+              {PRIMARY_PHONE.label}
             </a>{' '}
             дугаарт холбогдоно уу.
           </p>
@@ -513,8 +513,8 @@ export default function Order() {
                 className="mt-4 rounded-sm bg-red-50 px-3 py-2 text-xs text-red-600"
               >
                 {sendError}{' '}
-                <a href={CONTACT.phoneHref} className="font-semibold underline">
-                  {CONTACT.phone}
+                <a href={PRIMARY_PHONE.href} className="font-semibold underline">
+                  {PRIMARY_PHONE.label}
                 </a>
               </p>
             )}
@@ -553,7 +553,7 @@ export default function Order() {
               )}
             </button>
             <p className="mt-3 text-center text-xs text-muted">
-              Илгээсний дараа {CONTACT.hours} хооронд холбогдоно.
+              Илгээсний дараа ажлын цагт холбогдоно.
             </p>
           </div>
         </form>

@@ -1,7 +1,7 @@
 import PageHero from '../components/PageHero';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
-import { CONTACT } from '../data/site';
+import { PRIMARY_PHONE } from '../data/site';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { IconCheck, IconPhone } from '../components/icons';
 
@@ -46,11 +46,11 @@ export default function IdPhoto() {
               * Цээж зургийг онлайнаар захиалдаггүй — хүн ирж зураг авахуулах
               * шаардлагатай. Тиймээс энд захиалгын товч биш, залгах товч.
               */}
-            <a href={CONTACT.phoneHref} className="btn-accent mt-6 w-full sm:w-auto">
-              <IconPhone className="size-4" /> {CONTACT.phone} — залгах
+            <a href={PRIMARY_PHONE.href} className="btn-accent mt-6 w-full sm:w-auto">
+              <IconPhone className="size-4" /> {PRIMARY_PHONE.label} — залгах
             </a>
             <p className="mt-3 text-sm text-muted">
-              Цаг захиалахгүйгээр {CONTACT.hours} хооронд шууд ирээд авахуулна.
+              Цаг захиалахгүйгээр ажлын цагт шууд ирээд авахуулна.
             </p>
           </div>
 
@@ -68,7 +68,7 @@ export default function IdPhoto() {
             <div className="mt-6 rounded-md bg-brand-50 p-4 text-sm">
               <p className="font-semibold">Цаг захиалгагүй</p>
               <p className="mt-1 text-muted">
-                {CONTACT.hours} хооронд шууд ирээд авахуулж болно. 5–10 минутад бэлэн.
+                Ажлын цагт шууд ирээд авахуулж болно. 5–10 минутад бэлэн.
               </p>
             </div>
           </aside>

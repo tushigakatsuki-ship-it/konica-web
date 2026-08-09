@@ -97,3 +97,52 @@ test('дүрсний сан нь өнгө удирдагддаг, дэлгэц �
   assert.ok(!('lucide-react' in pkg.dependencies));
   assert.ok(!('react-icons' in pkg.dependencies));
 });
+
+/* ── Газрын зураг ──────────────────────────────────────────────────── */
+
+test('газрын зураг нь хуудас нээхэд iframe ачаалдаггүй', () => {
+  const map = read('src/components/MapEmbed.tsx');
+
+  /*
+   * Google Maps-ийн iframe нь ~1MB JS татдаг бөгөөд хуудас ачаалахтай зэрэг
+   * эхэлдэг. Холбоо барих хэсэг рүү хүрэлгүй гарсан хүн ч түүнийг төлнө.
+   * Тиймээс facade: дарсан үед л `shown` болж iframe гарна.
+   */
+  assert.ok(map.includes('useState'), 'facade байхгүй — iframe шууд ачаалагдана');
+  assert.ok(map.includes('{shown ?'), 'iframe нөхцөлгүйгээр зурагдаж байна');
+  assert.ok(map.includes("loading=\"lazy\""));
+});
+
+test('embed хаяг нь товч линк биш координат ашиглана', () => {
+  const map = read('src/components/MapEmbed.tsx');
+
+  // `maps.app.goo.gl` нь дотроо чиглүүлэлт хийдэг тул хөтөч iframe дотор
+  // блоклодог. Координатаар дуудахад л ажиллана.
+  assert.ok(map.includes('output=embed'));
+  assert.ok(!map.includes('src={mapUrl}'));
+
+  const site = read('src/data/site.ts');
+  assert.match(site, /lat:\s*4[0-9]\./, 'өргөрөг байхгүй');
+  assert.match(site, /lng:\s*10[0-9]\./, 'уртраг байхгүй');
+});
+
+/* ── Нүүр хуудасны дэвсгэр ─────────────────────────────────────────── */
+
+test('дэвсгэр зураг солигдох нь хүртээмж, гүйцэтгэлийг зөрчөөгүй', () => {
+  const hero = read('src/components/HeroSlideshow.tsx');
+
+  // Зөвхөн эхний зураг яаралтай — бусдыг зэрэг татвал анхны зурагдалт удаана.
+  assert.ok(hero.includes("i === 0 ? 'eager' : 'lazy'"));
+
+  // Хөдөлгөөнөөс толгой эргэдэг хүнд автомат солилт ажиллах ёсгүй.
+  assert.ok(hero.includes('prefers-reduced-motion'));
+
+  // Арын табанд таймер эргүүлэх нь батарей иддэг.
+  assert.ok(hero.includes('document.hidden'));
+
+  // Цайвар зураг дээр цагаан гарчиг алга болохоос сэргийлнэ.
+  assert.ok(hero.includes('brand-900/85'));
+
+  // Зураг байхгүй үед хуудас эвдрэх ёсгүй.
+  assert.ok(hero.includes('HERO_IMAGES.length === 0'));
+});
