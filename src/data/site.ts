@@ -11,4 +11,4 @@ export const CONTACT = {
  * Толгойн цэс. `/tseej-zurag` зам ажилласаар байгаа ч цэснээс хассан —
  * вэбийн гол зорилго нь зураг хүлээн авах.
  */
-export const NAV = [{ to: '/hevlel', label: 'Хэвлэл', icon: '🖨️' }] as const;
+export const NAV = [{ to: '/hevlel', label: 'Хэвлэл' }] as const;

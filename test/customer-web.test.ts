@@ -61,3 +61,39 @@ test('хэрэглэгч зөвхөн ӨӨРИЙН захиалгаа харда
   assert.ok(api.includes('/api/payment'));
   assert.ok(!api.includes('days='));
 });
+
+/* ── Дүрс тэмдэг ──────────────────────────────────────────────────── */
+
+/**
+ * Emoji нь төхөөрөмж бүр дээр өөр зурагддаг (iOS, Android, Windows гурав
+ * гурван өөр), өнгийг нь удирдах боломжгүй, зарим төхөөрөмж дээр хайрцаг (□)
+ * болж харагддаг, хэмжээ нь фонтоос хамаарч мөрийн өндрийг үсрүүлдэг.
+ * Оронд нь `src/components/icons.tsx` доторх SVG-г ашиглана.
+ *
+ * `×` (U+00D7) нь emoji биш — «10×15 см» гэсэн зөв типографийн тэмдэг тул
+ * шалгалтаас гадуур.
+ */
+const EMOJI =
+  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0F}]/u;
+
+/** Тайлбар доторх emoji хамаарахгүй — зөвхөн интерфейст гарах текст чухал. */
+const withoutComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+test('интерфейст emoji хэрэглэхгүй — зөвхөн SVG дүрс', () => {
+  for (const file of sourceFiles('src')) {
+    const found = withoutComments(read(file)).match(EMOJI);
+    assert.equal(found, null, `${file} дотор emoji байна: ${found?.[0]}`);
+  }
+});
+
+test('дүрсний сан нь өнгө удирдагддаг, дэлгэц уншигчид нуугдсан', () => {
+  const icons = read('src/components/icons.tsx');
+  assert.ok(icons.includes('stroke="currentColor"'), 'текстийн өнгөтэй нийцэх ёстой');
+  assert.ok(icons.includes('aria-hidden="true"'), 'дэлгэц уншигч давхар уншихгүй');
+
+  // Санг нэмэлт хамааралгүй байлгана — 12 дүрсэд 40KB-ийн сан оруулах нь утгагүй.
+  const pkg = JSON.parse(read('package.json')) as { dependencies: Record<string, string> };
+  assert.ok(!('lucide-react' in pkg.dependencies));
+  assert.ok(!('react-icons' in pkg.dependencies));
+});

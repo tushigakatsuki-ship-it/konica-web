@@ -1,6 +1,15 @@
 import { Link } from 'react-router-dom';
 import { CONTACT } from '../data/site';
 import LastOrderBanner from '../components/LastOrderBanner';
+import {
+  IconArrowRight,
+  IconAward,
+  IconClock,
+  IconMail,
+  IconMapPin,
+  IconPhone,
+  IconPrinter,
+} from '../components/icons';
 
 function Hero() {
   return (
@@ -17,7 +26,7 @@ function Hero() {
 
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-28">
         <span className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/20 sm:px-4 sm:py-2 sm:text-sm">
-          <span aria-hidden>🏆</span> Konica Minolta · Мэргэжлийн зураг угаалт
+          <IconAward className="size-4 text-accent" /> Konica Minolta · Мэргэжлийн зураг угаалт
         </span>
 
         <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.08] text-white sm:mt-8 sm:text-6xl lg:text-7xl">
@@ -35,7 +44,7 @@ function Hero() {
             to="/hevlel"
             className="btn-accent w-full !py-4 !text-base sm:w-auto sm:!px-10"
           >
-            <span aria-hidden>🖨️</span> Хэвлэл
+            <IconPrinter className="size-5" /> Хэвлэл
           </Link>
         </div>
       </div>
@@ -44,11 +53,11 @@ function Hero() {
 }
 
 const CONTACT_ROWS = [
-  { icon: '📍', label: 'Хаяг', value: CONTACT.address, href: null },
-  { icon: '📞', label: 'Утас', value: CONTACT.phone, href: CONTACT.phoneHref },
-  { icon: '🕐', label: 'Цагийн хуваарь', value: CONTACT.hours, href: null },
+  { Icon: IconMapPin, label: 'Хаяг', value: CONTACT.address, href: null },
+  { Icon: IconPhone, label: 'Утас', value: CONTACT.phone, href: CONTACT.phoneHref },
+  { Icon: IconClock, label: 'Цагийн хуваарь', value: CONTACT.hours, href: null },
   {
-    icon: '✉️',
+    Icon: IconMail,
     label: 'И-мэйл',
     value: CONTACT.email,
     href: `mailto:${CONTACT.email}`,
@@ -73,15 +82,15 @@ function Contact() {
             хурдан хариулна.
           </p>
           <Link to="/hevlel" className="btn-brand mt-6 w-full sm:mt-8 sm:w-auto">
-            Хэвлэл захиалах →
+            Хэвлэл захиалах <IconArrowRight className="size-4" />
           </Link>
         </div>
 
         <dl className="space-y-4">
           {CONTACT_ROWS.map((row) => (
             <div key={row.label} className="flex items-center gap-4">
-              <span className="grid size-12 shrink-0 place-items-center rounded-md bg-brand-50 text-xl">
-                <span aria-hidden>{row.icon}</span>
+              <span className="grid size-12 shrink-0 place-items-center rounded-md bg-brand-50 text-brand-500">
+                <row.Icon className="size-5" />
               </span>
               <div className="min-w-0">
                 <dt className="text-xs font-semibold uppercase tracking-wider text-muted">

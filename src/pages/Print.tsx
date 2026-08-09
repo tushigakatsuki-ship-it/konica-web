@@ -7,6 +7,15 @@ import { byCategory, type ServiceCategory, type ServiceItem } from '../data/cata
 import { fitBox, sizeOf } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
+import {
+  IconArrowRight,
+  IconChevronDown,
+  IconClose,
+  IconCrop,
+  IconImage,
+  IconPalette,
+  IconRuler,
+} from '../components/icons';
 
 const TABS: readonly { key: ServiceCategory; label: string; hint: string }[] = [
   { key: 'Угаалт', label: 'Зураг угаалт', hint: 'Konica Minolta лабораторын өнгө.' },
@@ -154,9 +163,10 @@ export default function Print() {
                 onClick={() => setShowAll((v) => !v)}
                 className="btn-outline mt-4 w-full !py-3 !text-sm"
               >
-                {showAll
-                  ? '↑ Түгээмэл хэмжээг харуулах'
-                  : `Бүх хэмжээ харах (${all.length}) ↓`}
+                {showAll ? 'Түгээмэл хэмжээг харуулах' : `Бүх хэмжээ харах (${all.length})`}
+                <IconChevronDown
+                  className={`size-4 transition-transform ${showAll ? 'rotate-180' : ''}`}
+                />
               </button>
             )}
           </div>
@@ -193,7 +203,7 @@ export default function Print() {
                               className="size-full object-cover"
                             />
                           ) : (
-                            '🖼️'
+                            <IconImage className="size-5 text-brand-400" />
                           )}
                         </span>
 
@@ -206,11 +216,11 @@ export default function Print() {
                               onClick={() => basket.remove(item.key)}
                               className="-mt-1 shrink-0 px-1 text-muted hover:text-ink"
                             >
-                              ✕
+                              <IconClose className="size-4" />
                             </button>
                           </div>
                           <p className="truncate text-[11px] text-muted">
-                            {item.value.fileName ?? '⚠️ зураг ороогүй'}
+                            {item.value.fileName}
                           </p>
 
                           <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -247,7 +257,8 @@ export default function Print() {
                             }
                             className="mt-1.5 text-xs font-semibold text-brand-500 hover:underline"
                           >
-                            Зураг солих →
+                            Зураг солих
+                            <IconArrowRight className="size-3.5" />
                           </button>
                         </div>
                       </li>
@@ -267,7 +278,7 @@ export default function Print() {
                 disabled={basket.items.length === 0}
                 className="btn-accent mt-3 hidden w-full lg:inline-flex"
               >
-                Захиалга үргэлжлүүлэх →
+                Захиалга үргэлжлүүлэх <IconArrowRight className="size-4" />
               </button>
 
               <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
@@ -292,25 +303,23 @@ export default function Print() {
           <div className="grid gap-4 border-t border-hairline p-4 sm:grid-cols-3">
             {[
               {
-                icon: '📐',
+                Icon: IconRuler,
                 title: 'Нягтрал',
                 text: 'Зураг сонгоход тухайн хэмжээнд тохирох пикселийн доод хэмжээг харуулж, багадвал сануулна.',
               },
               {
-                icon: '✂️',
+                Icon: IconCrop,
                 title: 'Тайралт',
                 text: 'Зураг цаасны харьцаанд төвөөрөө багтана. Урьдчилсан харагдац дээрх зүйл л хэвлэгдэнэ.',
               },
               {
-                icon: '🎨',
+                Icon: IconPalette,
                 title: 'Өнгө',
                 text: 'sRGB профайл. Хэт харанхуй эсвэл бүдэг зургийг ажилтан утсаар тохирч засаж өгнө.',
               },
             ].map((tip) => (
               <div key={tip.title} className="rounded-md bg-brand-50/60 p-4">
-                <span className="text-xl" aria-hidden>
-                  {tip.icon}
-                </span>
+                <tip.Icon className="size-5 text-brand-500" />
                 <h3 className="mt-2 text-sm font-bold">{tip.title}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-muted">{tip.text}</p>
               </div>
@@ -337,7 +346,7 @@ export default function Print() {
               onClick={() => navigate('/zakhialga')}
               className="btn-accent flex-1"
             >
-              Үргэлжлүүлэх →
+              Үргэлжлүүлэх <IconArrowRight className="size-4" />
             </button>
           </div>
         </div>

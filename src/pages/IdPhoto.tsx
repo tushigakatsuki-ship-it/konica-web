@@ -3,6 +3,7 @@ import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
 import { CONTACT } from '../data/site';
 import { formatCurrency, parsePrice } from '../lib/price';
+import { IconCheck, IconPhone } from '../components/icons';
 
 const REQUIREMENTS = [
   'Цагаан эсвэл цайвар цэнхэр дэвсгэр',
@@ -46,7 +47,7 @@ export default function IdPhoto() {
               * шаардлагатай. Тиймээс энд захиалгын товч биш, залгах товч.
               */}
             <a href={CONTACT.phoneHref} className="btn-accent mt-6 w-full sm:w-auto">
-              📞 {CONTACT.phone} — залгах
+              <IconPhone className="size-4" /> {CONTACT.phone} — залгах
             </a>
             <p className="mt-3 text-sm text-muted">
               Цаг захиалахгүйгээр {CONTACT.hours} хооронд шууд ирээд авахуулна.
@@ -58,9 +59,7 @@ export default function IdPhoto() {
             <ul className="mt-4 space-y-3">
               {REQUIREMENTS.map((req) => (
                 <li key={req} className="flex gap-3 text-sm text-ink-soft">
-                  <span className="text-ok" aria-hidden>
-                    ✓
-                  </span>
+                  <IconCheck className="mt-0.5 size-4 shrink-0 text-ok-strong" />
                   {req}
                 </li>
               ))}

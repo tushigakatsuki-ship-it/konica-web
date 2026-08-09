@@ -24,6 +24,12 @@ import { receiptPath, saveReceipt } from '../lib/lastOrder';
 import PaymentPanel from '../components/PaymentPanel';
 import { uploadBasketPhotos, type UploadProgress } from '../lib/upload';
 import { useBasket } from '../state/basket';
+import {
+  IconAlert,
+  IconArrowRight,
+  IconCheckCircle,
+  IconImage,
+} from '../components/icons';
 
 const EMPTY_CUSTOMER: CustomerInfo = { name: '', phone: '', email: '', note: '' };
 
@@ -200,8 +206,8 @@ export default function Order() {
           subtitle="Ажлын цагт операторууд тань руу залгаж баталгаажуулна."
         />
         <div className="mx-auto max-w-2xl px-4 py-14 text-center sm:px-6 sm:py-20">
-          <span className="mx-auto grid size-16 place-items-center rounded-full bg-ok/10 text-3xl">
-            <span aria-hidden>✅</span>
+          <span className="mx-auto grid size-16 place-items-center rounded-full bg-ok/10 text-ok-strong">
+            <IconCheckCircle className="size-8" />
           </span>
           <p className="mt-6 text-sm text-muted">Захиалгын дугаар</p>
           <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
@@ -213,9 +219,12 @@ export default function Order() {
           </p>
 
           {confirmed.photos === 'unavailable' && (
-            <p className="mt-6 rounded-md bg-accent/10 px-4 py-3 text-sm leading-relaxed text-accent-strong">
-              ⚠️ Зураг хүлээн авах систем түр ажиллахгүй байна. Захиалга тань
-              бүртгэгдсэн — ажилтан тань руу залгаж зургийг тань авна.
+            <p className="mt-6 flex items-start gap-2 rounded-md bg-accent/10 px-4 py-3 text-left text-sm leading-relaxed text-accent-strong">
+              <IconAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Зураг хүлээн авах систем түр ажиллахгүй байна. Захиалга тань
+                бүртгэгдсэн — ажилтан тань руу залгаж зургийг тань авна.
+              </span>
             </p>
           )}
 
@@ -277,7 +286,7 @@ export default function Order() {
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-xl font-bold">1. Таны зураг</h2>
               <Link to="/hevlel" className="text-sm font-semibold text-brand-500">
-                Засах →
+                Засах
               </Link>
             </div>
 
@@ -300,7 +309,7 @@ export default function Order() {
                           className="size-full object-cover"
                         />
                       ) : (
-                        <span aria-hidden>🖼️</span>
+                        <IconImage className="size-6 text-brand-400" />
                       )}
                     </span>
                     <p className="mt-2 text-xs font-bold">
@@ -352,7 +361,7 @@ export default function Order() {
                 to="/hevlel"
                 className="mt-3 block text-center text-xs font-semibold text-brand-500 hover:underline"
               >
-                Зураг, тоо ширхэг засах →
+                Зураг, тоо ширхэг засах
               </Link>
             )}
 
@@ -535,7 +544,13 @@ export default function Order() {
             )}
 
             <button type="submit" disabled={sending} className="btn-accent mt-6 w-full">
-              {sending ? 'Илгээж байна…' : 'Захиалга илгээх →'}
+              {sending ? (
+                'Илгээж байна…'
+              ) : (
+                <>
+                  Захиалга илгээх <IconArrowRight className="size-4" />
+                </>
+              )}
             </button>
             <p className="mt-3 text-center text-xs text-muted">
               Илгээсний дараа {CONTACT.hours} хооронд холбогдоно.

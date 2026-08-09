@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { readReceipt, receiptPath, type OrderReceipt } from '../lib/lastOrder';
+import { IconArrowRight } from './icons';
 
 /**
  * «Сүүлийн захиалга» мөр.
@@ -31,7 +32,9 @@ export default function LastOrderBanner() {
         <span className="block text-xs text-muted">Сүүлийн захиалга</span>
         <span className="block truncate font-bold">{receipt.orderNumber}</span>
       </span>
-      <span className="shrink-0 font-semibold text-brand-500">Төлөв харах →</span>
+      <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand-500">
+        Төлөв харах <IconArrowRight className="size-4" />
+      </span>
     </Link>
   );
 }

@@ -5,6 +5,7 @@ import { CONTACT } from '../data/site';
 import { fetchOrderStatus, type OrderStatus } from '../lib/api';
 import { clearReceipt, saveReceipt } from '../lib/lastOrder';
 import { formatCurrency } from '../lib/price';
+import { IconCheck, IconCheckCircle, IconClock, IconLink } from '../components/icons';
 
 /**
  * `/zakhialga/PMN-260806-4821?d=…&u=…` — захиалгын төлөв.
@@ -164,11 +165,11 @@ export default function OrderStatusPage() {
                 />
               )}
               <span
-                className={`rounded-full px-3 py-1.5 ${
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 ${
                   step.done ? 'bg-ok/15 text-ok-strong' : 'bg-brand-50 text-muted'
                 }`}
               >
-                {step.done ? '✓ ' : ''}
+                {step.done && <IconCheck className="size-3" />}
                 {step.label}
               </span>
             </li>
@@ -180,8 +181,18 @@ export default function OrderStatusPage() {
             paid ? 'border-ok/40 bg-ok/10' : 'border-accent/40 bg-accent/10'
           }`}
         >
-          <p className="text-base font-black">
-            {paid ? '✅ Төлбөр баталгаажсан' : '⏳ Төлбөр хүлээгдэж байна'}
+          <p className="flex items-center gap-2 text-base font-black">
+            {paid ? (
+              <>
+                <IconCheckCircle className="size-5 text-ok-strong" /> Төлбөр
+                баталгаажсан
+              </>
+            ) : (
+              <>
+                <IconClock className="size-5 text-accent-strong" /> Төлбөр хүлээгдэж
+                байна
+              </>
+            )}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
             {paid
@@ -214,7 +225,15 @@ export default function OrderStatusPage() {
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <button type="button" onClick={() => void copyLink()} className="btn-outline flex-1">
-            {copied ? '✓ Хууллаа' : '🔗 Линк хуулах'}
+            {copied ? (
+              <>
+                <IconCheck className="size-4" /> Хууллаа
+              </>
+            ) : (
+              <>
+                <IconLink className="size-4" /> Линк хуулах
+              </>
+            )}
           </button>
           <Link to="/hevlel" className="btn-brand flex-1">
             Шинэ захиалга

@@ -3,6 +3,7 @@ import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { renderPreview } from '../lib/photoRender';
 import { recommendedPixels, sizeOf } from '../lib/photoSize';
+import { IconAlert, IconClose, IconImage } from './icons';
 
 export interface EditorValue {
   qty: number;
@@ -142,9 +143,9 @@ export default function PhotoEditor({
             type="button"
             onClick={onCancel}
             aria-label="Хаах"
-            className="-mr-1 grid size-9 shrink-0 place-items-center rounded-md text-lg text-muted hover:bg-brand-50"
+            className="-mr-1 grid size-9 shrink-0 place-items-center rounded-md text-muted hover:bg-brand-50"
           >
-            ✕
+            <IconClose className="size-5" />
           </button>
         </div>
 
@@ -170,9 +171,9 @@ export default function PhotoEditor({
                   className="absolute inset-0 grid place-items-center rounded-md border-2 border-dashed border-brand-200 px-4 text-center"
                 >
                   <span>
-                    <span className="block text-3xl" aria-hidden>
-                      {loading ? '⏳' : '🖼️'}
-                    </span>
+                    <IconImage
+                      className={`mx-auto size-8 ${loading ? 'text-muted' : 'text-brand-400'}`}
+                    />
                     <span className="mt-2 block text-sm font-semibold text-brand-500">
                       {loading ? 'Уншиж байна…' : 'Зураг оруулах'}
                     </span>
@@ -225,15 +226,19 @@ export default function PhotoEditor({
           )}
 
           {error && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
+            <p className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
+              <IconAlert className="mt-px size-4 shrink-0" />
               {error}
             </p>
           )}
 
           {lowRes && (
-            <p className="mt-3 rounded-md bg-accent/10 px-3 py-2 text-xs leading-relaxed text-accent-strong">
-              Энэ зураг {size.label} хэвлэхэд нягтрал багавтар байна. Тод гаргахын
-              тулд {recommendedPixels(size)} орчим байвал зохимжтой.
+            <p className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 px-3 py-2 text-xs leading-relaxed text-accent-strong">
+              <IconAlert className="mt-px size-4 shrink-0" />
+              <span>
+                Энэ зураг {size.label} хэвлэхэд нягтрал багавтар байна. Тод гаргахын
+                тулд {recommendedPixels(size)} орчим байвал зохимжтой.
+              </span>
             </p>
           )}
 
@@ -300,13 +305,19 @@ export default function PhotoEditor({
             disabled={loading}
             className={ready ? 'btn-accent mt-3 w-full' : 'btn-brand mt-3 w-full'}
           >
-            {loading
-              ? 'Уншиж байна…'
-              : ready
-                ? editing
-                  ? 'Хадгалах'
-                  : 'Сагсанд нэмэх'
-                : '🖼️ Эхлээд зургаа сонгоно уу'}
+            {loading ? (
+              'Уншиж байна…'
+            ) : ready ? (
+              editing ? (
+                'Хадгалах'
+              ) : (
+                'Сагсанд нэмэх'
+              )
+            ) : (
+              <>
+                <IconImage className="size-4" /> Эхлээд зургаа сонгоно уу
+              </>
+            )}
           </button>
         </div>
       </div>

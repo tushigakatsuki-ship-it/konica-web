@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CONTACT } from '../data/site';
 import { formatCurrency } from '../lib/price';
 import type { PaymentDetails } from '../lib/api';
+import { IconAlert, IconCheckCircle, IconClock } from './icons';
 
 interface Props {
   payment: PaymentDetails;
@@ -72,8 +73,8 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
   if (paid) {
     return (
       <div className="mt-8 rounded-lg border border-ok/40 bg-ok/10 p-5 text-left">
-        <p className="text-base font-black text-ok-strong">
-          <span aria-hidden>✅</span> Төлбөр баталгаажлаа
+        <p className="flex items-center gap-2 text-base font-black text-ok-strong">
+          <IconCheckCircle className="size-5" /> Төлбөр баталгаажлаа
         </p>
         <p className="mt-2 text-sm text-ink-soft">
           {photoCount > 0
@@ -87,8 +88,8 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
   return (
     <div className="mt-8 rounded-lg border border-hairline text-left">
       <div className="border-b border-hairline bg-brand-50/60 px-5 py-4">
-        <p className="text-base font-black">
-          <span aria-hidden>⏳</span> Төлбөр хүлээгдэж байна
+        <p className="flex items-center gap-2 text-base font-black">
+          <IconClock className="size-5 text-accent-strong" /> Төлбөр хүлээгдэж байна
         </p>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {photoCount > 0 ? (
@@ -204,10 +205,13 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
                 </dd>
               </div>
             </dl>
-            <p className="mt-3 rounded-md bg-accent/10 px-3 py-2 text-xs leading-relaxed text-accent-strong">
-              Гүйлгээний утгад <strong>{payment.bank.reference}</strong> гэж заавал
-              бичнэ үү — эс тэгвээс аль захиалгынх нь болохыг таних боломжгүй.
-              Шилжүүлэг ажлын цагт 10–30 минутын дотор баталгаажна.
+            <p className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 px-3 py-2 text-xs leading-relaxed text-accent-strong">
+              <IconAlert className="mt-px size-4 shrink-0" />
+              <span>
+                Гүйлгээний утгад <strong>{payment.bank.reference}</strong> гэж заавал
+                бичнэ үү — эс тэгвээс аль захиалгынх нь болохыг таних боломжгүй.
+                Шилжүүлэг ажлын цагт 10–30 минутын дотор баталгаажна.
+              </span>
             </p>
           </div>
         )}
