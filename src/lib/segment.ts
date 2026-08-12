@@ -177,7 +177,12 @@ async function loadSession(): Promise<Session | null> {
   }
 }
 
-/** Загвар бэлэн эсэх — интерфейст «аль хөдөлгүүр ажиллав» гэж харуулна. */
+/**
+ * Загвар бэлэн эсэх — интерфейст «аль хөдөлгүүр ажиллав» гэж харуулна.
+ *
+ * Worker дотроос ч дуудагдана: `fetch` болон динамик `import` хоёулаа
+ * тэнд ажилладаг тул нэмэлт заслага хэрэггүй.
+ */
 export function modelReady(): Promise<boolean> {
   sessionPromise ??= loadSession();
   return sessionPromise.then((s) => s !== null);

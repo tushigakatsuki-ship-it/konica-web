@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
-import { CONTACT, FAQ, PRIMARY_PHONE } from '../data/site';
+import { CONTACT, HERO_IMAGES, PRIMARY_PHONE } from '../data/site';
 import LastOrderBanner from '../components/LastOrderBanner';
 import MapEmbed from '../components/MapEmbed';
 import HeroSlideshow from '../components/HeroSlideshow';
 import {
   IconArrowRight,
   IconAward,
-  IconChevronDown,
+  IconImage,
   IconClock,
   IconMail,
   IconMapPin,
@@ -16,7 +16,7 @@ import {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-brand-900">
+    <section className="aurora relative overflow-hidden bg-brand-900">
       <HeroSlideshow />
 
       {/*
@@ -24,7 +24,7 @@ function Hero() {
         * Доод талд цэгүүд сууж байгаа тул `pb` нэмэгдсэн.
         */}
       <div className="relative mx-auto max-w-6xl px-4 py-16 pb-20 sm:px-6 sm:py-28 sm:pb-32">
-        <span className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/20 sm:px-4 sm:py-2 sm:text-sm">
+        <span className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/25 backdrop-blur-sm sm:px-4 sm:py-2 sm:text-sm">
           <IconAward className="size-4 text-accent" /> Konica Minolta · Мэргэжлийн зураг угаалт
         </span>
 
@@ -46,6 +46,7 @@ function Hero() {
             <IconPrinter className="size-5" /> Хэвлэл
           </Link>
         </div>
+
       </div>
     </section>
   );
@@ -174,26 +175,137 @@ function Contact() {
 }
 
 /**
- * Түгээмэл асуултууд.
+ * Bento сүлжээ — үйлчилгээний тойм.
  *
- * Зургийн газарт ирдэг дуудлагын дийлэнх нь эдгээр асуулт. Урьдчилж
- * хариулснаар ажилтны утас чөлөөтэй болж, хэрэглэгч ч шууд шийднэ.
- * `<details>` учир JS-гүй ажиллаж, хайлтын систем ч уншина.
+ * ── Яагаад тэнцүү картны эгнээ биш вэ ────────────────────────────
+ *
+ * Дөрвөн ижил карт нь бүх зүйлийг адил чухал гэж хэлдэг — өөрөөр
+ * хэлбэл юу ч чухал биш. Bento нь хэмжээгээр нь эрэмбэ тогтооно:
+ * хамгийн том нүд нь вэбийн гол зорилго (зураг хэвлүүлэх), жижгүүд нь
+ * туслах.
+ *
+ * Утсан дээр нэг багана болж эвхэгдэнэ — тэнд хэмжээний эрэмбэ ажиллахгүй
+ * тул ДАРААЛАЛ нь эрэмбийг үүрнэ.
  */
-function Faq() {
+function Bento() {
+  /*
+   * Эхний дэвсгэр зургийг том нүдний хавтас болгож ашиглана. Тусад нь
+   * зураг нэмэхгүй байгаа шалтгаан: нэг зургийг хоёр удаа татахгүй,
+   * дэлгүүр нэг л газарт зургаа солино.
+   */
+  const cover = HERO_IMAGES[0]?.src;
+
   return (
-    <section className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
-      <h2 className="text-2xl font-extrabold sm:text-3xl">Түгээмэл асуулт</h2>
-      <div className="mt-5 divide-y divide-hairline rounded-lg border border-hairline">
-        {FAQ.map((item) => (
-          <details key={item.q} className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-semibold">
-              {item.q}
-              <IconChevronDown className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180" />
-            </summary>
-            <p className="px-4 pb-4 text-sm leading-relaxed text-muted">{item.a}</p>
-          </details>
-        ))}
+    <section className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
+      <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+        Юу хэвлүүлэх вэ,{' '}
+        <span className="text-muted">та л сонго</span>
+      </h2>
+      <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted">
+        Гэр бүлийн дурсамжаас албан ёсны бичиг баримт хүртэл — нэг лабораторын
+        чанартай өнгө.
+      </p>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2">
+        {/* Гол нүд — хоёр мөр эзэлнэ. */}
+        <Link
+          to="/hevlel"
+          className="tilt group lg:col-span-2 lg:row-span-2"
+          aria-label="Зураг хэвлүүлэх"
+        >
+          <span className="tilt-face card-lift relative flex h-full min-h-64 flex-col justify-end overflow-hidden p-6 sm:min-h-72 sm:p-8">
+            {/*
+              * Дэлгүүрийн бодит ажил — зураг өөрөө хамгийн сайн зар.
+              *
+              * `HERO_IMAGES` хоосон байвал зураггүй, ердийн картаар
+              * харагдана: хоосон `<img>` нь эвдэрсэн дүрс үлдээдэг.
+              */}
+            {cover && (
+              <>
+                <img
+                  src={cover}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                {/*
+                  * Налуу халхавч — ЗААВАЛ. Зураг нь цайвар ч бараан ч байж
+                  * болох тул текстийн ялгаралтыг зөвхөн халхавч л баталгаажуулна.
+                  * `from-brand-900` нь брэндийн бараан хөх — саарлаас илүү дулаан.
+                  */}
+                <span
+                  aria-hidden
+                  className="absolute inset-0 bg-gradient-to-t from-brand-900 via-brand-900/70 to-brand-900/10"
+                />
+              </>
+            )}
+
+            <span className={`relative ${cover ? 'text-white' : ''}`}>
+              <span className={cover ? 'eyebrow !text-accent' : 'eyebrow'}>
+                Зураг угаалт · Хэвлэл
+              </span>
+              <span className="mt-3 block text-2xl font-black tracking-tight sm:text-3xl">
+                Зургаа хэвлүүл
+              </span>
+              <span
+                className={`mt-2 block max-w-sm text-sm leading-relaxed ${
+                  cover ? 'text-white/85' : 'text-muted'
+                }`}
+              >
+                6×9-өөс 50×100 см хүртэл 12 хэмжээ. Хэмжээ сонгоод зургаа
+                оруулахад үнэ тэр дороо.
+              </span>
+
+              <span
+                className={`mt-6 inline-flex items-center gap-1.5 text-sm font-bold ${
+                  cover ? 'text-accent' : 'text-brand-500'
+                }`}
+              >
+                Захиалах
+                <IconArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </span>
+            </span>
+          </span>
+        </Link>
+
+        <Link to="/tseej-zurag" className="tilt group" aria-label="Цээж зураг">
+          <span className="tilt-face card-lift flex h-full flex-col justify-between p-5 sm:p-6">
+            <span>
+              <span className="grid size-10 place-items-center rounded-md bg-brand-50 text-brand-500">
+                <IconAward className="size-5" />
+              </span>
+              <span className="mt-3 block text-base font-bold">Бичиг баримтын зураг</span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">
+                Иргэний үнэмлэх, паспорт, виз
+              </span>
+            </span>
+            <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-brand-500">
+              Дэлгэрэнгүй
+              <IconArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+            </span>
+          </span>
+        </Link>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="card flex flex-col p-4">
+            <span className="grid size-9 place-items-center rounded-md bg-brand-50 text-brand-500">
+              <IconPrinter className="size-4.5" />
+            </span>
+            <span className="mt-2.5 block text-sm font-bold">Засвартай</span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
+              Мэргэжлийн боловсруулалт
+            </span>
+          </div>
+          <div className="card flex flex-col p-4">
+            <span className="grid size-9 place-items-center rounded-md bg-accent/15 text-accent-strong">
+              <IconImage className="size-4.5" />
+            </span>
+            <span className="mt-2.5 block text-sm font-bold">Фото цаас</span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
+              Гялгар ба матт
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -206,8 +318,8 @@ export default function Home() {
       <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
         <LastOrderBanner />
       </div>
-      <div className="pt-12 sm:pt-16">
-        <Faq />
+      <div className="pt-12 sm:pt-20">
+        <Bento />
       </div>
       <Contact />
     </>

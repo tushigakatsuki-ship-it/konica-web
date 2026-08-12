@@ -14,14 +14,30 @@ import {
   IconCrop,
   IconImage,
   IconPalette,
+  IconPhone,
   IconRuler,
 } from '../components/icons';
+import { PRIMARY_PHONE } from '../data/site';
 
 const TABS: readonly { key: ServiceCategory; label: string; hint: string }[] = [
   { key: 'Угаалт', label: 'Зураг угаалт', hint: 'Konica Minolta лабораторын өнгө.' },
   { key: 'Засвар', label: 'Засвартай зураг', hint: 'Хуучирсан зургийг сэргээж хэвлэнэ.' },
   { key: 'Хэвлэл', label: 'Фото цаас', hint: '200гр фото цаас — А4, А3.' },
+  {
+    key: 'Цээж зураг',
+    label: 'Цээж зураг',
+    hint: 'Иргэний үнэмлэх, паспорт, виз — онлайнаар эсвэл салбар дээр.',
+  },
 ];
+
+/**
+ * Энэ хуудсаас ШУУД захиалдаггүй категориуд.
+ *
+ * Цээж зураг нь ердийн зурагтай өөр урсгалтай: нүүр илрүүлэх, дэвсгэр
+ * солих, чанарын хаалт. Тиймээс энд үнийг нь харуулаад, тусгай хуудас
+ * руу чиглүүлнэ — тэнд онлайнаар захиалж болно.
+ */
+const WALK_IN: readonly ServiceCategory[] = ['Цээж зураг'];
 
 /**
  * Хамгийн их захиалагддаг хэмжээнүүд.
@@ -47,6 +63,7 @@ export default function Print() {
   >(null);
 
   const all = useMemo(() => byCategory(tab), [tab]);
+  const walkIn = WALK_IN.includes(tab);
 
   /** Түгээмэл хэмжээнүүд — жагсаалтын дарааллаар нь эрэмбэлнэ. */
   const popular = useMemo(() => {
@@ -131,6 +148,32 @@ export default function Print() {
         <div className="mt-5 grid gap-8 lg:grid-cols-[1fr_340px]">
           {/* ── Хэмжээний сонголт ─────────────────────────────── */}
           <div>
+            {/*
+              * Цээж зураг нь ӨӨР урсгалтай.
+              *
+              * Нүүр илрүүлэх, дэвсгэр солих, чанарын хаалт шаардлагатай тул
+              * ердийн зургийн картан урсгалд багтахгүй. Энд үнийг нь
+              * харуулаад тусгай хуудас руу чиглүүлнэ.
+              */}
+            {walkIn && (
+              <div className="mb-4 rounded-lg bg-brand-50 p-4">
+                <p className="text-sm font-bold">Цээж зураг тусдаа хуудастай</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                  Зургаа оруулахад нүүрийг олж, дэвсгэрийг цагаан болгож,
+                  стандартын дагуу тайрна. Хэвлэхэд тохирох эсэхийг шалгаад л
+                  сагсанд нэмнэ. Салбар дээр ирж авахуулах ч боломжтой.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link to="/tseej-zurag" className="btn-brand !py-2 !text-xs">
+                    Цээж зураг захиалах
+                  </Link>
+                  <a href={PRIMARY_PHONE.href} className="btn-outline !py-2 !text-xs">
+                    <IconPhone className="size-4" /> {PRIMARY_PHONE.label}
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               {services.map((service) => {
                 const size = sizeOf(service.name);
@@ -142,11 +185,14 @@ export default function Print() {
                   <button
                     key={service.id}
                     type="button"
-                    onClick={() => setEditorFor({ service })}
-                    className={`card relative flex flex-col items-center p-3 text-center transition-colors sm:p-4 ${
-                      count > 0
-                        ? 'border-brand-500 bg-brand-50/50'
-                        : 'hover:border-brand-200 hover:bg-brand-50/40'
+                    onClick={() => (walkIn ? undefined : setEditorFor({ service }))}
+                    disabled={walkIn}
+                    className={`${walkIn ? 'card' : 'card-lift'} relative flex flex-col items-center p-3 text-center sm:p-4 ${
+                      walkIn
+                        ? 'cursor-default'
+                        : count > 0
+                          ? '!border-brand-500 bg-brand-50/50'
+                          : 'hover:bg-brand-50/40'
                     }`}
                   >
                     {count > 0 && (
@@ -164,6 +210,7 @@ export default function Print() {
                       <span
                         aria-hidden
                         style={{ width: box.width, height: box.height }}
+                        /* Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр. */
                         className="block rounded-[3px] border-2 border-brand-400 bg-white"
                       />
                     </span>
@@ -351,7 +398,7 @@ export default function Print() {
       {/* Утсан дээрх доод мөр */}
       {basket.items.length > 0 && (
         <div
-          className="sticky bottom-0 z-40 border-t border-hairline bg-white/95 px-4 py-3 backdrop-blur lg:hidden"
+          className="sticky bottom-0 z-40 border-t border-hairline bg-card/95 px-4 py-3 backdrop-blur lg:hidden"
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
         >
           <div className="mx-auto flex max-w-6xl items-center gap-3">

@@ -4,6 +4,7 @@ import { formatCurrency, parsePrice } from '../lib/price';
 import { renderPreview } from '../lib/photoRender';
 import { recommendedPixels, sizeOf } from '../lib/photoSize';
 import { IconAlert, IconClose, IconImage } from './icons';
+import PrintPreview3D from './PrintPreview3D';
 
 export interface EditorValue {
   qty: number;
@@ -129,7 +130,7 @@ export default function PhotoEditor({
         role="dialog"
         aria-modal="true"
         aria-label={`${service.name} — зураг оруулах`}
-        className="relative flex max-h-[94dvh] w-full flex-col rounded-t-xl bg-white shadow-2xl sm:max-w-md sm:rounded-xl"
+        className="relative flex max-h-[94dvh] w-full flex-col rounded-t-xl bg-card shadow-2xl sm:max-w-md sm:rounded-xl"
       >
         {/* Толгой */}
         <div className="flex shrink-0 items-start gap-3 border-b border-hairline px-4 py-3.5 sm:px-5">
@@ -149,7 +150,7 @@ export default function PhotoEditor({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+        <div className="scroll-hint min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {/* Зургийн хүрээ */}
           <div className="mx-auto w-full max-w-[260px]">
             <div
@@ -157,11 +158,17 @@ export default function PhotoEditor({
               className="relative w-full overflow-hidden rounded-md bg-brand-50"
             >
               {preview ? (
-                <img
+                /*
+                  * Хавтгай зураг биш, ЗУЗААНТАЙ цаас мэт харуулна.
+                  *
+                  * Хэрэглэгчийн жинхэнэ асуулт нь «тайрагдах уу» биш
+                  * «би юу гартаа авах вэ». Цаасны зузаан, ирмэг, гялбаа
+                  * харагдсан нь захиалахад итгэл өгнө.
+                  */
+                <PrintPreview3D
                   src={preview}
                   alt=""
-                  draggable={false}
-                  className="absolute inset-0 size-full object-cover"
+                  className="absolute inset-0 size-full [&_img]:size-full [&_.print-card]:size-full [&_.stage-face]:size-full"
                 />
               ) : (
                 <button
@@ -187,7 +194,7 @@ export default function PhotoEditor({
               )}
 
               {loading && preview && (
-                <span className="absolute inset-0 grid place-items-center bg-white/70 text-sm font-semibold text-brand-500">
+                <span className="absolute inset-0 grid place-items-center bg-card/70 text-sm font-semibold text-brand-500">
                   Уншиж байна…
                 </span>
               )}
@@ -226,7 +233,7 @@ export default function PhotoEditor({
           )}
 
           {error && (
-            <p className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
+            <p className="mt-3 flex items-start gap-2 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">
               <IconAlert className="mt-px size-4 shrink-0" />
               {error}
             </p>
@@ -268,7 +275,7 @@ export default function PhotoEditor({
 
         {/* Хөл — тоо ширхэг ба хадгалах */}
         <div
-          className="shrink-0 border-t border-hairline bg-white px-4 py-3 sm:px-5"
+          className="shrink-0 border-t border-hairline bg-card px-4 py-3 sm:px-5"
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
         >
           <div className="flex items-center justify-between gap-3">

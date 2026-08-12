@@ -430,7 +430,7 @@ export default function Order() {
                   placeholder="Батболд"
                 />
                 {errors.name && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {errors.name}
                   </p>
                 )}
@@ -456,7 +456,7 @@ export default function Order() {
                   placeholder="99001234"
                 />
                 {errors.phone && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {errors.phone}
                   </p>
                 )}
@@ -480,7 +480,7 @@ export default function Order() {
                   placeholder="name@example.com"
                 />
                 {errors.email && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {errors.email}
                   </p>
                 )}
@@ -502,7 +502,7 @@ export default function Order() {
             </div>
 
             {errors.lines && (
-              <p className="mt-4 rounded-sm bg-red-50 px-3 py-2 text-xs text-red-600">
+              <p className="mt-4 rounded-sm bg-danger-soft px-3 py-2 text-xs text-danger">
                 {errors.lines}
               </p>
             )}
@@ -510,7 +510,7 @@ export default function Order() {
             {sendError && (
               <p
                 role="alert"
-                className="mt-4 rounded-sm bg-red-50 px-3 py-2 text-xs text-red-600"
+                className="mt-4 rounded-sm bg-danger-soft px-3 py-2 text-xs text-danger"
               >
                 {sendError}{' '}
                 <a href={PRIMARY_PHONE.href} className="font-semibold underline">

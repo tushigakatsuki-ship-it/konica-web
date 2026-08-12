@@ -120,6 +120,10 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
                 alt="QPay QR код"
                 width={200}
                 height={200}
+                /*
+                 * ⚠️ Цагаан дэвсгэр ЗААВАЛ. QR уншигч хар/цагаан ялгаа
+                 * шаарддаг тул харанхуй горимд ч энэ хэвээр байх ёстой.
+                 */
                 className="mx-auto mt-3 size-50 rounded-md border border-hairline bg-white p-2"
               />
             )}

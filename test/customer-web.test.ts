@@ -343,3 +343,581 @@ test('загвар байхгүй үед хэрэгсэл ажилласаар �
   const studio = read('src/pages/IdPhotoStudio.tsx');
   assert.match(studio, /mask \?\?= backgroundMask/, 'силуэт руу буцах зам алга');
 });
+
+test('томруулалт нь төв дээр суурилсан — гулсахгүй', () => {
+  /*
+   * Тайралтыг `x/y` төлөвөөр барьвал томруулах бүрд зураг гулсана.
+   * Төв + томруулалтаар барих нь энэ асуудлыг үндсээр нь хаана.
+   */
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+
+  assert.ok(!studio.includes('setCrop('), 'хүрээг шууд төлөвт хадгалж байна');
+  assert.match(studio, /const crop = useMemo/, 'хүрээ дүгнэгддэг байх ёстой');
+  assert.ok(studio.includes('zoomCrop('), 'томруулалт хэрэглэгдээгүй');
+
+  // Шинэ зураг эсвэл хэмжээ сонгоход гар тохиргоо тэглэгдэнэ.
+  assert.ok(studio.includes('setZoom(ZOOM.default)'), 'томруулалт тэглэгддэггүй');
+
+  // Стандартаас хазайхад сэрэмжлүүлнэ — хориглохгүй.
+  assert.ok(studio.includes('offStandard'), 'стандартын сэрэмжлүүлэг алга');
+  assert.ok(studio.includes('Автомат хэмжээ'), 'буцах товч алга');
+});
+
+test('нарийн тохиргоо анхдагчаар НУУГДСАН', () => {
+  /*
+   * Ажилтан «Зөвшөөрөл: 60» гэдгээс юу ч ойлгохгүй. Автомат утга нь
+   * тохиолдлын дийлэнхэд ажилладаг тул үндсэн урсгалд байх шаардлагагүй.
+   */
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+
+  assert.ok(
+    studio.includes('const [advanced, setAdvanced] = useState(false)'),
+    'нарийн тохиргоо нээлттэй эхэлж байна',
+  );
+  assert.ok(studio.includes('Нарийн тохиргоо'), 'хумих хэсэг алга');
+  assert.ok(studio.includes('aria-expanded={advanced}'), 'дэлгэц уншигчид төлөв мэдэгдэхгүй');
+
+  // Техникийн нэр томьёо үндсэн урсгалд гарах ёсгүй.
+  /*
+   * ⚠️ Тайлбарыг ЗААВАЛ хасна. Эхний хувилбар түүхий эхийг зүсээд шалгасан
+   * тул кодын тайлбар доторх «U²-Net» дурдлагыг интерфейсийн текст гэж
+   * тоолоод худал уналаа.
+   */
+  const ui = withoutComments(studio);
+  const beforeAdvanced = ui.slice(0, ui.indexOf('Нарийн тохиргоо'));
+  assert.ok(!beforeAdvanced.includes('U²-Net загвар'), 'хөдөлгүүрийн нэр үндсэн урсгалд байна');
+});
+
+test('алдааг хэрэглэгчийн хэлээр харуулна', () => {
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+
+  // Техникийн дэлгэрэнгүйг консолд, хэрэглэгчид энгийн өгүүлбэр.
+  assert.ok(studio.includes('console.error('), 'хөгжүүлэгчид мэдээлэл үлдээгээгүй');
+  assert.match(studio, /Зургийг боловсруулахад асуудал гарлаа/, 'найрсаг мессеж алга');
+
+  // Түүхий алдааг дэлгэц рүү дамжуулах ёсгүй.
+  assert.ok(!/setProblem\(\s*String\(error\)/.test(studio));
+  assert.ok(!/setProblem\(\s*error/.test(studio));
+});
+
+test('чанарын шалгалт интерфейст холбогдсон', () => {
+  const studio = read('src/pages/IdPhotoStudio.tsx');
+  assert.ok(studio.includes('checkQuality('), 'шалгалт дуудагдаагүй');
+  assert.ok(studio.includes('Хэвлэхэд бэлэн'), 'төлөв харуулаагүй');
+  assert.ok(studio.includes('isPrintReady('), 'бэлэн эсэхийг шийдээгүй');
+});
+
+/* ── Багц боловсруулалт ба Worker ─────────────────────────────────── */
+
+test('Worker-ийн зам DOM-д хүрэхгүй', () => {
+  /*
+   * ⚠️ Worker дотор `document`, `window` БАЙХГҮЙ. Тэдгээрт хүрвэл багц
+   * боловсруулалт шууд унана — гэхдээ зөвхөн ТУРШИЛТЫН үед биш, бодит
+   * ажлын үед. Тиймээс энэ түгжээ хэрэгтэй.
+   *
+   * `lib/canvas.ts` нь цорын ганц зөвшөөрөгдсөн газар: тэр нь
+   * OffscreenCanvas руу шилжиж, DOM-ыг зөвхөн НӨӨЦ зам болгон хэрэглэдэг.
+   */
+  const chain = [
+    'src/workers/photo.worker.ts',
+    'src/lib/processPhoto.ts',
+    'src/lib/faceDetect.ts',
+    'src/lib/segment.ts',
+    'src/lib/idPhoto.ts',
+    'src/lib/quality.ts',
+    'src/lib/batch.ts',
+  ];
+
+  for (const file of chain) {
+    const source = withoutComments(read(file));
+    assert.doesNotMatch(source, /\bdocument\./, `${file} нь document-д хүрч байна`);
+    assert.doesNotMatch(source, /\bwindow\./, `${file} нь window-д хүрч байна`);
+  }
+
+  // Зөвшөөрөгдсөн газарт нь DOM нь НӨӨЦ зам байх ёстой, анхдагч биш.
+  const canvas = withoutComments(read('src/lib/canvas.ts'));
+  assert.ok(canvas.includes('new OffscreenCanvas('), 'OffscreenCanvas хэрэглээгүй');
+  assert.ok(
+    canvas.indexOf('OffscreenCanvas') < canvas.indexOf('document.createElement'),
+    'DOM нь анхдагч зам болсон байна',
+  );
+});
+
+test('Worker болон нөөц зам НЭГ логик хуваалцана', () => {
+  /*
+   * Хоёр тусдаа хэрэгжүүлэлт бичвэл цаг хугацаа өнгөрөхөд зөрнө: нэгд нь
+   * засвар орж, нөгөөд нь ордоггүй. Тэр зөрүү нь зөвхөн Worker дэмждэггүй
+   * хөтөч дээр илэрдэг тул хамгийн сүүлд анзаарагдана.
+   */
+  const worker = read('src/workers/photo.worker.ts');
+  const batch = read('src/lib/photoBatch.ts');
+
+  assert.ok(worker.includes('processPhoto'), 'Worker нь дамжлагыг импортлоогүй');
+  assert.ok(batch.includes('processPhoto'), 'нөөц зам дамжлагыг импортлоогүй');
+
+  // Дамжлагын дүрэм Worker дотор ДАВХАРДАЖ бичигдээгүй байх ёстой.
+  assert.ok(!worker.includes('cropForFace'), 'Worker дотор логик давхардсан');
+  assert.ok(!worker.includes('backgroundMask'), 'Worker дотор логик давхардсан');
+});
+
+test('нэг зураг унахад багц зогсохгүй', () => {
+  const batch = read('src/lib/photoBatch.ts');
+  // `Promise.all` нь БҮГДийг зэрэг эхлүүлж, эхний алдаанд бүхлээр унана.
+  assert.ok(!/Promise\.all\(\s*files/.test(batch), 'files дээр Promise.all хэрэглэсэн');
+  assert.ok(batch.includes('runBatch('), 'дараалал хэрэглээгүй');
+
+  const queue = read('src/lib/batch.ts');
+  assert.ok(queue.includes('catch (error)'), 'алдааг барихгүй байна');
+  assert.match(queue, /concurrency/, 'зэрэгцээлт хязгаарлаагүй');
+});
+
+test('цээж зургийг онлайнаар сагсанд хийлгэхгүй', () => {
+  /*
+   * Цээж зургийн үнийг харуулах нь ЗӨВ — хүн ирэхээсээ өмнө мэдэх ёстой.
+   * Гэхдээ сагсанд хийлгэх нь БУРУУ: гэрээсээ илгээсэн зураг гэрэлтүүлэг,
+   * дэвсгэр, толгойн байрлалын стандарт хангадаггүй тул буцаагдана.
+   * Мөнгө авчихаад буцаах нь хэрэглэгчийг хуурсан хэрэг.
+   */
+  const print = read('src/pages/Print.tsx');
+
+  assert.ok(print.includes("key: 'Цээж зураг'"), 'таб нэмэгдээгүй');
+  assert.ok(print.includes('WALK_IN'), 'онлайн бус категори тэмдэглэгдээгүй');
+  assert.match(print, /disabled=\{walkIn\}/, 'картыг дарж болохоор үлдсэн');
+  assert.ok(print.includes('PRIMARY_PHONE'), 'залгах гарц алга');
+});
+
+/* ── Дизайн систем ба харанхуй горим ─────────────────────────────── */
+
+test('интерфейст ХАТУУ өнгө хэрэглээгүй — харанхуйд эргэх ёстой', () => {
+  /*
+   * Харанхуй горим нь `--color-*` хувьсагчийг дахин зарлаж ажилладаг.
+   * `bg-white`, `text-[#333]` гэх мэт хатуу утга нь тэр механизмыг
+   * тойрч гарах тул харанхуйд цагаан толбо, уншигдахгүй текст үлдэнэ.
+   *
+   * Хоёр ҮНДЭСЛЭЛТЭЙ үл хамаарах зүйл бий:
+   *   • QR код — уншигч хар/цагаан ялгаа шаарддаг
+   *   • Цаасны загвар — цаас нь үргэлж цагаан
+   * Хоёулаа кодод тайлбартай.
+   */
+  const allowed = new Set([
+    'src/components/PaymentPanel.tsx',
+    'src/pages/Print.tsx',
+    'src/components/HeroSlideshow.tsx',
+    'src/pages/Home.tsx',
+    'src/components/PhotoEditor.tsx',
+  ]);
+
+  for (const file of sourceFiles('src')) {
+    if (allowed.has(file.replace(/\\/g, '/'))) continue;
+    const source = withoutComments(read(file));
+
+    assert.doesNotMatch(
+      source,
+      /className="[^"]*\bbg-white\b(?!\/)/,
+      `${file} дотор bg-white — харанхуйд эргэхгүй`,
+    );
+    assert.doesNotMatch(
+      source,
+      /\b(?:bg|text|border)-\[#[0-9a-fA-F]{3,8}\]/,
+      `${file} дотор хатуу hex өнгө`,
+    );
+
+    /*
+     * ⚠️ Tailwind-ийн АНХДАГЧ палитр ч мөн адил хориотой.
+     *
+     * Эхний хувилбар зөвхөн `bg-white` болон hex утгыг хайсан тул
+     * `bg-red-50`, `text-red-600` зэрэг өнгө шалгалтаас мултарсан.
+     * Тэдгээр нь тогтмол утга — харанхуй горимд эргэхгүй. `bg-red-50`
+     * (#fef2f2) нь бараг цагаан тул бараан карт дээр цайвар толбо болно.
+     *
+     * Оронд нь `--color-danger`, `--color-ok` гэх мэт утга санааны
+     * токенуудыг хэрэглэнэ.
+     */
+    assert.doesNotMatch(
+      source,
+      /\b(?:bg|text|border|ring|divide)-(?:red|green|blue|slate|gray|zinc|neutral|stone|yellow|orange|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/,
+      `${file} дотор Tailwind-ийн анхдагч палитр — харанхуйд эргэхгүй`,
+    );
+  }
+});
+
+test('харанхуй горим бүрэн палитртай', () => {
+  const css = read('src/index.css');
+
+  /*
+   * ⚠️ СЕЛЕКТОРыг хайна, зүгээр нэрийг нь биш.
+   *
+   * Эхний хувилбар `indexOf("[data-theme='dark']")` бичсэн нь буруу байв:
+   * тэр мөр файлын толгойн ТАЙЛБАР дотор ч байдаг тул зүсэлт бүхэл
+   * `@theme` блокийг хамруулж, тест худал ногоон/улаан болно.
+   */
+  const lightBlock = css.slice(css.indexOf('@theme {'), css.indexOf('@layer base'));
+  const darkStart = css.indexOf("[data-theme='dark'] {");
+  assert.ok(darkStart > 0, 'харанхуй горимын селектор алга');
+  const darkBlock = css.slice(darkStart, css.indexOf('html {'));
+
+  const names = [...lightBlock.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]);
+  const surfaces = names.filter((n) => /^(canvas|card|sunken|ink|ink-soft|muted|hairline)$/.test(n));
+
+  assert.ok(surfaces.length >= 7, `гадаргууны токен дутуу: ${surfaces.join(', ')}`);
+  for (const name of surfaces) {
+    assert.ok(darkBlock.includes(`--color-${name}:`), `харанхуйд --color-${name} алга`);
+  }
+
+  // Цэвэр хар нь OLED дээр нүд ядраадаг — зориуд хэрэглээгүй.
+  assert.doesNotMatch(darkBlock, /--color-canvas:\s*#000/, 'зотон цэвэр хар болсон');
+});
+
+test('амбер дээрх текст хоёр горимд уншигдана', () => {
+  /*
+   * `--color-on-accent` нь ЗОРИУД флипддэггүй. Амбер дэвсгэр хоёр горимд
+   * хоёуланд нь цайвар байдаг тул текст нь үргэлж бараан байх ёстой.
+   * Флипдэг токен (жишээ нь brand-900) хэрэглэвэл харанхуйд цайвар дээр
+   * цайвар болно.
+   */
+  const css = read('src/index.css');
+  assert.ok(css.includes('--color-on-accent:'), 'амбер дээрх текстийн токен алга');
+  assert.match(css, /@utility btn-accent \{[\s\S]*?text-on-accent/, 'амбер товч буруу токен ашиглаж байна');
+
+  const dark = css.slice(css.indexOf("[data-theme='dark'] {"), css.indexOf('html {'));
+  assert.ok(!dark.includes('--color-on-accent:'), 'амбер дээрх текст харанхуйд флипдэж байна');
+});
+
+test('горим сонголт гурван төлөвтэй, анивчихаас сэргийлсэн', () => {
+  const theme = read('src/state/theme.ts');
+
+  /*
+   * «Систем» төлөв заавал хэрэгтэй: зөвхөн гэрэл/харанхуй хоёртой бол
+   * хэрэглэгчийн үйлдлийн систем оройдоо солигдоход вэб дагахгүй.
+   */
+  assert.match(theme, /'light' \| 'dark' \| 'system'/, 'системийн төлөв алга');
+  assert.ok(theme.includes("removeAttribute('data-theme')"), 'систем рүү буцах зам алга');
+
+  // localStorage нь нууц горимд шидэж болно — вэбийг унагаах ёсгүй.
+  assert.match(theme, /catch\s*\{/, 'localStorage хамгаалалтгүй');
+
+  /*
+   * Анивчихаас сэргийлэх скрипт нь index.html дотор, БЛОКЛОДОГ байх ёстой.
+   * React дотор хийвэл харанхуй горимын хэрэглэгч эхлээд цагаан дэлгэц
+   * харна.
+   */
+  const html = read('index.html');
+  assert.ok(html.includes('printmn-theme'), 'анивчихаас сэргийлэх скрипт алга');
+  assert.ok(html.indexOf('printmn-theme') < html.indexOf('/src/main.tsx'), 'скрипт хожуу ажиллана');
+  assert.ok(!/<script[^>]*\bdefer\b[^>]*>[\s\S]*?printmn-theme/.test(html), 'скрипт defer болсон');
+});
+
+test('хөдөлгөөнийг нэг газраас удирдана', () => {
+  const css = read('src/index.css');
+
+  /*
+   * `prefers-reduced-motion` дүрэм НЭГ газар байх нь чухал: компонент
+   * бүрт `motion-safe:` бичих шаардлагатай бол нэгийг нь мартах нь
+   * цаг хугацааны асуудал.
+   */
+  assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'хөдөлгөөн хумих дүрэм алга');
+  assert.match(css, /animation-duration:\s*0\.01ms\s*!important/);
+  assert.match(css, /transition-duration:\s*0\.01ms\s*!important/);
+
+  // Товч дарагдахад хариу өгнө.
+  assert.match(css, /@utility btn \{[\s\S]*?active:scale/, 'товч дарагдах хариугүй');
+  // Хуудас шилжих анимаци богино байх ёстой.
+  assert.match(css, /page-enter\s+(\d+)ms/, 'хуудас шилжих анимаци алга');
+  const ms = Number(/page-enter (\d+)ms/.exec(css)?.[1]);
+  assert.ok(ms > 0 && ms <= 250, `хуудас шилжилт хэт удаан: ${ms}ms`);
+});
+
+test('хуудас шилжихэд анимаци ДАХИН ажиллана', () => {
+  /*
+   * `key` байхгүй бол React зөвхөн ялгааг шинэчилдэг тул CSS анимаци
+   * нэг л удаа ажиллаад дахин гарахгүй — өөрөөр хэлбэл шилжилт байхгүй.
+   */
+  const layout = read('src/components/Layout.tsx');
+  assert.match(layout, /key=\{pathname\}/, 'түлхүүргүй тул анимаци дахин ажиллахгүй');
+  assert.ok(layout.includes('page-enter'), 'шилжилтийн класс алга');
+});
+
+/* ── Premium minimal харагдац ─────────────────────────────────────── */
+
+test('түгээмэл асуултын хэсэг бүрэн устсан', () => {
+  const home = read('src/pages/Home.tsx');
+  assert.ok(!home.includes('function Faq'), 'FAQ компонент үлдсэн');
+  assert.ok(!home.includes('FAQ'), 'FAQ импорт үлдсэн');
+
+  // Хэрэглэгдэхээ больсон өгөгдөл ч үлдэх ёсгүй.
+  const site = read('src/data/site.ts');
+  assert.ok(!site.includes('export const FAQ'), 'FAQ өгөгдөл үлдсэн');
+});
+
+test('шилэн гадаргууг ХЭМНЭЛТТЭЙ хэрэглэсэн', () => {
+  /*
+   * `backdrop-filter` нь пиксел бүрийг дахин тооцдог тул хямд утсан дээр
+   * гүйлгэлт таталддаг. Мөн доогуураа юу байгаагаас текстийн ялгаралт
+   * хамаардаг тул урт текст дээр уншигдах баталгаа алдагдана.
+   *
+   * Хязгаар: цөөн хэдэн гадаргуу. Хэтэрвэл энэ тест сануулна.
+   */
+  let uses = 0;
+  for (const file of sourceFiles('src')) {
+    uses += (withoutComments(read(file)).match(/\bglass\b/g) ?? []).length;
+  }
+  assert.ok(uses > 0, 'шилэн гадаргуу огт хэрэглээгүй');
+  assert.ok(uses <= 6, `шилэн гадаргуу хэт олон газар: ${uses}`);
+
+  const css = read('src/index.css');
+  assert.ok(css.includes('-webkit-backdrop-filter'), 'Safari дээр ажиллахгүй');
+  // Дээд ирмэгийн гэрэл нь горим бүрт өөр — харанхуйд сул байх ёстой.
+  assert.ok(css.includes('--glass-edge'), 'шилэн ирмэгийн токен алга');
+});
+
+test('aurora нь товшилт, гүйлгэлтэд саад болохгүй', () => {
+  /*
+   * `filter: blur()` нь GPU давхарга үүсгэдэг. Хэрэв тэр давхарга
+   * товшилт барьдаг бол доорх линкүүд дарагдахаа болино — нүдээр
+   * харагдахгүй, зөвхөн хэрэглэгч гомдолловол мэдэгдэнэ.
+   */
+  const css = read('src/index.css');
+  const block = css.slice(css.indexOf('.aurora::before'), css.indexOf('}', css.indexOf('.aurora::before')));
+  assert.match(block, /pointer-events:\s*none/, 'aurora товшилт барина');
+  assert.match(block, /z-index:\s*-1/, 'aurora агуулгыг халхална');
+
+  // Нэг л газар — олон газар давтвал чимэглэл болно.
+  let uses = 0;
+  for (const file of sourceFiles('src')) {
+    uses += (withoutComments(read(file)).match(/\baurora\b/g) ?? []).length;
+  }
+  assert.ok(uses <= 2, `aurora хэт олон газар: ${uses}`);
+});
+
+test('3D хазайлт нь хуруунд гацахгүй', () => {
+  /*
+   * Хуруугаар ажилладаг төхөөрөмж дээр `hover` гэж байхгүй. Зарим хөтөч
+   * товшилтыг hover гэж тайлбарладаг тул карт хазайсан хэвээр «гацдаг».
+   */
+  const css = read('src/index.css');
+  assert.match(css, /@media \(hover: none\)[\s\S]{0,120}transform:\s*none/, 'хуруунд гацна');
+
+  // Хазайлт бага байх ёстой — их бол текст гажигтай харагдана.
+  const deg = [...css.matchAll(/rotate[XY]\((-?[\d.]+)deg\)/g)].map((m) => Math.abs(Number(m[1])));
+  assert.ok(deg.length > 0, 'хазайлт алга');
+  assert.ok(Math.max(...deg) <= 4, `хазайлт хэт их: ${Math.max(...deg)}°`);
+});
+
+test('bento сүлжээ утсан дээр эвхэгдэнэ', () => {
+  const home = read('src/pages/Home.tsx');
+  assert.ok(home.includes('function Bento'), 'bento хэсэг алга');
+
+  /*
+   * Утсан дээр хэмжээний эрэмбэ ажиллахгүй тул НЭГ багана болж, дараалал
+   * нь эрэмбийг үүрнэ. `lg:` угтваргүй `col-span` нь утсан дээр ч хүчинтэй
+   * үлдэж, сүлжээг эвдэнэ.
+   */
+  assert.ok(!/\bcol-span-2\b(?<!lg:col-span-2)/.test(home.replace(/lg:col-span-2/g, '')), 'багана эвхэгдэхгүй');
+  assert.ok(home.includes('lg:col-span-2'), 'том нүд томроогүй');
+});
+
+test('цээж зургийн ЧАНАРЫН ХААЛТ сулраагүй', () => {
+  /*
+   * ⚠️ Энэ бол хамгийн чухал түгжээ.
+   *
+   * Цээж зургийг онлайнаар авах боломжтой болсны ЦОРЫН ГАНЦ үндэслэл нь
+   * чанарын хаалт. Эхэндээ энэ боломжийг зориуд хаасан байсан: гэрээсээ
+   * илгээсэн зураг стандарт хангахгүй тул буцаагдана, мөнгө авчихаад
+   * буцаах нь хэрэглэгчийг хуурсан хэрэг гэж үзсэн.
+   *
+   * `isPrintReady` шалгалт нь тэр эсэргүүцлийг арилгасан. Хаалтыг
+   * сулруулбал анхны асуудал буцаад ирнэ.
+   */
+  const order = read('src/components/IdPhotoOrder.tsx');
+
+  assert.ok(order.includes('isPrintReady('), 'чанарын шалгалт дуудагдаагүй');
+  assert.match(order, /disabled=\{!ready/, 'шалгалт унасан ч сагсанд нэмж болно');
+
+  // Нэмэх функц өөрөө ч хамгаалалттай байх ёстой — товч л биш.
+  assert.match(order, /if \(!service \|\| !blob \|\| !ready\) return;/, 'функцэд хамгаалалтгүй');
+
+  // Сагсанд ЭХ файл биш, боловсруулсан файл орно.
+  assert.ok(order.includes('new File([blob]'), 'боловсруулсан файл сагсанд ороогүй');
+});
+
+test('цээж зураг хоёр замтай — онлайн ба салбар', () => {
+  const page = read('src/pages/IdPhoto.tsx');
+  assert.ok(page.includes('IdPhotoOrder'), 'онлайн захиалга алга');
+  // Салбар дээр ирэх зам ч үлдэх ёстой — шалгалт унасан хүнд гарц хэрэгтэй.
+  assert.ok(page.includes('PRIMARY_PHONE'), 'залгах гарц алга');
+
+  const order = read('src/components/IdPhotoOrder.tsx');
+  assert.match(order, /салбар дээр\s*\n?\s*ирээд авахуулж болно/, 'нөөц гарц санал болгоогүй');
+});
+
+test('сагс БҮХ хуудаснаас харагдана', () => {
+  /*
+   * Сагсны интерфейс анх зөвхөн `/hevlel`-ийн баруун баганад байсан.
+   * Цээж зургийг `/tseej-zurag`-аас захиалдаг болсноор энэ эвдэрсэн:
+   * хэрэглэгч нэмэхэд дэлгэц дээр юу ч өөрчлөгдөхгүй, сагсаа хаанаас
+   * харахаа ч мэдэхгүй болсон.
+   *
+   * Толгой бол цорын ганц зөв газар — бүх хуудсанд байдаг.
+   */
+  const header = read('src/components/Header.tsx');
+  assert.ok(header.includes('BasketButton'), 'толгойд сагс алга');
+
+  const button = read('src/components/BasketButton.tsx');
+  assert.ok(button.includes("to=\"/zakhialga\""), 'сагс захиалгын хуудас руу заагаагүй');
+  assert.match(button, /totalQty === 0\) return null/, 'хоосон сагс цэс дүүргэж байна');
+  // Тоо нь дэлгэц уншигчид ч хүрэх ёстой — зөвхөн харагдах тэмдэг хангалтгүй.
+  assert.match(button, /aria-label=\{`Сагс/, 'дэлгэц уншигчид тоо хүрэхгүй');
+});
+
+test('сагсанд нэмсний дараа юу болохыг хэлнэ', () => {
+  const order = read('src/components/IdPhotoOrder.tsx');
+  assert.ok(order.includes('Сагсанд нэмэгдлээ'), 'баталгаа алга');
+  assert.ok(order.includes('Захиалга үргэлжлүүлэх'), 'дараагийн алхам алга');
+  assert.ok(order.includes('Өөр зураг нэмэх'), 'дахин нэмэх зам алга');
+});
+
+test('сагсанд өгсөн зургийн хаяг устгагдахгүй', () => {
+  /*
+   * `URL.createObjectURL` нь гараар чөлөөлөгддөг. Сагсанд өгсөн хаягийг
+   * компонент цэвэрлэвэл сагсан дахь зураг эвдэрнэ — алдаа шидэхгүй,
+   * зүгээр л хоосон дөрвөлжин үлдэнэ.
+   */
+  const order = read('src/components/IdPhotoOrder.tsx');
+  const add = order.slice(order.indexOf('const addToBasket'), order.indexOf('return (', order.indexOf('const addToBasket')));
+  assert.match(add, /urlRef\.current = null;/, 'эзэмшил шилжээгүй — хаяг устгагдана');
+});
+
+/* ── 3D гүн ─────────────────────────────────────────────────────── */
+
+test('заагч дагасан хазайлт нь ГУРВАН хамгаалалттай', () => {
+  const tilt = read('src/lib/useTilt.ts');
+
+  /*
+   * 1. `pointermove` нь секундэд 100+ удаа дуудагдана. Тухай бүрд нь
+   *    style тавибал зурагдалт таталдана.
+   */
+  assert.ok(tilt.includes('requestAnimationFrame'), 'rAF хязгаарлалтгүй');
+  assert.ok(tilt.includes('cancelAnimationFrame'), 'цэвэрлэгээгүй');
+
+  /*
+   * 2. ⚠️ `index.css` доторх нэгдсэн `prefers-reduced-motion` дүрэм нь
+   *    `transition`, `animation`-ыг л барина. JS-ээр ШУУД тавьсан
+   *    утгад хүрэхгүй тул энд ТУСАД нь шалгах ёстой.
+   */
+  assert.ok(
+    tilt.includes("matchMedia('(prefers-reduced-motion: reduce)')"),
+    'хөдөлгөөн хумих сонголтыг үл ойшоолоо',
+  );
+
+  // 3. Хуруугаар ажилладаг төхөөрөмжид заагч байхгүй.
+  assert.match(tilt, /hover: hover/, 'хуруунд дэмий сонсогч хавсаргана');
+
+  // Сонсогчийг заавал салгана — эс бөгөөс санах ой алдагдана.
+  assert.ok(tilt.includes('removeEventListener'), 'сонсогч салгагдаагүй');
+});
+
+test('JS ажиллаагүй ч 3D загвар зөв харагдана', () => {
+  /*
+   * `--tilt-*` анхдагч утга нь 0 байх ёстой. Байхгүй бол SSR, хуучин
+   * хөтөч, эсвэл хөдөлгөөн хүсээгүй хэрэглэгч дээр `calc()` нь
+   * тодорхойгүй болж, карт огт зурагдахгүй.
+   */
+  const css = read('src/index.css');
+  const stage = css.slice(css.indexOf('@utility stage {'), css.indexOf('@utility stage-face'));
+  assert.match(stage, /--tilt-x:\s*0/, 'анхдагч утга алга');
+  assert.match(stage, /--tilt-y:\s*0/, 'анхдагч утга алга');
+});
+
+test('3D нь WebGL сан нэмээгүй', () => {
+  /*
+   * Three.js нь ~150KB gz — одоогийн бүх багц үүнээс бага. Гурав дахин
+   * хүндрүүлэх нь Улаанбаатарын утасны сүлжээн дэх хэрэглэгчид рүү
+   * шууд буудаг.
+   */
+  const pkg = JSON.parse(read('package.json')) as { dependencies?: Record<string, string> };
+  for (const dep of Object.keys(pkg.dependencies ?? {})) {
+    assert.ok(!/three|babylon|@react-three/.test(dep), `WebGL сан нэмэгдсэн: ${dep}`);
+  }
+});
+
+test('3D загвар нь зөвхөн зураг оруулсны дараа гарна', () => {
+  /*
+   * Овоолол нь эхэндээ hero дээр байсан ч хасагдсан: тэр нь ЗАР
+   * сурталчилгааны шинжтэй байсан бөгөөд хэрэглэгчийн асуултад
+   * хариулдаггүй байв. Одоо 3D нь зөвхөн ХЭРЭГЛЭГЧИЙН ӨӨРИЙН зураг
+   * дээр ажиллана — «би юу гартаа авах вэ» гэдэгт хариулна.
+   */
+  const preview = read('src/components/PrintPreview3D.tsx');
+  assert.ok(!preview.includes('PrintStack3D'), 'хэрэглэгдэхгүй овоолол үлдсэн');
+
+  const editor = read('src/components/PhotoEditor.tsx');
+  assert.ok(editor.includes('PrintPreview3D'), '3D загвар холбогдоогүй');
+});
+
+test('bento-гийн том нүдэн дэх зураг текстийг халхлахгүй', () => {
+  const home = read('src/pages/Home.tsx');
+
+  /*
+   * Зураг нь цайвар ч бараан ч байж болно. Текстийн уншигдалтыг
+   * ЗӨВХӨН халхавч л баталгаажуулна — зурган дээр шууд текст тавибал
+   * гэрэлтэй зурагт цагаан үсэг алга болно.
+   */
+  assert.ok(home.includes('bg-gradient-to-t from-brand-900'), 'халхавч алга');
+
+  /*
+   * Зураг байхгүй үед `<img src="">` нь эвдэрсэн дүрс үлдээдэг тул
+   * бүхэлд нь нөхцөлтэй байх ёстой. `HeroSlideshow`-той ижил зарчим.
+   */
+  assert.match(home, /const cover = HERO_IMAGES\[0\]\?\.src/, 'зураггүй үеийн хамгаалалтгүй');
+  assert.match(home, /\{cover && \(/, 'зураг нөхцөлгүйгээр зурагдана');
+
+  // Хавтас нь чимэглэл — анхны зурагдалтыг удаашруулах ёсгүй.
+  assert.match(home, /loading="lazy"/, 'хавтас яаралтай татагдана');
+});
+
+test('гүйдэг талбар нь гүйхээ ХЭЛНЭ', () => {
+  /*
+   * Гүйдэг талбар нь доор нь өөр агуулга байгаа эсэхээ хэлдэггүй.
+   * Хэрэглэгч «энэ гүйх үү» гэдгийг таамаглах хэрэгтэй болдог —
+   * ялангуяа модал цонхонд, товч нь доор нуугдсан үед.
+   *
+   * `background-attachment: local` ба `scroll` хоёрын хослол нь JS-гүйгээр
+   * үүнийг шийднэ: ирмэгт байхад халхавч сүүдрийг дарна, гүйж эхлэхэд
+   * сүүдэр илэрнэ.
+   */
+  const css = read('src/index.css');
+  const hint = css.slice(css.indexOf('@utility scroll-hint'), css.length);
+
+  assert.ok(hint.includes('no-repeat local'), 'агуулгатай хамт гүйх халхавч алга');
+  assert.ok(hint.includes('no-repeat scroll'), 'талбартай зогсох сүүдэр алга');
+  // Хуруугаар босоо чиглэлд гүйлгэхэд саад болохгүй.
+  assert.match(hint, /touch-action:\s*pan-y/, 'хуруугаар гүйлгэхэд саад болно');
+
+  const editor = read('src/components/PhotoEditor.tsx');
+  assert.ok(editor.includes('scroll-hint'), 'модалд заалт алга');
+  // Гүйдэг талбарын бүтэц зөв эсэх — эдгээргүйгээр огт гүйхгүй.
+  assert.match(editor, /min-h-0 flex-1 overflow-y-auto/, 'гүйдэг талбарын бүтэц эвдэрсэн');
+});
+
+test('алдааны өнгө хоёр горимд ажиллана', () => {
+  const css = read('src/index.css');
+  assert.ok(css.includes('--color-danger:'), 'алдааны токен алга');
+  assert.ok(css.includes('--color-danger-soft:'), 'алдааны дэвсгэрийн токен алга');
+
+  const darkStart = css.indexOf("[data-theme='dark'] {");
+  const dark = css.slice(darkStart, css.indexOf('html {'));
+  assert.ok(dark.includes('--color-danger:'), 'харанхуйд алдааны өнгө эргэхгүй');
+  assert.ok(dark.includes('--color-danger-soft:'), 'харанхуйд алдааны дэвсгэр эргэхгүй');
+});
+
+test('hero дээр хэвлэмэлийн овоолол байхгүй', () => {
+  const home = read('src/pages/Home.tsx');
+  assert.ok(!home.includes('PrintStack3D'), 'овоолол үлдсэн');
+
+  /*
+   * `HERO_IMAGES` нь ХЭРЭГЛЭГДСЭЭР байна — bento-гийн том нүдний хавтас
+   * болгож. Эхний хувилбар «импорт үлдсэн» гэж шалгасан нь хэт өргөн
+   * байсан: овоолол хасагдсан ч зураг өөр зорилгоор хэрэгтэй хэвээр.
+   */
+  assert.ok(home.includes('HERO_IMAGES[0]?.src'), 'том нүдний хавтас алга');
+});

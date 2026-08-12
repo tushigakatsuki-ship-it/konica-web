@@ -5,6 +5,7 @@ import {
   IconAlert,
   IconArrowRight,
   IconCheck,
+  IconChevronDown,
   IconCrop,
   IconImage,
 } from '../components/icons';
@@ -16,6 +17,10 @@ import {
   backgroundMask,
   autoWhiteBalance,
   fitBackdrop,
+  headRatioIn,
+  zoomCrop,
+  HEAD_RATIO_TOLERANCE,
+  ZOOM,
   PURPOSES,
   type Backdrop,
   type PurposeKey,
@@ -28,6 +33,8 @@ import {
 } from '../lib/idPhoto';
 import { detectFace, type FaceResult } from '../lib/faceDetect';
 import { modelReady, segmentWithModel } from '../lib/segment';
+import { checkQuality, isPrintReady, worstLevel, type Check } from '../lib/quality';
+import BatchProcessor from '../components/BatchProcessor';
 import { decodeImage } from '../lib/photoRender';
 
 /**
@@ -81,8 +88,16 @@ export default function IdPhotoStudio() {
   const [copies, setCopies] = useState(0);
   const [stage, setStage] = useState<Stage>('idle');
   const [face, setFace] = useState<FaceResult | null>(null);
-  /** Тайрах хүрээ — автоматаар тооцоод, ажилтан чирж засаж болно. */
-  const [crop, setCrop] = useState<CropRect | null>(null);
+  /*
+   * Тайралтыг ТӨВ + ТОМРУУЛАЛТААР илэрхийлнэ, `x/y`-аар биш.
+   *
+   * Томруулахад төв тогтвортой үлдэх ёстой. `x/y`-аар хадгалбал томруулах
+   * бүрд зураг гулсаж, ажилтан дахин дахин байрлуулна.
+   */
+  /** Автоматаар тооцсон суурь хүрээ — томруулалтын лавлагаа. */
+  const [baseCrop, setBaseCrop] = useState<CropRect | null>(null);
+  const [center, setCenter] = useState<{ x: number; y: number } | null>(null);
+  const [zoom, setZoom] = useState<number>(ZOOM.default);
   const [clamped, setClamped] = useState(false);
   /** Дэвсгэр жигд бус тул хавтгайн загварт итгээгүй. */
   const [messyBackdrop, setMessyBackdrop] = useState(false);
@@ -93,6 +108,14 @@ export default function IdPhotoStudio() {
   /** Хамгийн сүүлд аль хөдөлгүүр ажиллав. */
   const [engine, setEngine] = useState<'silhouette' | 'u2net'>('silhouette');
   const [busy, setBusy] = useState(false);
+  /** Автомат чанарын шалгалтын үр дүн — энгийн монгол өгүүлбэрүүд. */
+  const [checks, setChecks] = useState<Check[]>([]);
+  /** Нарийн тохиргоо нээлттэй эсэх. Анхдагчаар ХААЛТТАЙ. */
+  const [advanced, setAdvanced] = useState(false);
+  /** Хэрэглэгчид харуулах найрсаг алдааны мессеж. */
+  const [problem, setProblem] = useState<string | null>(null);
+  /** Олон зургийн горим. */
+  const [batch, setBatch] = useState(false);
 
   const layout = useMemo(() => sheetLayout(size), [size]);
   const background = BACKGROUNDS.find((b) => b.key === bgKey) ?? BACKGROUNDS[0];
@@ -114,13 +137,33 @@ export default function IdPhotoStudio() {
       if (!source || !detected) return;
 
       const auto = cropForFace(detected.box, target, source.width, source.height);
-      setCrop(auto.rect);
+      setBaseCrop(auto.rect);
+      setCenter({ x: auto.rect.x + auto.rect.w / 2, y: auto.rect.y + auto.rect.h / 2 });
+      // Хэмжээ эсвэл зураг солигдоход гар тохиргоог тэглэнэ.
+      setZoom(ZOOM.default);
       setClamped(auto.clamped);
     },
     [],
   );
 
   useEffect(() => recrop(face, size), [face, recrop, size]);
+
+  /** Эцсийн хүрээ — суурь, төв, томруулалт гурваас гарна. */
+  const crop = useMemo<CropRect | null>(() => {
+    const source = sourceRef.current;
+    if (!baseCrop || !center || !source) return null;
+    return zoomCrop(baseCrop, center, zoom, source.width, source.height);
+  }, [baseCrop, center, zoom]);
+
+  /*
+   * Гараар томруулсны дараа стандарт зөрчигдсөн эсэх.
+   *
+   * Хориглохгүй — СЭРЭМЖЛҮҮЛНЭ. Заримдаа өндөр үс, малгайны улмаас зөв
+   * шалтгаанаар хазайлгах шаардлага гардаг.
+   */
+  const headRatio = face && crop ? headRatioIn(face.box.h, crop.h) : null;
+  const offStandard =
+    headRatio !== null && Math.abs(headRatio - size.headRatio) > HEAD_RATIO_TOLERANCE;
 
   /** Зургийн тайрсан хэсгийг canvas дээр буулгаж, дэвсгэрийг солино. */
   const drawPhoto = useCallback(
@@ -177,8 +220,38 @@ export default function IdPhotoStudio() {
 
       applyBackground(image.data, soft, background.rgb);
       ctx.putImageData(image, 0, 0);
+
+      /*
+       * Чанарын шалгалтыг ЭНД хийнэ — эцсийн, боловсруулагдсан пиксел дээр.
+       * Эх зураг дээр шалгавал тайралт, дэвсгэр солилтын дараах бодит үр
+       * дүнг хэмжихгүй.
+       */
+      let backgroundPixels = 0;
+      for (let i = 0; i < soft.length; i += 1) if (soft[i] > 200) backgroundPixels += 1;
+
+      const scaleX = outW / crop.w;
+      const scaleY = outH / crop.h;
+      setChecks(
+        checkQuality({
+          data: image.data,
+          width: outW,
+          height: outH,
+          face: face
+            ? {
+                x: (face.box.x - crop.x) * scaleX,
+                y: (face.box.y - crop.y) * scaleY,
+                w: face.box.w * scaleX,
+                h: face.box.h * scaleY,
+              }
+            : null,
+          faceCount: face?.faceCount,
+          size,
+          backdrop,
+          backgroundShare: backgroundPixels / soft.length,
+        }),
+      );
     },
-    [background, crop, size, tolerance],
+    [background, crop, face, size, tolerance],
   );
 
   useEffect(() => {
@@ -194,7 +267,11 @@ export default function IdPhotoStudio() {
     if (!file) return;
     setStage('working');
     setFace(null);
-    setCrop(null);
+    setBaseCrop(null);
+    setCenter(null);
+    setZoom(ZOOM.default);
+
+    setProblem(null);
 
     try {
       closeRef.current?.();
@@ -238,6 +315,19 @@ export default function IdPhotoStudio() {
         },
       });
       setStage('ready');
+    } catch (error) {
+      /*
+       * Хэрэглэгчид ХЭЗЭЭ Ч техникийн мессеж харуулахгүй. «Failed to decode
+       * image» гэдэг нь юу хийхээ хэлдэггүй; «өөр зураг сонгоно уу» гэдэг
+       * нь хэлдэг.
+       *
+       * Дэлгэрэнгүйг консолд үлдээнэ — хөгжүүлэгчид хэрэгтэй.
+       */
+      console.error('[цээж зураг] боловсруулалт амжилтгүй', error);
+      setProblem(
+        'Зургийг боловсруулахад асуудал гарлаа. Өөр зураг сонгоод дахин оролдоно уу.',
+      );
+      setStage('idle');
     } finally {
       setBusy(false);
     }
@@ -258,11 +348,18 @@ export default function IdPhotoStudio() {
     const dy = ((event.clientY - start.y) / rect.height) * crop.h;
     drag.current = { x: event.clientX, y: event.clientY };
 
-    setCrop({
-      ...crop,
-      x: Math.max(0, Math.min(source.width - crop.w, crop.x - dx)),
-      y: Math.max(0, Math.min(source.height - crop.h, crop.y - dy)),
-    });
+    /*
+     * Төвийг ШУУД хязгаарлана. Зөвхөн хүрээг хязгаарлавал ирмэг дээр
+     * чирэхэд төв цааш явсаар байгаад буцахад «наалдсан» мэдрэмж өгнө.
+     */
+    setCenter((c) =>
+      c === null
+        ? c
+        : {
+            x: Math.max(crop.w / 2, Math.min(source.width - crop.w / 2, c.x - dx)),
+            y: Math.max(crop.h / 2, Math.min(source.height - crop.h / 2, c.y - dy)),
+          },
+    );
   };
 
   /* ── Хуудас угсарч татах ──────────────────────────────────────── */
@@ -405,12 +502,30 @@ export default function IdPhotoStudio() {
               ref={fileInput}
               type="file"
               accept="image/jpeg,image/png,image/webp"
+              multiple
               hidden
               onChange={(e) => {
-                void pickFile(e.target.files?.[0]);
+                const files = e.target.files;
+                /*
+                 * Олон зураг сонгосон бол багцын горим руу ӨӨРӨӨ шилжинэ.
+                 * Ажилтан тусдаа горим сонгож сурах шаардлагагүй — сонголт
+                 * нь юу хийхийг нь аль хэдийн хэлсэн.
+                 */
+                if (files && files.length > 1) setBatch(true);
+                else void pickFile(files?.[0]);
                 e.target.value = '';
               }}
             />
+
+            {stage === 'idle' && !batch && (
+              <button
+                type="button"
+                onClick={() => setBatch(true)}
+                className="mt-3 w-full text-[11px] font-semibold text-muted transition-colors hover:text-brand-500"
+              >
+                Олон зураг нэг дор боловсруулах
+              </button>
+            )}
 
             {stage !== 'idle' && (
               <button
@@ -420,6 +535,21 @@ export default function IdPhotoStudio() {
               >
                 Зураг солих
               </button>
+            )}
+
+            {/*
+              * Алдааны мессеж — ХЭРЭГЛЭГЧИЙН хэлээр.
+              *
+              * «Failed to decode image» гэдэг нь юу хийхээ хэлдэггүй.
+              * Дэлгэрэнгүй нь консол дээр үлдэнэ (`console.error`).
+              */}
+            {problem && (
+              <div className="mt-4 rounded-md bg-accent/10 p-3">
+                <p className="flex items-start gap-2 text-xs leading-relaxed text-accent-strong">
+                  <IconAlert className="mt-px size-4 shrink-0" />
+                  {problem}
+                </p>
+              </div>
             )}
 
             {/* ── Илрүүлэлтийн төлөв ──────────────────────────── */}
@@ -468,23 +598,74 @@ export default function IdPhotoStudio() {
             )}
 
             {/*
-              * Аль хөдөлгүүр ажилласныг ил хэлнэ. Ажилтан үр дүн муу гарвал
-              * шалтгааныг таамаглах шаардлагагүй байх ёстой.
+              * Чанарын автомат шалгалт.
+              *
+              * Техникийн тоо биш, ЭНГИЙН өгүүлбэр. Ажилтан «Лапласын дисперс
+              * 0.42» гэдгээс юу ч ойлгохгүй; «Зураг бага зэрэг бүдэг байна»
+              * гэдгээс юу хийхээ мэднэ.
               */}
-            {stage === 'ready' && removeBg && (
-              <p className="mt-2 text-[11px] leading-relaxed text-muted">
-                Дэвсгэр салгалт:{' '}
-                <span className="font-semibold text-ink-soft">
-                  {engine === 'u2net' ? 'U²-Net загвар' : 'дүрсийн хүрээ'}
-                </span>
-                {engine === 'silhouette' && hasModel && ' (загвар ачаалагдсангүй)'}
-                {!hasModel && ' — загвар суулгаагүй'}
-              </p>
+            {stage === 'ready' && checks.length > 0 && (
+              <div className="mt-4 rounded-lg border border-hairline p-3.5">
+                <p
+                  className={`flex items-center gap-2 text-sm font-bold ${
+                    isPrintReady(checks) ? 'text-ok-strong' : 'text-accent-strong'
+                  }`}
+                >
+                  {isPrintReady(checks) ? (
+                    <IconCheck className="size-4 shrink-0" />
+                  ) : (
+                    <IconAlert className="size-4 shrink-0" />
+                  )}
+                  {isPrintReady(checks)
+                    ? worstLevel(checks) === 'ok'
+                      ? 'Хэвлэхэд бэлэн'
+                      : 'Хэвлэж болно — доорхийг шалгана уу'
+                    : 'Хэвлэхэд тохирохгүй'}
+                </p>
+
+                <ul className="mt-2.5 space-y-1.5">
+                  {checks
+                    .filter((c) => c.level !== 'ok' || worstLevel(checks) === 'ok')
+                    .map((check) => (
+                      <li
+                        key={check.key}
+                        className={`flex items-start gap-2 text-[11px] leading-relaxed ${
+                          check.level === 'ok' ? 'text-muted' : 'text-accent-strong'
+                        }`}
+                      >
+                        {check.level === 'ok' ? (
+                          <IconCheck className="mt-px size-3.5 shrink-0 text-ok-strong" />
+                        ) : (
+                          <IconAlert className="mt-px size-3.5 shrink-0" />
+                        )}
+                        {check.message}
+                      </li>
+                    ))}
+                </ul>
+              </div>
             )}
           </div>
 
           {/* ── Тохиргоо ───────────────────────────────────────── */}
           <div className="space-y-6">
+            {/*
+              * Багцын горим — тохиргооны баганын ДЭЭД талд.
+              *
+              * Хэмжээ, дэвсгэр зэрэг доорх тохиргоог багц ч хэрэглэдэг тул
+              * ажилтан эхлээд тохируулаад дараа нь зургуудаа оруулна.
+              */}
+            {batch && (
+              <BatchProcessor
+                settings={{
+                  sizeIndex: ID_SIZES.indexOf(size),
+                  background: background.rgb,
+                  tolerance,
+                  outHeight: cmToPx(size.h),
+                }}
+                onExit={() => setBatch(false)}
+              />
+            )}
+
             {/*
               * Зорилго — техникийн биш, ЭРХ ЗҮЙН сонголт.
               *
@@ -521,8 +702,66 @@ export default function IdPhotoStudio() {
               )}
             </div>
 
+            {/*
+              * Томруулалт — автомат тайралтын гар засвар.
+              *
+              * Илрүүлэлт бага зэрэг алдвал (үс өндөр, эрүү бүдэг) хүн хэт том
+              * эсвэл жижиг орно. Дахин зураг авахуулахаас гулсуур хямд.
+              */}
+            {stage === 'ready' && (
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-bold">2. Томруулалт</h2>
+                  <button
+                    type="button"
+                    onClick={() => setZoom(ZOOM.default)}
+                    disabled={zoom === ZOOM.default}
+                    className="text-[11px] font-semibold text-muted transition-colors hover:text-brand-500 disabled:opacity-40"
+                  >
+                    Автомат хэмжээ
+                  </button>
+                </div>
+
+                <label className="mt-2 block">
+                  <span className="sr-only">Томруулалт</span>
+                  <input
+                    type="range"
+                    min={ZOOM.min}
+                    max={ZOOM.max}
+                    step={ZOOM.step}
+                    value={zoom}
+                    onChange={(event) => setZoom(Number(event.target.value))}
+                    className="w-full accent-brand-500"
+                  />
+                </label>
+
+                <div className="flex items-center justify-between text-[11px] text-muted">
+                  <span>Жижиг</span>
+                  <span className="font-semibold text-ink-soft">
+                    {headRatio !== null
+                      ? `толгой ${Math.round(headRatio * 100)}%`
+                      : `${zoom.toFixed(2)}×`}
+                  </span>
+                  <span>Том</span>
+                </div>
+
+                <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                  Зураг дээр чирж байрлуулна. Стандарт{' '}
+                  {Math.round(size.headRatio * 100)}%.
+                </p>
+
+                {offStandard && (
+                  <p className="mt-2 flex items-start gap-2 rounded-md bg-accent/10 p-3 text-[11px] leading-relaxed text-accent-strong">
+                    <IconAlert className="mt-px size-4 shrink-0" />
+                    Толгойн харьцаа стандартаас хазайлаа. Зөв шалтгаан (өндөр үс,
+                    малгай) байвал зүгээр, эс бөгөөс «Автомат хэмжээ» рүү буцаана уу.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
-              <h2 className="text-sm font-bold">2. Хэмжээ</h2>
+              <h2 className="text-sm font-bold">3. Хэмжээ</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 {ID_SIZES.map((item) => (
                   <button
@@ -545,7 +784,7 @@ export default function IdPhotoStudio() {
             </div>
 
             <div>
-              <h2 className="text-sm font-bold">3. Дэвсгэр</h2>
+              <h2 className="text-sm font-bold">4. Дэвсгэр</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 {BACKGROUNDS.map((item) => (
                   <button
@@ -573,31 +812,14 @@ export default function IdPhotoStudio() {
               </div>
 
               {removeBg ? (
-                <div className="mt-3 space-y-3">
-                  <label className="block">
-                    <span className="flex justify-between text-xs font-semibold text-ink-soft">
-                      <span>Зөвшөөрөл</span>
-                      <span className="text-muted">{tolerance}</span>
-                    </span>
-                    <input
-                      type="range"
-                      min={10}
-                      max={160}
-                      value={tolerance}
-                      onChange={(e) => setTolerance(Number(e.target.value))}
-                      className="mt-1.5 w-full accent-[#1a56db]"
-                    />
-                  </label>
-
-                  <p className="flex items-start gap-2 rounded-md bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent-strong">
-                    <IconAlert className="mt-px size-4 shrink-0" />
-                    <span>
-                      Буржгар үс, нимгэн шил зэрэг нарийн ирмэг заримдаа бүдгэрнэ.
-                      Хүнд тохиолдолд <strong>«Хэвээр»</strong> сонгоод гараар
-                      засах нь хурдан.
-                    </span>
-                  </p>
-                </div>
+                <p className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent-strong">
+                  <IconAlert className="mt-px size-4 shrink-0" />
+                  <span>
+                    Буржгар үс, нимгэн шил зэрэг нарийн ирмэг заримдаа бүдгэрнэ.
+                    Хүнд тохиолдолд <strong>«Хэвээр»</strong> сонгоод гараар
+                    засах нь хурдан.
+                  </span>
+                </p>
               ) : (
                 <p className="mt-3 text-[11px] leading-relaxed text-muted">
                   Дэвсгэрийг хөндөхгүй — тайралт, хуудасны байрлуулалт л хийгдэнэ.
@@ -605,8 +827,64 @@ export default function IdPhotoStudio() {
               )}
             </div>
 
+            {/*
+              * ── Нарийн тохиргоо ─────────────────────────────────
+              *
+              * Энгийн ажилтан үүнийг ХЭЗЭЭ Ч нээх шаардлаггүй. Автомат утга
+              * тохирохгүй ховор тохиолдолд л нээнэ. Тиймээс анхдагчаар
+              * хаалттай — үндсэн урсгалыг богино байлгана.
+              */}
+            <div className="border-t border-hairline pt-4">
+              <button
+                type="button"
+                onClick={() => setAdvanced((v) => !v)}
+                aria-expanded={advanced}
+                className="flex w-full items-center justify-between text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+              >
+                Нарийн тохиргоо
+                <span aria-hidden className={advanced ? 'rotate-180' : ''}>
+                  <IconChevronDown className="size-4" />
+                </span>
+              </button>
+
+              {advanced && (
+                <div className="mt-3 space-y-4">
+                  {removeBg && (
+                    <label className="block">
+                      <span className="flex justify-between text-xs font-semibold text-ink-soft">
+                        <span>Дэвсгэр таних мэдрэг байдал</span>
+                        <span className="text-muted">{tolerance}</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={10}
+                        max={160}
+                        value={tolerance}
+                        onChange={(e) => setTolerance(Number(e.target.value))}
+                        className="mt-1.5 w-full accent-[#1a56db]"
+                      />
+                      <span className="mt-1 block text-[11px] leading-relaxed text-muted">
+                        Дэвсгэр дутуу арилвал нэмнэ, хүн идэгдвэл багасгана.
+                      </span>
+                    </label>
+                  )}
+
+                  {removeBg && (
+                    <p className="text-[11px] leading-relaxed text-muted">
+                      Дэвсгэр салгалт:{' '}
+                      <span className="font-semibold text-ink-soft">
+                        {engine === 'u2net' ? 'U²-Net загвар' : 'дүрсийн хүрээ'}
+                      </span>
+                      {engine === 'silhouette' && hasModel && ' (загвар ачаалагдсангүй)'}
+                      {!hasModel && ' — загвар суулгаагүй'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div>
-              <h2 className="text-sm font-bold">4. Хуудас</h2>
+              <h2 className="text-sm font-bold">5. Хуудас</h2>
               <dl className="mt-2 rounded-md bg-brand-50/70 px-3 py-2.5 text-xs">
                 <div className="flex justify-between py-0.5">
                   <dt className="text-muted">Цаас</dt>

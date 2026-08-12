@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NAV, PRIMARY_PHONE } from '../data/site';
+import ThemeToggle from './ThemeToggle';
+import BasketButton from './BasketButton';
 import { IconClose, IconMenu, IconPhone, IconPrinter } from '../components/icons';
 
 const linkBase =
@@ -30,8 +32,18 @@ export default function Header() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-hairline bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+    /*
+      * ── Хөвөгч толгой ────────────────────────────────────────────
+      *
+      * Дэлгэцийн ирмэгээс ТАСАРСАН, бөөрөнхий, сүүдэртэй. Бүтэн өргөнтэй
+      * зурвасаас ялгаатай нь: агуулга нь доогуур нь гүйж өнгөрөх нь
+      * харагдаж, хуудас нэг бүтэн хуудас биш, ДАВХАРГА мэт мэдрэгдэнэ.
+      *
+      * Гадна `sticky` контейнер нь өндрөө эзэлдэг тул доорх агуулга
+      * толгойн доогуур ороод алга болохгүй.
+      */
+    <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
+      <div className="glass mx-auto flex h-16 max-w-6xl items-center justify-between rounded-xl px-4 sm:px-5">
         <Link to="/" onClick={close} className="flex items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-md bg-brand-500 text-lg font-black text-white">
             P
@@ -77,9 +89,13 @@ export default function Header() {
               <IconPrinter className="size-4" /> {item.label}
             </NavLink>
           ))}
+          <BasketButton />
+          <ThemeToggle className="ml-1" />
         </nav>
 
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-1.5 md:hidden">
+          <BasketButton onNavigate={close} />
+          <ThemeToggle className="size-11" />
           {/* Утсан дээр дугаарыг цэс нээхгүйгээр шууд дарж болно. */}
           <a
             href={PRIMARY_PHONE.href}
@@ -101,7 +117,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <nav className="border-t border-hairline bg-white px-4 py-2 shadow-lg md:hidden">
+        <nav className="glass mx-auto mt-2 max-w-6xl rounded-xl px-4 py-2 md:hidden">
           {NAV.map((item) => (
             <NavLink key={item.to} to={item.to} onClick={close} className={mobileLink}>
               <IconPrinter className="size-4" /> {item.label}

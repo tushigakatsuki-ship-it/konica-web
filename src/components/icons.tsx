@@ -171,3 +171,34 @@ export const IconAward = (props: IconProps) => (
     <path d="m8.2 13.9-1.4 7 5.2-3 5.2 3-1.4-7" />
   </Base>
 );
+
+/** Гэрэл горим — нар. */
+export const IconSun = (props: IconProps) => (
+  <Base {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+  </Base>
+);
+
+/** Харанхуй горим — сар. */
+export const IconMoon = (props: IconProps) => (
+  <Base {...props}>
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+  </Base>
+);
+
+/** Системийн горимыг дагана — дэлгэц. */
+export const IconDisplay = (props: IconProps) => (
+  <Base {...props}>
+    <rect x="2" y="4" width="20" height="13" rx="2" />
+    <path d="M8 21h8M12 17v4" />
+  </Base>
+);
+
+/** Сагс. */
+export const IconBasket = (props: IconProps) => (
+  <Base {...props}>
+    <path d="M6 2 3 7M18 2l3 5M2 7h20l-1.6 11.2A3 3 0 0 1 17.4 21H6.6a3 3 0 0 1-3-2.8L2 7Z" />
+    <path d="M10 11v6M14 11v6" />
+  </Base>
+);

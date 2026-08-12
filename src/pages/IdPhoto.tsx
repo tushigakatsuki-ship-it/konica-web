@@ -5,6 +5,7 @@ import { byCategory } from '../data/catalog';
 import { PRIMARY_PHONE } from '../data/site';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { IconCheck, IconCrop, IconPhone } from '../components/icons';
+import IdPhotoOrder from '../components/IdPhotoOrder';
 
 const REQUIREMENTS = [
   'Цагаан эсвэл цайвар цэнхэр дэвсгэр',
@@ -28,31 +29,46 @@ export default function IdPhoto() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-16">
         <div className="grid gap-8 lg:grid-cols-[1fr_360px] lg:gap-10">
           <div>
-            <h2 className="text-xl font-bold">Үнэ</h2>
-            <ul className="mt-4 divide-y divide-hairline rounded-lg border border-hairline">
-              {items.map((service) => (
-                <li
-                  key={service.id}
-                  className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-5 sm:py-4"
-                >
-                  <span className="text-sm font-medium">{service.name}</span>
-                  <span className="shrink-0 text-sm font-bold text-brand-500">
-                    {formatCurrency(parsePrice(service.price))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-
             {/*
-              * Цээж зургийг онлайнаар захиалдаггүй — хүн ирж зураг авахуулах
-              * шаардлагатай. Тиймээс энд захиалгын товч биш, залгах товч.
+              * ── Дараалал: ҮЙЛДЭЛ эхэнд, лавлагаа дараа ──────────────
+              *
+              * Хүн энэ хуудсанд «цээж зураг хийлгэе» гэсэн зорилготой
+              * ирдэг. Үнийн жагсаалтыг эхэнд тавьбал зорилгодоо хүрэхийн
+              * тулд эхлээд гүйлгэх шаардлагатай болно.
+              *
+              * Үнэ нь ЛАВЛАГАА — хэрэгтэй, гэхдээ хоёрдугаарт. Захиалгын
+              * хэсэгт сонгосон хэмжээний үнэ аль хэдийн харагддаг тул
+              * дийлэнх хүн жагсаалт хүртэл огт хүрэхгүй.
               */}
-            <a href={PRIMARY_PHONE.href} className="btn-accent mt-6 w-full sm:w-auto">
-              <IconPhone className="size-4" /> {PRIMARY_PHONE.label} — залгах
-            </a>
-            <p className="mt-3 text-sm text-muted">
-              Цаг захиалахгүйгээр ажлын цагт шууд ирээд авахуулна.
-            </p>
+            <IdPhotoOrder />
+
+            <div className="mt-10">
+              <h2 className="text-xl font-bold">Бүх хэмжээний үнэ</h2>
+              <ul className="mt-4 divide-y divide-hairline rounded-lg border border-hairline">
+                {items.map((service) => (
+                  <li
+                    key={service.id}
+                    className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-5 sm:py-4"
+                  >
+                    <span className="text-sm font-medium">{service.name}</span>
+                    <span className="shrink-0 text-sm font-bold text-brand-500">
+                      {formatCurrency(parsePrice(service.price))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-10 rounded-lg bg-brand-50 p-5">
+              <p className="text-sm font-bold">Эсвэл салбар дээр ирж авахуулна</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                Цаг захиалахгүйгээр ажлын цагт шууд ирээд 5–10 минутад
+                авахуулна. Мэргэжлийн гэрэлтүүлэг, дэвсгэртэй.
+              </p>
+              <a href={PRIMARY_PHONE.href} className="btn-accent mt-4 w-full sm:w-auto">
+                <IconPhone className="size-4" /> {PRIMARY_PHONE.label} — залгах
+              </a>
+            </div>
 
             {/*
               * Ажилтны хэрэгсэл рүү холбоос.

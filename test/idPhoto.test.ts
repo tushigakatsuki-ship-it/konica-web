@@ -11,6 +11,9 @@ import {
   backgroundMask,
   borderColor,
   cmToPx,
+  headRatioIn,
+  zoomCrop,
+  ZOOM,
   featherMask,
   fitBackdrop,
   sheetLayout,
@@ -577,4 +580,81 @@ test('баримтын горим засварыг хаана', () => {
   assert.ok(doc && general);
   assert.equal(doc.allowRetouch, false, 'баримтад царай өөрчлөх засвар нээлттэй');
   assert.equal(general.allowRetouch, true);
+});
+
+/* ── Гар аргаар томруулах ────────────────────────────────────────── */
+
+const base = { x: 100, y: 100, w: 200, h: 267 };
+
+test('томруулахад ТӨВ хөдөлдөггүй', () => {
+  /*
+   * Хамгийн чухал шинж. Байрлалыг `x/y`-аар бодвол томруулах бүрд зураг
+   * гулсаж, ажилтан дахин дахин байрлуулна — гулсуур ашиглах боломжгүй
+   * болно.
+   */
+  const center = { x: 200, y: 233.5 };
+
+  for (const zoom of [0.7, 1, 1.4, 2]) {
+    const r = zoomCrop(base, center, zoom, 1000, 1000);
+    assert.ok(Math.abs(r.x + r.w / 2 - center.x) < 0.001, `төв гулссан: zoom ${zoom}`);
+    assert.ok(Math.abs(r.y + r.h / 2 - center.y) < 0.001, `төв гулссан: zoom ${zoom}`);
+  }
+});
+
+test('томруулалт их = хүрээ жижиг = хүн ТОМ', () => {
+  const center = { x: 200, y: 233.5 };
+  const wide = zoomCrop(base, center, 0.8, 1000, 1000);
+  const tight = zoomCrop(base, center, 1.5, 1000, 1000);
+
+  assert.ok(tight.w < wide.w, 'томруулахад хүрээ жижгэрээгүй');
+  assert.ok(
+    headRatioIn(100, tight.h) > headRatioIn(100, wide.h),
+    'толгойн эзлэх хувь өсөөгүй',
+  );
+});
+
+test('харьцаа хадгалагдана — зураг сунахгүй', () => {
+  /*
+   * Хүрээ зурагнаас хэтэрвэл зөвхөн нэг талыг нь тайрвал зураг сунана.
+   * Хоёр талыг ХАМТ багасгах ёстой.
+   */
+  const ratio = base.w / base.h;
+  const center = { x: 200, y: 233.5 };
+
+  for (const zoom of [0.6, 1, 2]) {
+    const r = zoomCrop(base, center, zoom, 1000, 1000);
+    assert.ok(Math.abs(r.w / r.h - ratio) < 1e-6, `харьцаа алдагдсан: zoom ${zoom}`);
+  }
+
+  // Зурагнаас том хүрээ асуусан ч харьцаа хэвээр.
+  const huge = zoomCrop(base, center, ZOOM.min, 150, 400);
+  assert.ok(Math.abs(huge.w / huge.h - ratio) < 1e-6, 'багтаахад харьцаа алдагдсан');
+});
+
+test('хүрээ зургийн гадна гардаггүй', () => {
+  const iw = 300;
+  const ih = 400;
+
+  // Төвийг булан руу түлхсэн ч хүрээ дотор үлдэх ёстой.
+  for (const center of [
+    { x: 0, y: 0 },
+    { x: iw, y: ih },
+    { x: -500, y: 900 },
+  ]) {
+    const r = zoomCrop(base, center, 1, iw, ih);
+    assert.ok(r.x >= -1e-6 && r.y >= -1e-6, `сөрөг байрлал: ${r.x}, ${r.y}`);
+    assert.ok(r.x + r.w <= iw + 1e-6, 'баруун ирмэг давсан');
+    assert.ok(r.y + r.h <= ih + 1e-6, 'доод ирмэг давсан');
+  }
+});
+
+test('томруулалтын хязгаар утга учиртай', () => {
+  assert.ok(ZOOM.min < ZOOM.default && ZOOM.default < ZOOM.max);
+  // Хэт өргөн хязгаар нь ашиггүй: 0.5-аас доош бол хүн танигдахаа болино.
+  assert.ok(ZOOM.min >= 0.5, 'хэт жижрүүлэх боломжтой');
+  assert.ok(ZOOM.max <= 3, 'хэт томруулах боломжтой');
+});
+
+test('толгойн харьцааг тэгд хуваахгүй', () => {
+  assert.equal(headRatioIn(100, 0), 0);
 });

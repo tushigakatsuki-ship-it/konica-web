@@ -4,9 +4,23 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Хөтөч гэрэл/харанхуй горимоо тааж, анхны зурагдалт цайхаас сэргийлнэ. -->
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#1a56db" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f8fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)" />
+
+    <!--
+      Хадгалсан горимыг React ачаалагдахААС ӨМНӨ буулгана.
+
+      ⚠️ Энэ нь блоклодог скрипт байх ЁСТОЙ. `defer`, эсвэл React дотор
+      хийвэл харанхуй горимын хэрэглэгч эхлээд цагаан дэлгэц харна —
+      шөнө нүд гялбуулна. Хэдэн байт кодыг блоклох нь зөв солилцоо.
+    -->
+    <script>
+      try {
+        var t = localStorage.getItem('printmn-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
     <title>Printmn — Чанартай хэвлэл, хурдан үйлчилгээ</title>
     <meta
       name="description"

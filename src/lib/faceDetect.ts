@@ -26,6 +26,7 @@
  */
 
 import { backgroundMask, borderColor } from './idPhoto';
+import { context2d, createCanvas } from './canvas';
 
 export interface FaceBox {
   /** Толгойн орой (эх зургийн пикселээр). */
@@ -45,6 +46,14 @@ export interface FaceResult {
    * дахин авахыг хүсэх нь хямд.
    */
   confidence: 'high' | 'low';
+  /**
+   * Илэрсэн хүний тоо. `undefined` = илрүүлэгч тоолж ЧАДААГҮЙ.
+   *
+   * Энэ ялгаа чухал: «мэдэхгүй» гэдгийг «нэг байна» гэж дүрслэх нь худал
+   * баталгаа болно. Хоёр хүнтэй зураг чимээгүй өнгөрөх нь дээрх худал
+   * баталгаанаас үүдэлтэй байх магадлалтай.
+   */
+  faceCount?: number;
 }
 
 export type FaceDetector = (
@@ -70,6 +79,21 @@ interface RowRun {
   right: number;
   width: number;
 }
+
+/** Мөр доторх хүний пикселийн ЗАЛГАА бүх хэсэг. */
+const runsIn = (person: Uint8Array, width: number, y: number): RowRun[] => {
+  const runs: RowRun[] = [];
+  let start = -1;
+  for (let x = 0; x <= width; x += 1) {
+    const filled = x < width && person[y * width + x] > 127;
+    if (filled && start === -1) start = x;
+    if (!filled && start !== -1) {
+      runs.push({ left: start, right: x - 1, width: x - start });
+      start = -1;
+    }
+  }
+  return runs;
+};
 
 /** Мөр доторх хүний пикселийн ЗАЛГАА хамгийн урт хэсэг. */
 const longestRun = (
@@ -168,6 +192,16 @@ export function faceFromSilhouette(
    *   • Толгой хэт том — мөр толгойтой хамт орсон байх магадлалтай
    *   • Хамгийн өргөн мөр нь оройноос хэт хол — мөрийг толгой гэж үзсэн байж болзошгүй
    */
+  /*
+   * Хэдэн хүн байна вэ — толгойн мөрөнд хэдэн ТУСДАА бүлэг байгааг тоолно.
+   *
+   * Энэ бол болгоомжтой дохио: зэрэгцэн зогссон хоёр хүнийг барина, харин
+   * нэг нь нөгөөгөө халхалсан бол алдана. Тиймээс зөвхөн 2 ба түүнээс
+   * дээш үед л тоо буцаана — «яг нэг хүн байна» гэж БАТЛАХГҮЙ.
+   */
+  const headRuns = runsIn(person, width, widestY).filter((r) => r.width >= headW * 0.5);
+  const faceCount = headRuns.length >= 2 ? headRuns.length : undefined;
+
   const ratio = headW / width;
   const farFromCrown = widestY - crown > headH * 1.2;
   const confidence: FaceResult['confidence'] =
@@ -182,6 +216,7 @@ export function faceFromSilhouette(
     },
     source: 'silhouette',
     confidence,
+    faceCount,
   };
 }
 
@@ -204,21 +239,24 @@ export async function faceFromBrowser(
   if (!Detector) return null;
 
   try {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    /*
+     * Worker дотор `document` байхгүй тул `createCanvas` нь OffscreenCanvas
+     * буцаана. Энд `document.createElement` шууд дуудвал багц боловсруулалт
+     * Worker-т орох үед чимээгүй унана.
+     */
+    const canvas = createCanvas(width, height);
+    const ctx = context2d(canvas);
     // `Uint8ClampedArray`-г шинэ буфер рүү хуулна — `ImageData` нь
     // `ArrayBuffer`-т суурилсан массив шаарддаг.
     const image = ctx.createImageData(width, height);
     image.data.set(data);
     ctx.putImageData(image, 0, 0);
 
-    const detector = new Detector({ maxDetectedFaces: 1, fastMode: false }) as {
+    // Хоёр хүнтэй зургийг ИЛРҮҮЛЭХИЙН тулд нэгээс олныг асууна.
+    const detector = new Detector({ maxDetectedFaces: 5, fastMode: false }) as {
       detect(source: CanvasImageSource): Promise<{ boundingBox: DOMRectReadOnly }[]>;
     };
-    const faces = await detector.detect(canvas);
+    const faces = await detector.detect(canvas as CanvasImageSource);
     if (faces.length === 0) return null;
 
     const box = faces[0].boundingBox;
@@ -240,6 +278,7 @@ export async function faceFromBrowser(
       },
       source: 'native',
       confidence: 'low',
+      faceCount: faces.length,
     };
   } catch {
     return null;

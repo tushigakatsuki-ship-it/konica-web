@@ -3,36 +3,87 @@
 /**
  * Дизайн токенууд.
  *
- * Бүх утга printmn-expo/src/theme/colors.ts + theme.ts-ээс шууд авсан тул
- * native app болон web хоёр яг ижил өнгө, радиустай харагдана.
+ * ── Яагаад native app-аас САЛСАН бэ ──────────────────────────────
+ *
+ * Эхэндээ бүх утга `printmn-expo/src/theme`-ээс шууд хуулагдсан байсан:
+ * хоёр платформ яг ижил харагдана гэсэн зорилготой. Гэвч вэб бол өөр
+ * гадаргуу — том дэлгэц, хулганы заалт, олон цонх, харанхуй горим.
+ * Апп-ын 8px радиус, цэвэр цагаан дэвсгэр нь утсанд зөв ч вэб дээр
+ * хуучирсан харагддаг.
+ *
+ * **Брэндийн өнгө хэвээр** (`#1a56db` цэнхэр, `#f59e0b` амбер) — таних
+ * тэмдэг нь тэдгээр. Харин гадаргуу, радиус, сүүдэр нь вэбийнх.
+ *
+ * ── Харанхуй горим ───────────────────────────────────────────────
+ *
+ * `--color-*` хувьсагчийг `[data-theme='dark']` дотор ДАХИН зарлана.
+ * Tailwind-ийн утилитууд `var(--color-…)` рүү заадаг тул автоматаар
+ * шилжинэ — класс бүрийг `dark:` хувилбартай болгох шаардлагагүй.
+ *
+ * ⚠️ Тиймээс интерфейст `bg-white`, `text-[#…]` зэрэг ХАТУУ өнгө
+ * хэрэглэж болохгүй — харанхуйд эргэхгүй. `bg-card`, `text-ink` гэх мэт
+ * утга санааны нэрийг л ашиглана. `test/customer-web.test.ts` түгжсэн.
+ *
+ * Ганц үл хамаарах зүйл: canvas дээр зурагдах ХЭВЛЭХ файл. Цаас нь
+ * үргэлж цагаан тул `ctx.fillStyle = '#ffffff'` зөв — тэр нь интерфейс
+ * биш, бүтээгдэхүүн.
  */
 @theme {
-  /* BRAND — colors.ts */
-  --color-brand-50: #eff6ff; /* surfaceTint */
-  --color-brand-100: #dbeafe; /* border */
-  --color-brand-200: #bfdbfe; /* borderStrong */
-  --color-brand-400: #3b82f6; /* primaryLight */
-  --color-brand-500: #1a56db; /* primary */
+  /* ── Брэнд — native app-тай ижил хэвээр ── */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-400: #3b82f6;
+  --color-brand-500: #1a56db;
   --color-brand-600: #1a56db;
-  --color-brand-700: #1e40af; /* primaryDark */
+  --color-brand-700: #1e40af;
   --color-brand-900: #0f2a6b;
 
   --color-accent: #f59e0b;
   --color-accent-strong: #d97706;
+  /*
+   * Амбер дээрх текст — хоёр горимд ИЖИЛ бараан.
+   *
+   * Энэ нь зориуд флипддэггүй. Амбер дэвсгэр хоёр горимд хоёуланд нь
+   * цайвар хэвээр байдаг тул текст нь үргэлж бараан байх ёстой. Цагаан
+   * текст амбер дээр 2.2:1 — уншигдахгүй.
+   */
+  --color-on-accent: #422006;
   --color-ok: #22c55e;
   --color-ok-strong: #16a34a;
 
-  /* NEUTRAL — colors.ts */
+  /*
+   * Алдааны өнгө — УТГА САНААНЫ токен.
+   *
+   * Tailwind-ийн `red-600`, `red-50`-ийг шууд хэрэглэж болохгүй: тэдгээр
+   * нь тогтмол утга тул харанхуй горимд эргэхгүй. `bg-red-50` (#fef2f2)
+   * нь бараг цагаан бөгөөд бараан карт дээр цайвар толбо болно.
+   */
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  /* ── Гадаргуу ── */
+  --color-canvas: #f7f8fb;
+  --color-card: #ffffff;
+  --color-sunken: #eef1f6;
+
+  /* ── Текст, шугам ── */
   --color-ink: #0f172a;
   --color-ink-soft: #334155;
   --color-muted: #6b7280;
-  --color-hairline: #e2e8f0;
+  --color-hairline: #e4e8ef;
 
-  /* RADIUS — theme.ts */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /*
+   * Радиус нь апп-ынхаас том. Том дэлгэц дээр 8px радиус нь хурц,
+   * хуучирсан харагддаг; 14–24px нь орчин үеийн вэбийн хэмжээ.
+   */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Хөдөлгөөний хугацаа — нэг газраас удирдана. */
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
@@ -40,16 +91,115 @@
 }
 
 @layer base {
+  /* Сүүдэр нь өнгө хамааралтай тул токенээс ГАДНА, эндээс удирдана. */
+  :root {
+    --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 12px rgb(15 23 42 / 0.05);
+    --shadow-float: 0 2px 6px rgb(15 23 42 / 0.06), 0 12px 32px rgb(15 23 42 / 0.08);
+    --skeleton-sheen: rgb(15 23 42 / 0.06);
+    /* Шилэн гадаргуугийн дээд ирмэгийн гэрэл — гүн үүсгэдэг гол деталь. */
+    --glass-edge: rgb(255 255 255 / 0.55);
+    --glass-tint: 68%;
+    --scroll-hint-shadow: rgb(15 23 42 / 0.14);
+    color-scheme: light;
+  }
+
+  /**
+   * Харанхуй горимын палитр.
+   *
+   * Цэвэр хар (#000) ЗОРИУД хэрэглээгүй: OLED дээр контраст хэт хурц
+   * болж, урт ажлын ээлжинд нүд ядраадаг. #0e1117 нь зөөлөн.
+   *
+   * Брэндийн цэнхэр бага зэрэг тодруулсан — #1a56db нь бараан дэвсгэр
+   * дээр хангалттай ялгарахгүй.
+   */
+  [data-theme='dark'] {
+    --color-canvas: #0e1117;
+    --color-card: #171b22;
+    --color-sunken: #0a0d12;
+
+    --color-ink: #e6edf3;
+    --color-ink-soft: #c0c9d4;
+    --color-muted: #8b949e;
+    --color-hairline: #2a313c;
+
+    --color-brand-50: #15213a;
+    --color-brand-100: #1b2c4c;
+    --color-brand-200: #24406e;
+    --color-brand-400: #60a5fa;
+    --color-brand-500: #3b82f6;
+    --color-brand-600: #3b82f6;
+    --color-brand-700: #60a5fa;
+    --color-brand-900: #cfe0ff;
+
+    --color-accent: #fbbf24;
+    --color-accent-strong: #fcd34d;
+    --color-ok-strong: #4ade80;
+    --color-danger: #f87171;
+    --color-danger-soft: #2b1416;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+    --shadow-float: 0 2px 6px rgb(0 0 0 / 0.45), 0 12px 32px rgb(0 0 0 / 0.4);
+    --skeleton-sheen: rgb(255 255 255 / 0.06);
+    /*
+     * Харанхуйд шилэн ирмэг нь СУЛ байх ёстой. Гэрэл горимын 55%
+     * цагаан ирмэг бараан дэвсгэр дээр хиймэл, хямд харагдана.
+     */
+    --glass-edge: rgb(255 255 255 / 0.08);
+    --glass-tint: 58%;
+    --scroll-hint-shadow: rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+
+  /* Системийн сонголтыг дагана — хэрэглэгч гараар сонгоогүй бол. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --color-canvas: #0e1117;
+      --color-card: #171b22;
+      --color-sunken: #0a0d12;
+
+      --color-ink: #e6edf3;
+      --color-ink-soft: #c0c9d4;
+      --color-muted: #8b949e;
+      --color-hairline: #2a313c;
+
+      --color-brand-50: #15213a;
+      --color-brand-100: #1b2c4c;
+      --color-brand-200: #24406e;
+      --color-brand-400: #60a5fa;
+      --color-brand-500: #3b82f6;
+      --color-brand-600: #3b82f6;
+      --color-brand-700: #60a5fa;
+      --color-brand-900: #cfe0ff;
+
+      --color-accent: #fbbf24;
+      --color-accent-strong: #fcd34d;
+      --color-ok-strong: #4ade80;
+      --color-danger: #f87171;
+      --color-danger-soft: #2b1416;
+
+      --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+      --shadow-float: 0 2px 6px rgb(0 0 0 / 0.45), 0 12px 32px rgb(0 0 0 / 0.4);
+      --skeleton-sheen: rgb(255 255 255 / 0.06);
+      /*
+       * Харанхуйд шилэн ирмэг нь СУЛ байх ёстой. Гэрэл горимын 55%
+       * цагаан ирмэг бараан дэвсгэр дээр хиймэл, хямд харагдана.
+       */
+      --glass-edge: rgb(255 255 255 / 0.08);
+      --glass-tint: 58%;
+      --scroll-hint-shadow: rgb(0 0 0 / 0.5);
+      color-scheme: dark;
+    }
+  }
+
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-white text-ink font-sans antialiased;
+    @apply bg-canvas text-ink font-sans antialiased;
     margin: 0;
   }
 
-  /* Кирилл толгой гарчгууд native app-тай ижил нягт */
   h1,
   h2,
   h3 {
@@ -59,6 +209,23 @@
 
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+
+  /**
+   * Хөдөлгөөнөөс толгой эргэдэг, дотор муухайрдаг хүн бий.
+   *
+   * Энэ дүрэм НЭГ газар байх нь чухал: компонент бүрт `motion-safe:`
+   * бичих шаардлагагүй болж, нэгийг нь мартах эрсдэл алга болно.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -71,12 +238,13 @@
  */
 @utility btn {
   @apply inline-flex items-center justify-center gap-2 rounded-md px-6 py-3
-         text-sm font-semibold transition-colors disabled:cursor-not-allowed
-         disabled:opacity-50;
+         text-sm font-semibold transition-[background-color,border-color,color,transform]
+         duration-150 active:scale-[0.97] disabled:cursor-not-allowed
+         disabled:opacity-50 disabled:active:scale-100;
 }
 
 @utility btn-accent {
-  @apply btn bg-accent text-white hover:bg-accent-strong;
+  @apply btn bg-accent text-on-accent hover:bg-accent-strong;
 }
 
 @utility btn-brand {
@@ -88,16 +256,33 @@
 }
 
 @utility btn-outline {
-  @apply btn border border-hairline bg-white text-ink-soft
+  @apply btn border border-hairline bg-card text-ink-soft
          hover:border-brand-200 hover:bg-brand-50;
 }
 
+/**
+ * Карт — цайвар зотон дээр хөвдөг цагаан гадаргуу.
+ *
+ * Гүнийг ЗӨВХӨН хүрээгээр гаргах нь хавтгай харагддаг. Зотон нь цагаанаас
+ * бага зэрэг бараан (`--color-canvas`) тул карт өөрөө ялгарч, сүүдэр нь
+ * түүнийг бататгана.
+ */
 @utility card {
-  @apply overflow-hidden rounded-lg border border-hairline bg-white;
+  @apply overflow-hidden rounded-lg border border-hairline bg-card;
+  box-shadow: var(--shadow-card);
+}
+
+/** Дарж болох карт — хулгана дээр аваачихад бага зэрэг дээшилнэ. */
+@utility card-lift {
+  @apply card transition-[transform,border-color,box-shadow] duration-200
+         hover:-translate-y-0.5 hover:border-brand-200 active:translate-y-0;
+}
+.card-lift:hover {
+  box-shadow: var(--shadow-float);
 }
 
 @utility field {
-  @apply w-full rounded-md border border-hairline bg-white px-4 py-3 text-sm
+  @apply w-full rounded-md border border-hairline bg-card px-4 py-3 text-sm
          text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none;
 }
 
@@ -107,4 +292,236 @@
 
 @utility eyebrow {
   @apply text-xs font-bold tracking-[0.2em] text-accent uppercase;
+}
+
+/**
+ * Ачааллын үеийн орлуулагч.
+ *
+ * Хоосон дэлгэц ширтэхээс бүтэц нь урьдчилж харагдсан нь дээр: хүн юу
+ * ирэхийг мэдэж, хүлээлт нь богино мэдрэгддэг.
+ */
+@utility skeleton {
+  @apply relative overflow-hidden rounded-md bg-sunken;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sheen 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/**
+ * Хуудас солигдоход агуулга зөөлөн гарч ирнэ.
+ *
+ * Богино (180ms) байх нь чухал: удаан шилжилт нь хурдан ажилладаг
+ * ажилтныг удаашруулж, эцэст нь бухимдуулна.
+ */
+@utility page-enter {
+  animation: page-enter 180ms var(--ease-out-soft) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+
+/* ── Гүн ба гадаргуу ─────────────────────────────────────────────── */
+
+/**
+ * Шилэн гадаргуу (glassmorphism).
+ *
+ * ⚠️ **Хэмнэлттэй хэрэглэнэ.** `backdrop-filter` нь пиксел бүрийг дахин
+ * тооцдог тул хямд утсан дээр гүйлгэлт таталддаг. Мөн доогуураа юу ч
+ * байсан текстийн ялгаралт хувьсдаг — уншигдах баталгаа алдагдана.
+ *
+ * Тиймээс зөвхөн: толгой, зурган дээрх шошго, модал бүрхүүл. Урт текст
+ * агуулсан карт дээр ХЭРЭГЛЭХГҮЙ.
+ *
+ * Дээд ирмэгийн гэрэл (`--glass-edge`) нь гол деталь: түүнгүйгээр зүгээр
+ * л бүдэг тунгалаг тэгш өнцөгт болно.
+ */
+@utility glass {
+  background: color-mix(in oklab, var(--color-card) var(--glass-tint), transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid color-mix(in oklab, var(--color-hairline) 70%, transparent);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 1px 0 var(--glass-edge);
+}
+
+/**
+ * Aurora — зөөлөн өнгөт туяа.
+ *
+ * Зотон дээр нэг л удаа, hero хэсэгт. Хэд хэдэн газар давтвал «premium»
+ * биш «чимэглэл» болж хувирдаг.
+ *
+ * `filter: blur()` нь GPU-д ачаалалтай тул `::before` нь `z-index: -1`,
+ * `pointer-events: none` — гүйлгэлт, товшилтод огт нөлөөлөхгүй.
+ */
+@utility aurora {
+  position: relative;
+  isolation: isolate;
+}
+.aurora::before {
+  content: '';
+  position: absolute;
+  inset: -30% -15% auto -15%;
+  height: 150%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      38% 46% at 12% 18%,
+      color-mix(in oklab, var(--color-brand-400) 32%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      32% 42% at 88% 8%,
+      color-mix(in oklab, var(--color-accent) 26%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44% 52% at 62% 92%,
+      color-mix(in oklab, var(--color-brand-500) 24%, transparent),
+      transparent 70%
+    );
+  filter: blur(44px);
+}
+
+/**
+ * Гүнтэй карт — хулгана дээр аваачихад бага зэрэг хазайж, дээшилнэ.
+ *
+ * Хазайлт нь МАШ бага (2°). Илүү их бол тоглоом мэт болж, текст
+ * гажигтай харагдана. Perspective нь картын дотор биш, ГАДНА элемент
+ * дээр байх ёстой — эс бөгөөс хазайлт хавтгай харагдана.
+ */
+@utility tilt {
+  perspective: 900px;
+}
+@utility tilt-face {
+  @apply transition-transform duration-300;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt:hover .tilt-face {
+  transform: translateY(-6px) rotateX(2deg) rotateY(-2deg) scale(1.01);
+}
+
+/*
+ * Хуруугаар ажилладаг төхөөрөмж дээр hover гэж байхгүй — зарим хөтөч
+ * товшилтыг hover гэж тайлбарлаж, карт «гацаж» үлддэг.
+ */
+@media (hover: none) {
+  .tilt:hover .tilt-face {
+    transform: none;
+  }
+}
+
+/* ── 3D хэвлэмэл загвар ──────────────────────────────────────────── */
+
+/**
+ * Заагч дагасан 3D тавцан.
+ *
+ * `--tilt-x` / `--tilt-y` (−1…1) утгыг `lib/useTilt.ts` тавина. Бодит
+ * хувиргалт нь ЭНД — харагдац CSS-д үлдэж, JS зөвхөн хэмжигдэхүүн өгнө.
+ *
+ * Анхдагч утга 0 тул JS ажиллаагүй ч (SSR, хуучин хөтөч, хөдөлгөөн
+ * хүсээгүй хэрэглэгч) хавтгай, зөв харагдана.
+ */
+@utility stage {
+  --tilt-x: 0;
+  --tilt-y: 0;
+  perspective: 1100px;
+}
+
+@utility stage-face {
+  transform-style: preserve-3d;
+  transform: rotateY(calc(var(--tilt-x) * 7deg)) rotateX(calc(var(--tilt-y) * 7deg));
+  transition: transform 120ms var(--ease-out-soft);
+  will-change: transform;
+}
+
+/**
+ * Хэвлэмэл зураг — ЗУЗААНТАЙ цаас.
+ *
+ * Хавтгай preview нь цаасны зузаан, ирмэгийн гэрэл, өнгөний гүнийг
+ * хэлдэггүй. Фото хэвлэлийн газарт «би юу худалдаж авах вэ» гэдэгт
+ * хариулах нь бодит үнэ цэн — зөвхөн чимэглэл биш.
+ *
+ * Зузааныг ХУУРАМЧААР гаргана: доод давхарга нь `translateZ`-ээр ард
+ * суусан, бага зэрэг бараан. Жинхэнэ 3D биет үүсгэхээс хамаагүй хямд
+ * бөгөөд ялгаа нь бараг мэдэгдэхгүй.
+ */
+@utility print-card {
+  position: relative;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow:
+    0 1px 0 rgb(0 0 0 / 0.12),
+    0 2px 0 rgb(0 0 0 / 0.06),
+    calc(var(--tilt-x) * -14px) calc(var(--tilt-y) * 14px + 18px) 34px rgb(15 23 42 / 0.22);
+}
+
+/**
+ * Гэрлийн тусгал — хазайлтыг дагаж гүйнэ.
+ *
+ * Энэ нь «гялгар цаас» гэсэн мэдрэмжийг өгдөг цорын ганц деталь.
+ * Хөдөлгөөнгүй тусгал нь наалдсан толбо мэт харагдана.
+ */
+.print-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    calc(105deg + var(--tilt-x) * 25deg),
+    transparent 38%,
+    rgb(255 255 255 / 0.28) 50%,
+    transparent 62%
+  );
+  opacity: calc(0.35 + var(--tilt-x) * 0.25);
+}
+
+
+/**
+ * Гүйдэг талбарын ирмэгийн сүүдэр — JS-гүй.
+ *
+ * ── Ямар асуудлыг шийдэж байна вэ ────────────────────────────────
+ *
+ * Гүйдэг талбар нь доор нь өөр агуулга байгаа эсэхээ ХЭЛДЭГГҮЙ.
+ * Хэрэглэгч «энэ гүйх үү, үгүй юу» гэдгийг таамаглах хэрэгтэй болдог —
+ * ялангуяа модал цонхонд, товч нь доор нуугдсан үед.
+ *
+ * ── Хэрхэн ажилладаг вэ ──────────────────────────────────────────
+ *
+ * `background-attachment` хоёр өөр утгыг хослуулна:
+ *   • `local` — агуулгатай хамт гүйнэ (цагаан халхавч)
+ *   • `scroll` — талбартай хамт зогсоно (сүүдэр)
+ *
+ * Дээд/доод ирмэгт байхад халхавч нь сүүдрийг ДАРНА. Гүйж эхлэхэд
+ * халхавч зайлж, сүүдэр илэрнэ. Өөрөөр хэлбэл сүүдэр нь «цааш үргэлжилж
+ * байна» гэсэн үг — JS, ResizeObserver огт хэрэггүй.
+ */
+@utility scroll-hint {
+  touch-action: pan-y;
+  background:
+    linear-gradient(var(--color-card) 30%, transparent) top / 100% 26px no-repeat local,
+    linear-gradient(transparent, var(--color-card) 70%) bottom / 100% 26px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--scroll-hint-shadow), transparent) top / 100% 11px
+      no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--scroll-hint-shadow), transparent) bottom /
+      100% 11px no-repeat scroll;
 }
