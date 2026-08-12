@@ -921,3 +921,55 @@ test('hero дээр хэвлэмэлийн овоолол байхгүй', () =>
    */
   assert.ok(home.includes('HERO_IMAGES[0]?.src'), 'том нүдний хавтас алга');
 });
+
+/* ── Build тохиргоо ──────────────────────────────────────────────── */
+
+test('worker нь ES модуль форматтай — эс бөгөөс build УНАНА', () => {
+  /*
+   * ⚠️ Энэ бол бодит build алдааны түгжээ.
+   *
+   * Vite-ийн анхдагч `worker.format` нь `'iife'`. Тэр формат нь код
+   * хуваахыг дэмждэггүй. Бидний worker нь `lib/processPhoto.ts`-ээр
+   * дамжин `onnxruntime-web`-ийг ДИНАМИК import хийдэг тул заавал
+   * хуваагдана — Vercel дээр яг дараах алдаагаар унасан:
+   *
+   *   Invalid value "iife" for option "worker.format" —
+   *   UMD and IIFE output formats are not supported for code-splitting
+   *
+   * ⚠️ typecheck болон unit тест энэ алдааг ХАРАХГҮЙ: зөвхөн бодит
+   * bundler ажиллах үед л илэрдэг. Тиймээс тохиргоог эндээс түгжив.
+   */
+  const config = read('vite.config.ts');
+  assert.match(config, /worker:\s*\{[\s\S]{0,200}?format:\s*'es'/, 'worker.format нь es биш');
+
+  // `new Worker(..., { type: 'module' })`-тэй нийцэх ёстой.
+  const batch = read('src/lib/photoBatch.ts');
+  assert.ok(batch.includes("type: 'module'"), 'worker модуль биш байна');
+
+  // Код хуваалт үнэхээр гардаг эсэх — динамик import байгаа эсэхээр.
+  const segment = read('src/lib/segment.ts');
+  assert.ok(
+    segment.includes("await import('onnxruntime-web')"),
+    'динамик import алга — тохиргооны шалтгаан алдагдсан',
+  );
+});
+
+test('worker ачаалж чадаагүй үед ГАЦАХГҮЙ', () => {
+  /*
+   * `onerror` барихгүй бол worker ачаалагдаж чадаагүй үед promise хэзээ ч
+   * шийдэгдэхгүй. Хэрэглэгч «боловсруулж байна…» гэсэн бичгийг үүрд
+   * хардаг — алдаа ч гарахгүй, явц ч урагшлахгүй.
+   *
+   * Модуль worker-ийг хуучин хөтөч дэмждэггүй бөгөөд `workersSupported()`
+   * шалгалт үүнийг урьдчилж мэдэж ЧАДАХГҮЙ.
+   */
+  const batch = read('src/lib/photoBatch.ts');
+
+  assert.ok(batch.includes('worker.onerror'), 'worker-ийн алдааг барихгүй байна');
+  assert.match(batch, /waiting\.reject\(/, 'хүлээгдэж буй хүсэлт шийдэгдэхгүй үлдэнэ');
+
+  // Алдаа гарвал үндсэн урсгал руу буцах ёстой — багц бүхэлдээ унах ёсгүй.
+  assert.ok(batch.includes('class PoolFailure'), 'сангийн алдааг ялгаагүй');
+  assert.match(batch, /instanceof PoolFailure/, 'нөөц зам руу шилжихгүй');
+  assert.match(batch, /response = await direct\(\)/, 'үндсэн урсгалын нөөц зам алга');
+});

@@ -14,6 +14,27 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
+
+  /**
+   * ⚠️ Worker нь ES модуль байх ЁСТОЙ.
+   *
+   * Vite-ийн анхдагч `worker.format` нь `'iife'`. Тэр формат нь код хуваахыг
+   * (code-splitting) дэмждэггүй. Бидний worker нь `lib/processPhoto.ts`-ээр
+   * дамжин `onnxruntime-web`-ийг ДИНАМИК import хийдэг тул заавал хуваагдана —
+   * үүнээс болж build дараах алдаагаар унана:
+   *
+   *   Invalid value "iife" for option "worker.format" —
+   *   UMD and IIFE output formats are not supported for code-splitting builds
+   *
+   * `new Worker(..., { type: 'module' })` гэж аль хэдийн дуудаж байгаа тул
+   * энэ тохиргоо нь түүнтэй нийцнэ.
+   *
+   * Модуль worker дэмждэггүй хуучин хөтөч дээр `lib/photoBatch.ts` нь үндсэн
+   * урсгал руу буцдаг (`onerror` барих).
+   */
+  worker: {
+    format: 'es',
+  },
   build: {
     /**
      * 2022 оноос хойшхи хөтөч. `import.meta`, `??=`, top-level await зэрэг нь

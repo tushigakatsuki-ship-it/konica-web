@@ -724,6 +724,20 @@ Worker дэмждэггүй хөтөч дээр `processPhoto` үндсэн ур
 **Логик нь нэг л газар** (`lib/processPhoto.ts`) бичигдсэн — хоёр зам хооронд
 зөрөх боломжгүй. `test/customer-web.test.ts` үүнийг түгжсэн.
 
+⚠️ **`vite.config.ts` дотор `worker.format: 'es'` ЗААВАЛ.** Vite-ийн
+анхдагч нь `'iife'` бөгөөд тэр формат код хуваахыг дэмждэггүй. Бидний
+worker нь `onnxruntime-web`-ийг динамик import хийдэг тул заавал хуваагдаж,
+build дараах алдаагаар унана:
+
+```
+Invalid value "iife" for option "worker.format" —
+UMD and IIFE output formats are not supported for code-splitting builds
+```
+
+typecheck болон unit тест үүнийг **харахгүй** — зөвхөн бодит bundler
+ажиллах үед л илэрдэг. Vercel дээр яг ингэж унасан тул тохиргоог
+`test/customer-web.test.ts` дотор түгжив.
+
 ⚠️ Worker дотор `document`, `window` **байхгүй**. Дамжлагын бүх модуль DOM-гүй
 байх ёстой; canvas хэрэгтэй бол `lib/canvas.ts` (OffscreenCanvas). Тестээр
 түгжсэн.
