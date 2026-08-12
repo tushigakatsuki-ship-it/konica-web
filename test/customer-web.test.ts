@@ -973,3 +973,13 @@ test('worker ачаалж чадаагүй үед ГАЦАХГҮЙ', () => {
   assert.match(batch, /instanceof PoolFailure/, 'нөөц зам руу шилжихгүй');
   assert.match(batch, /response = await direct\(\)/, 'үндсэн урсгалын нөөц зам алга');
 });
+
+test('CSS нь үндсэн оролтод холбогдсон', () => {
+  /*
+   * `main.tsx`-ээс `index.css` импортыг санамсаргүй хасвал бүх загвар
+   * алга болно — TypeScript ч, тест ч анзаарахгүй, зөвхөн нүдээр л
+   * харагдана. (Build оношилгооны үеэр яг ингэж түр хассан байсан.)
+   */
+  const main = read('src/main.tsx');
+  assert.ok(main.includes("import './index.css'"), 'CSS импорт алга — загвар ажиллахгүй');
+});
