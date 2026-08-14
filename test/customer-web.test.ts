@@ -224,7 +224,16 @@ test('зам бүр рүү орох гарц байна — хаягдсан х�
       const rel = `${dir}/${entry.name}`;
       if (entry.isDirectory()) walk(rel);
       else if (/\.tsx?$/.test(entry.name)) {
-        for (const m of read(rel).matchAll(/(?:to|href|navigate\()\s*[=(]?\s*['"`]\/([^'"`?#]*)/g)) {
+        /*
+         * ⚠️ Гурван бичлэгийг ЗЭРЭГ барина:
+         *   JSX:    to="/une"
+         *   дуудлага: navigate('/une')
+         *   объект:  { to: '/une' }   ← `site.ts` доторх NAV
+         *
+         * Эхний хувилбар `:`-ийг мартсан тул зөвхөн цэсээс холбогдсон
+         * хуудсыг «хаягдсан» гэж худал зарласан.
+         */
+        for (const m of read(rel).matchAll(/(?:to|href|navigate\()\s*[=(:]?\s*['"`]\/([^'"`?#]*)/g)) {
           links.add(m[1].replace(/\/$/, ''));
         }
       }
@@ -982,4 +991,16 @@ test('CSS нь үндсэн оролтод холбогдсон', () => {
    */
   const main = read('src/main.tsx');
   assert.ok(main.includes("import './index.css'"), 'CSS импорт алга — загвар ажиллахгүй');
+});
+
+
+test('утасны дугаар бодит', () => {
+  /*
+   * Орлуулга дугаар нь бүх «залгах» CTA-г чимээгүй эвдэнэ: товч дарагдана,
+   * утас нээгдэнэ, дугаар нь байхгүй. Хэрэглэгч дэлгүүрийг ажиллахгүй
+   * гэж бодно.
+   */
+  const site = read('src/data/site.ts');
+  assert.ok(!site.includes('99000000'), 'орлуулга дугаар үлдсэн');
+  assert.match(site, /href: 'tel:\+976\d{8}'/, 'tel: хэлбэр буруу');
 });

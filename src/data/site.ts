@@ -24,7 +24,7 @@ export const CONTACT = {
    * Эхнийх нь ҮНДСЭН дугаар — толгойд болон «залгах» товчнуудад энэ гарна.
    */
   phones: [
-    { label: '9900-0000', href: 'tel:+97699000000', note: 'Захиалга, лавлагаа' },
+    { label: '8055-2222', href: 'tel:+97680552222', note: 'Захиалга, лавлагаа' },
   ] as readonly Phone[],
 
   emails: ['info@printmn.mn'] as readonly string[],
