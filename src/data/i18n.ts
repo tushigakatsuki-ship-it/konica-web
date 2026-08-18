@@ -240,9 +240,16 @@ export const STRINGS = {
   },
 
   /* ── Ажлын цаг ── */
-  'hours.weekdays': { mn: 'Даваа – Баасан', en: 'Monday – Friday' },
-  'hours.saturday': { mn: 'Бямба', en: 'Saturday' },
-  'hours.sunday': { mn: 'Ням', en: 'Sunday' },
+  /*
+   * ⚠️ Монгол, англи хоёр нь ИЖИЛ өдрүүдийг заах ёстой.
+   *
+   * `mn: 'Даваа – Ням'` / `en: 'Monday – Friday'` гэж зөрсөн байв:
+   * монголоор долоо хоног бүтэн, англиар ажлын өдөр л нээлттэй гэж
+   * уншигдана. Гадаад иргэн бямба гаригт дэмий ирэх эрсдэлтэй.
+   */
+  'hours.weekdays': { mn: 'Даваа – Ням', en: 'Monday – Sunday' },
+  // 'hours.saturday': { mn: 'Бямба', en: 'Saturday' },
+  'hours.tuesday': { mn: 'Мягмар', en: 'Tuesday' },
   'hours.closed': { mn: 'Амарна', en: 'Closed' },
 
   /* ── Нийтлэг ── */

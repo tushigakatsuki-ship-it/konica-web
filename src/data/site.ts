@@ -76,10 +76,10 @@ export const CONTACT = {
    * хэлдэггүй тул хүн залгаж асуухад хүрдэг.
    */
   hours: [
-    { daysKey: 'hours.weekdays', time: '09:00 – 18:00' },
-    { daysKey: 'hours.saturday', time: '10:00 – 15:00' },
+    { daysKey: 'hours.weekdays', time: '10:00 – 18:00' },
+    // { daysKey: 'hours.saturday', time: '10:00 – 15:00' },
     /* «Амарна» нь цаг биш, үг — тиймээс энэ мөр орчуулагдана. */
-    { daysKey: 'hours.sunday', timeKey: 'hours.closed' },
+    { daysKey: 'hours.tuesday', timeKey: 'hours.closed' },
   ] as readonly OpeningRow[],
 
   /** Хоосон мөрийг интерфейс автоматаар алгасана. */

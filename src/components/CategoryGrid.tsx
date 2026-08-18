@@ -27,12 +27,11 @@ interface Tile {
 }
 
 /**
- * Дараалал нь ЗОРИУД каталогийн дараалал биш.
+ * Каталогийн 12 ангилал БҮРИЙН тайлбар, дүрс.
  *
- * Хамгийн их захиалагддаг зүйл эхэндээ байх ёстой: утсан дээр эхний
- * дөрвөн цонх л нэг дэлгэцэнд багтана. Зураг угаалт нь вэбийн гол
- * зорилго тул эхнийх, дараа нь цээж зураг — хоёулаа зурагтай ажилладаг
- * тул зэрэгцээ байх нь логиктой.
+ * Тор дээр бүгд харагдахгүй (доорх `CATEGORY_TILES`-ыг үз) ч ангилал
+ * сонгосны дараа хуудасны дээд талд тайлбар нь гарах тул бүгдийг эндээс
+ * авна.
  */
 export const CATEGORY_TILES: readonly Omit<Tile, 'count'>[] = [
   { key: 'Угаалт', hint: 'cat.wash', Icon: IconImage },
@@ -60,23 +59,56 @@ export const CATEGORY_HINT = Object.fromEntries(
   CATEGORY_TILES.map((tile) => [tile.key, tile.hint]),
 ) as Record<ServiceCategory, StringKey>;
 
+/**
+ * Зураг угаалтын доор НЭГТГЭГДСЭН ангиллууд.
+ *
+ * Эдгээр нь тусдаа цонх БОЛОХГҮЙ: гурвуулаа зурагтай ажилладаг, хэрэглэгч
+ * хооронд нь байнга үсэрдэг («10×15 угаалгах уу, засвартай нь уу», «энэ
+ * зураг цээж зурагт тохирох уу»). Тусдаа цонх болгосон нь торыг гурав
+ * дахин уншуулаад, дараа нь дотор нь ижил табууд гардаг байсан.
+ *
+ * Одоо тор дээр НЭГ л цонх — «Зураг угаалт». Дарахад дотор нь гурван таб
+ * гарна (`QUICK_TABS` — `pages/Print.tsx`).
+ */
+const MERGED_INTO_WASH: readonly ServiceCategory[] = ['Засвар', 'Цээж зураг'];
+
+/**
+ * Одоогоор ОНЛАЙНААР бэлэн ангилал.
+ *
+ * Бусад нь дэлгүүр дээр материал, хэмжээ, загварыг биечлэн тохирдог тул
+ * вэб урсгал нь бэлэн биш. Нуухын оронд «Удахгүй» гэж ил харуулна —
+ * үйлчлүүлэгч тэр үйлчилгээ энд БАЙХ эсэхийг мэдэх нь дэлгүүр рүү залгах
+ * эсэхээ шийдэхэд хэрэгтэй.
+ */
+const READY: readonly ServiceCategory[] = ['Угаалт'];
+
+/** Тор дээр харагдах цонхнууд — нэгтгэгдсэн хоёрыг хассан. */
+const GRID_TILES = CATEGORY_TILES.filter(
+  (tile) => !MERGED_INTO_WASH.includes(tile.key),
+);
+
 interface Props {
   counts: Record<string, number>;
   onPick(category: ServiceCategory): void;
 }
 
 /**
- * 12 ангиллын шилэн цонх — цэнхэр дэвсгэр дээр.
+ * Ангиллын шилэн цонхнууд — цэнхэр дэвсгэр дээр.
  *
  * ── Яагаад таб биш вэ ────────────────────────────────────────────
  *
  * Өмнө нь дөрвөн таб байсан бөгөөд үлдсэн найман ангилал вэб дээр ОГТ
  * харагддаггүй байв — медаль, өргөмжлөл, фудболк хэвлэл захиалах гэсэн
- * хүн энд байгааг нь мэдэх аргагүй. Таб нь цөөн зүйлд тохирдог; 12
- * зүйлийг таб болгож хэвтээ гүйлгэвэл сүүлийн хэдийг нь хэн ч олохгүй.
+ * хүн энд байгааг нь мэдэх аргагүй. Тор нь бүгдийг НЭГ дэлгэцэнд гаргана.
  *
- * Тор нь бүгдийг НЭГ дэлгэцэнд гаргана — дэлгүүр юу хийдгийг эхний
- * харцаар л ойлгуулна.
+ * ── Хоёр төлөв ───────────────────────────────────────────────────
+ *
+ * **Бэлэн** (`READY`) — дарагдана, тод харагдана.
+ * **Удахгүй** — дарагдахгүй, бүдэг, «Удахгүй» шошготой.
+ *
+ * Бэлэн бишийг НУУХГҮЙ байгаа шалтгаан: үйлчлүүлэгч тэр үйлчилгээ энд
+ * байх эсэхийг мэдэх нь дэлгүүр рүү залгах эсэхээ шийдэхэд хэрэгтэй.
+ * Гэхдээ дарагдвал хоосон урсгалд унах тул `<span>`-аар зурна.
  */
 export default function CategoryGrid({ counts, onPick }: Props) {
   const { t, tc } = useLang();
@@ -88,45 +120,89 @@ export default function CategoryGrid({ counts, onPick }: Props) {
       */
     <section className="category-sky relative overflow-hidden py-10 sm:py-14">
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+        {/* Дэвсгэр цагаан болсон тул текст нь ердийн бэхний өнгөтэй. */}
+        <h2 className="text-2xl font-black tracking-tight sm:text-3xl">
           {t('print.categories')}
         </h2>
-        <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/80">
+        <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">
           {t('print.categoriesHint')}
         </p>
 
         <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {CATEGORY_TILES.map((tile, index) => (
-            <li
-              key={tile.key}
-              className="tile-in"
-              /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 440ms-д. */
-              style={{ animationDelay: `${index * 40}ms` }}
-            >
-              <button
-                type="button"
-                onClick={() => onPick(tile.key)}
-                className="glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5"
-              >
+          {GRID_TILES.map((tile, index) => {
+            const ready = READY.includes(tile.key);
+
+            /*
+             * Бэлэн бол `<button>`, эс бөгөөс `<span>`.
+             *
+             * `disabled` товч биш `<span>` ашиглаж байгаа шалтгаан: идэвхгүй
+             * товч нь гар, дэлгэц уншигчид «энд товч байна, гэхдээ ажиллахгүй»
+             * гэж мэдэгддэг бөгөөд табаар дамжихад саад болно. Мэдээллийн
+             * хавтан бол товч биш.
+             */
+            const inner = (
+              <>
                 <span aria-hidden className="glass-tile-sheen" />
 
-                <span className="relative grid size-10 place-items-center rounded-md bg-white/20 text-white">
+                {/*
+                 * Цагаан дэвсгэр дээр УТГА САНААНЫ токен ашиглана
+                 * (`text-ink`, `text-muted`) — эс тэгвээс харанхуй горимд
+                 * эргэхгүй. Бэлэн бус хувилбар нь нэг зэрэг бүдэг.
+                 */}
+                <span
+                  className={`relative grid size-10 place-items-center rounded-md ${
+                    ready ? 'bg-brand-500 text-white' : 'bg-sunken text-muted'
+                  }`}
+                >
                   <tile.Icon className="size-5" />
                 </span>
 
-                <span className="relative mt-3 block text-sm font-bold leading-snug text-white sm:text-base">
+                <span
+                  className={`relative mt-3 block text-sm font-bold leading-snug sm:text-base ${
+                    ready ? 'text-ink' : 'text-ink-soft'
+                  }`}
+                >
                   {tc(tile.key)}
                 </span>
-                <span className="relative mt-1 block text-[11px] leading-relaxed text-white/75 sm:text-xs">
+                <span className="relative mt-1 block text-[11px] leading-relaxed text-muted sm:text-xs">
                   {t(tile.hint)}
                 </span>
 
-                <span className="relative mt-auto block pt-3 text-[11px] font-bold text-white/90">
-                  {counts[tile.key] ?? 0} {t('print.itemCount')}
+                <span className="relative mt-auto block pt-3 text-[11px] font-bold">
+                  {ready ? (
+                    <span className="text-brand-500">
+                      {counts[tile.key] ?? 0} {t('print.itemCount')}
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-sunken px-2 py-0.5 uppercase tracking-wider text-muted">
+                      {t('home.comingSoon')}
+                    </span>
+                  )}
                 </span>
-              </button>
-            </li>
-          ))}
+              </>
+            );
+
+            const shared = 'glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5';
+
+            return (
+              <li
+                key={tile.key}
+                className="tile-in"
+                /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 360ms-д. */
+                style={{ animationDelay: `${index * 40}ms` }}
+              >
+                {ready ? (
+                  <button type="button" onClick={() => onPick(tile.key)} className={shared}>
+                    {inner}
+                  </button>
+                ) : (
+                  <span aria-disabled="true" className={`${shared} cursor-default opacity-70`}>
+                    {inner}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </section>

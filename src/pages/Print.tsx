@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import LastOrderBanner from '../components/LastOrderBanner';
@@ -41,6 +41,16 @@ const QUICK_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 
  *
  * Каталог нь build үед тогтмол тул нэг л удаа тоолно.
  */
+/**
+ * Хүчинтэй ангиллын нэрс — хаягийн параметрийг шалгахад.
+ *
+ * `?t=` нь хэрэглэгчийн гараас ирж болно. Шалгаагүй утгыг `tab` болгон
+ * хүлээж авбал `byCategory` хоосон жагсаалт буцааж, хуудас хоосон харагдана.
+ */
+const CATEGORY_ORDER: readonly ServiceCategory[] = [
+  ...new Set(SERVICES.map((service) => service.category)),
+];
+
 const COUNTS: Record<string, number> = SERVICES.reduce<Record<string, number>>(
   (acc, service) => {
     acc[service.category] = (acc[service.category] ?? 0) + 1;
@@ -102,14 +112,44 @@ export default function Print() {
   const { t, tc, ts } = useLang();
 
   /*
-   * `null` = 12 цонхны сонголт харагдана. Ангилал сонгосны дараа тухайн
-   * ангиллын үнийн жагсаалт руу шилжинэ.
+   * Сонгосон ангилал нь ХАЯГанд амьдарна: `/hevlel?t=Угаалт`.
    *
-   * Router-ийн зам биш, дотоод төлөв ашиглаж байгаа шалтгаан: сагсанд
-   * `File` объект байдаг тул хуудас солигдоход алдагдах эрсдэлтэй.
-   * Ангилал хооронд үсрэх нь сонгосон зургийг арчих ёсгүй.
+   * ── Яагаад дотоод төлөв биш вэ ──────────────────────────────────
+   *
+   * Эхэндээ `useState` байсан. Тэр үед ангилал сонгоход хаяг өөрчлөгддөггүй
+   * тул хөтчийн ТҮҮХЭНД цэг үүсэхгүй байв — утасны «буцах» зангаа эсвэл
+   * товч дарахад хэрэглэгч торны сонголт руу биш, САЙТААС БҮРМӨСӨН гарч
+   * байлаа. Утсан дээр буцах зангаа бол үндсэн навигаци тул энэ нь
+   * жирийн эвгүйдэл биш, урсгал таслах алдаа юм.
+   *
+   * `?t=` параметр нь мөн: хуудсыг сэргээхэд сонголт хэвээр үлдэнэ, ангилал
+   * руу шууд линк илгээж болно.
+   *
+   * ⚠️ Сагсанд `File` объект байдаг ч энэ нь аюулгүй: `BasketProvider` нь
+   * `Routes`-оос ГАДНА байрладаг тул хайлтын параметр солигдоход дахин
+   * үүсэхгүй — сонгосон зураг хэвээр үлдэнэ.
    */
-  const [tab, setTab] = useState<ServiceCategory | null>(null);
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('t');
+  const tab: ServiceCategory | null =
+    raw && (CATEGORY_ORDER as readonly string[]).includes(raw)
+      ? (raw as ServiceCategory)
+      : null;
+
+  const setTab = (next: ServiceCategory | null) => {
+    setShowAll(false);
+    if (next === null) {
+      /*
+       * Торны сонголт руу буцах нь ШИНЭ цэг биш, өмнөх цэг рүү буцах явдал.
+       * `replace` хийвэл товчоор буцахад хуудаснаас гарна — хэрэглэгчийн
+       * оюун дахь «буцах» гэсэн үйлдэлтэй зөрчилдөнө.
+       */
+      setParams({}, { replace: false });
+      return;
+    }
+    setParams({ t: next });
+  };
+
   const [showAll, setShowAll] = useState(false);
   const [editorFor, setEditorFor] = useState<
     { service: ServiceItem; itemKey?: string } | null
@@ -183,29 +223,33 @@ export default function Print() {
           * түүнийг ЭХЭНД нь нэмнэ: эс тэгвээс хэрэглэгч хаана байгаагаа
           * табуудаас олж харахгүй, аль нь ч идэвхгүй харагдана.
           */}
+        {/*
+          * ── Буцах товч ────────────────────────────────────────
+          *
+          * Табын ГҮЙДЭГ мөрөөс гаргаж, өөрийн мөрөнд байрлуулав. Өмнө нь
+          * табуудтай нэг эгнээнд байсан бөгөөд утсан дээр тэр эгнээ 609px
+          * өргөнтэй (дэлгэц 390px) тул хэрэглэгч хажуу тийш гүйлгэж байж
+          * олдог байв. Буцах нь хамгийн олон дардаг үйлдэл — хайж олох ёсгүй.
+          *
+          * Хуруунд 46px өндөр — Apple-ийн зөвлөмжийн 44px-ээс дээш.
+          */}
+        <button
+          type="button"
+          onClick={() => setTab(null)}
+          className="mb-3 inline-flex items-center gap-2 rounded-xl border border-hairline px-4 py-3 text-sm font-semibold text-ink-soft transition-colors hover:border-neon hover:text-neon"
+        >
+          <IconArrowRight className="size-4 rotate-180" />
+          {t('print.allCategories')}
+        </button>
+
         <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setTab(null);
-                setShowAll(false);
-              }}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 py-2.5 text-sm font-semibold text-muted transition-colors hover:text-neon"
-            >
-              <IconArrowRight className="size-3.5 rotate-180" />
-              {t('print.allCategories')}
-            </button>
-
             {(QUICK_TABS.includes(tab) ? QUICK_TABS : [tab, ...QUICK_TABS]).map(
               (category) => (
                 <button
                   key={category}
                   type="button"
-                  onClick={() => {
-                    setTab(category);
-                    setShowAll(false);
-                  }}
+                  onClick={() => setTab(category)}
                   aria-current={category === tab ? 'true' : undefined}
                   className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                     category === tab
@@ -235,13 +279,23 @@ export default function Print() {
             * Нууц өгөгдөл байхгүй тул хамгаалалт хэрэггүй: хэрэгсэл бүрэн
             * офлайн ажилладаг, сервер рүү юу ч илгээдэггүй.
             */}
-          <Link
-            to="/tseej-zurag/avtomat"
-            className="inline-flex shrink-0 items-center gap-1.5 self-start text-xs font-semibold text-muted transition-colors hover:text-brand-500"
-          >
-            <IconCrop className="size-3.5" />
-            {t('print.staffTool')}
-          </Link>
+          {/*
+            * ── ТҮР НУУСАН ────────────────────────────────────────
+            *
+            * `/tseej-zurag/avtomat` хуудас ХЭВЭЭР ажиллана: зам нь `App.tsx`
+            * дээр бүртгэлтэй тул ажилтан хаягаар нь шууд орно. Зөвхөн ЛИНК
+            * нь үйлчлүүлэгчийн хуудаснаас түр хасагдсан.
+            *
+            * Буцааж нэмэхэд доорхийн тайлбарыг авахад хангалттай:
+            *
+            * <Link
+            *   to="/tseej-zurag/avtomat"
+            *   className="inline-flex shrink-0 items-center gap-1.5 self-start text-xs font-semibold text-muted transition-colors hover:text-brand-500"
+            * >
+            *   <IconCrop className="size-3.5" />
+            *   {t('print.staffTool')}
+            * </Link>
+            */}
         </div>
         </>
         )}
@@ -254,15 +308,20 @@ export default function Print() {
           * сагс ганцаараа сунжирна. Тиймээс тэр үед нэг багана болгож,
           * сагсыг хэмжээгээр нь хязгаарлана.
           */}
-        <div
-          className={
-            tab === null
-              ? 'mt-5 max-w-md'
-              : 'mt-5 grid gap-8 lg:grid-cols-[1fr_340px]'
-          }
-        >
+        {/*
+          * Сагсны хэсэг нь ЗӨВХӨН ангилал сонгосны дараа харагдана.
+          *
+          * Торны дэлгэц дээр «Таны сонголт» нь хэрэглэгчийн шийдвэрт огт
+          * нэмэр болдоггүй — тэр мөчид сонгох зүйл нь ангилал, ширхэг биш.
+          * Хоосон сагс харуулах нь зөвхөн доош гүйх зай нэмнэ.
+          *
+          * Сагсны агуулга алдагдахгүй: `BasketProvider` нь router-аас гадна
+          * амьдардаг тул нуугдсан ч зураг, ширхэг хэвээр хадгалагдана. Мөн
+          * толгой дээрх сагсны товч хаана ч байсан тоог харуулна.
+          */}
+        {tab !== null && (
+        <div className="mt-5 grid gap-8 lg:grid-cols-[1fr_340px]">
           {/* ── Хэмжээний сонголт ─────────────────────────────── */}
-          {tab !== null && (
           <div>
             {/*
               * Дэлгүүр дээр хийгддэг үйлчилгээ.
@@ -375,7 +434,6 @@ export default function Print() {
               </button>
             )}
           </div>
-          )}
 
           {/* ── Сагс ──────────────────────────────────────────── */}
           <aside className="lg:sticky lg:top-24 lg:self-start">
@@ -496,6 +554,7 @@ export default function Print() {
             </div>
           </aside>
         </div>
+        )}
 
         {/*
           * Заавруудыг анхдагчаар хураасан.
