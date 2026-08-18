@@ -6,6 +6,20 @@
  * уншдаг тул нэг л газар засахад хангалттай.
  */
 
+import type { StringKey } from './i18n';
+
+/**
+ * Ажлын цагийн нэг мөр.
+ *
+ * Гараг нь үргэлж орчуулагдана. Цаг нь ихэвчлэн тоо (`09:00 – 18:00`) тул
+ * хоёр хэлэнд ижил — гэхдээ «Амарна» гэх мэт үг байвал `timeKey` өгнө.
+ */
+export interface OpeningRow {
+  daysKey: StringKey;
+  time?: string;
+  timeKey?: StringKey;
+}
+
 export interface Phone {
   /** Харагдах хэлбэр: `7575-8575` */
   label: string;
@@ -24,10 +38,11 @@ export const CONTACT = {
    * Эхнийх нь ҮНДСЭН дугаар — толгойд болон «залгах» товчнуудад энэ гарна.
    */
   phones: [
-    { label: '8055-2222', href: 'tel:+97680552222', note: 'Захиалга, лавлагаа' },
+    { label: '8022-2323', href: 'tel:+97680222323', note: 'Захиалга, лавлагаа' },
+    { label: '9075-0408', href: 'tel:+97690750408' },
   ] as readonly Phone[],
 
-  emails: ['info@printmn.mn'] as readonly string[],
+  emails: ['narantuulkonica@gmail.com'] as readonly string[],
 
   address: {
     /** Google Maps дээрх байгууллагын нэр. */
@@ -61,10 +76,11 @@ export const CONTACT = {
    * хэлдэггүй тул хүн залгаж асуухад хүрдэг.
    */
   hours: [
-    { days: 'Даваа – Баасан', time: '09:00 – 18:00' },
-    { days: 'Бямба', time: '10:00 – 15:00' },
-    { days: 'Ням', time: 'Амарна' },
-  ] as readonly { days: string; time: string }[],
+    { daysKey: 'hours.weekdays', time: '09:00 – 18:00' },
+    { daysKey: 'hours.saturday', time: '10:00 – 15:00' },
+    /* «Амарна» нь цаг биш, үг — тиймээс энэ мөр орчуулагдана. */
+    { daysKey: 'hours.sunday', timeKey: 'hours.closed' },
+  ] as readonly OpeningRow[],
 
   /** Хоосон мөрийг интерфейс автоматаар алгасана. */
   social: {
@@ -112,7 +128,7 @@ export const PRIMARY_PHONE = CONTACT.phones[0];
  * footer-т амьдарна.
  */
 export const NAV = [
-  { to: '/hevlel', label: 'Хэвлэл' },
-  { to: '/tseej-zurag', label: 'Цээж зураг' },
-] as const;
+  { to: '/hevlel', key: 'nav.print' },
+  { to: '/tseej-zurag', key: 'nav.idPhoto' },
+] as const satisfies readonly { to: string; key: StringKey }[];
 

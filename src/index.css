@@ -41,6 +41,22 @@
 
   --color-accent: #f59e0b;
   --color-accent-strong: #d97706;
+
+  /*
+   * Цэсний нион ногоон.
+   *
+   * ⚠️ Жинхэнэ нион (#39FF14) нь цагаан дэвсгэр дээр 1.4:1 харьцаатай —
+   * уншигдахгүй. Тиймээс ГЭРЭЛ горимд бага зэрэг гүнзгийрүүлсэн ногоон
+   * (#00A63E, 3.9:1) хэрэглэнэ: нүдэнд нион мэт хурц ч уншигдана.
+   * Харанхуй горимд жинхэнэ нионд ойртоно — бараан дэвсгэр дээр хурц
+   * ногоон нь аюулгүй.
+   *
+   * Зөвхөн ИДЭВХТЭЙ болон hover төлөвт хэрэглэнэ. Цэсний бүх мөрийг
+   * ногоон болговол брэндийн цэнхэртэй зөрчилдөж, аль нь идэвхтэйг
+   * ялгах боломжгүй болно.
+   */
+  --color-neon: #00a63e;
+  --color-neon-soft: #e8fbef;
   /*
    * Амбер дээрх текст — хоёр горимд ИЖИЛ бараан.
    *
@@ -134,6 +150,10 @@
     --color-accent: #fbbf24;
     --color-accent-strong: #fcd34d;
     --color-ok-strong: #4ade80;
+
+    /* Бараан дэвсгэр дээр жинхэнэ нионд ойртоно — эндээ уншигдана. */
+    --color-neon: #3ef07a;
+    --color-neon-soft: #10281a;
     --color-danger: #f87171;
     --color-danger-soft: #2b1416;
 
@@ -174,6 +194,10 @@
       --color-accent: #fbbf24;
       --color-accent-strong: #fcd34d;
       --color-ok-strong: #4ade80;
+
+      /* Бараан дэвсгэр дээр жинхэнэ нионд ойртоно — эндээ уншигдана. */
+      --color-neon: #3ef07a;
+      --color-neon-soft: #10281a;
       --color-danger: #f87171;
       --color-danger-soft: #2b1416;
 
@@ -495,6 +519,107 @@
   opacity: calc(0.35 + var(--tilt-x) * 0.25);
 }
 
+
+/**
+ * Шилэн хавтан — ЦЭНХЭР дэвсгэр дээрх ангиллын цонх.
+ *
+ * ── Яагаад `glass`-ыг ашиглаагүй вэ ──────────────────────────────
+ *
+ * `glass` нь `backdrop-filter: blur()` хэрэглэдэг бөгөөд дээрх тайлбарт
+ * «урт текст агуулсан карт дээр ХЭРЭГЛЭХГҮЙ» гэж тусгайлан бичсэн:
+ * пиксел бүрийг дахин тооцдог тул хямд утсан дээр гүйлгэлт таталддаг.
+ * Энд 12 хавтан зэрэг харагдана — яг тэр тохиолдол.
+ *
+ * Мөн эдгээр хавтан нь ЖИГД цэнхэр дэвсгэр дээр сууна. Бүдгэрүүлэх зүйл
+ * байхгүй тул `backdrop-filter` нь харагдацад юу ч нэмэхгүй — ердийн
+ * тунгалаг цагаан яг ижил үр дүн өгнө, үнэгүйгээр.
+ *
+ * ── Хөдөлгөөн ────────────────────────────────────────────────────
+ *
+ * Дээрээс нь гэрлийн туяа өнгөрөх нь шилэн мэдрэмжийг үүсгэдэг гол
+ * деталь. `transform`-оор хөдөлгөнө (`left` биш) тул зөвхөн compositor
+ * дээр ажиллаж, layout дахин тооцоологдохгүй.
+ */
+@utility glass-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 8px 24px rgb(0 0 0 / 0.18);
+  transition:
+    background 220ms var(--ease-out-soft),
+    transform 220ms var(--ease-out-soft),
+    box-shadow 220ms var(--ease-out-soft);
+}
+
+@utility glass-tile-sheen {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.22) 50%,
+    transparent 100%
+  );
+  transform: translateX(-160%) skewX(-12deg);
+  transition: transform 700ms var(--ease-out-soft);
+}
+
+@media (hover: hover) {
+  .glass-tile:hover {
+    background: rgb(255 255 255 / 0.2);
+    transform: translateY(-4px);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 16px 34px rgb(0 0 0 / 0.26);
+  }
+
+  .glass-tile:hover .glass-tile-sheen {
+    transform: translateX(320%) skewX(-12deg);
+  }
+}
+
+/* Дарах агшинд шууд хариу — хуруунд ч мэдрэгдэнэ. */
+.glass-tile:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/**
+ * Хавтангууд ЭЭЛЖЛЭН гарч ирнэ.
+ *
+ * 12 хавтан зэрэг үсрэн гарах нь эмх замбараагүй харагддаг. 40ms-ийн
+ * зөрүүтэйгээр эрэмбэлэн гаргавал нүд зүүнээс баруун тийш дагаж, бүтэц
+ * нь өөрөө уншигдана. Нийт 480ms — хүлээлт мэдрэгдэхгүй.
+ */
+@utility tile-in {
+  animation: tile-in 320ms var(--ease-out-soft) both;
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-in {
+    animation: none;
+  }
+
+  .glass-tile,
+  .glass-tile-sheen {
+    transition: none;
+  }
+}
 
 /**
  * Гүйдэг талбарын ирмэгийн сүүдэр — JS-гүй.

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import { BasketProvider } from './state/basket';
+import { LangProvider } from './state/lang';
 
 /**
  * Нүүр хуудсаас бусдыг тусад нь ачаална.
@@ -56,25 +57,32 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <BasketProvider>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<Home />} />
-              <Route path="zakhialga" element={<Order />} />
-              {/* Захиалгын төлөв — хэрэглэгч хэдийд ч буцаж орж болно. */}
-              <Route path="zakhialga/:orderNumber" element={<OrderStatus />} />
-              <Route path="hevlel" element={<Print />} />
-              {/* Хуучин линк — шинэ хэвлэлийн хуудас руу шилжүүлнэ. */}
-              <Route path="zurag-ugaalt" element={<Navigate to="/hevlel" replace />} />
-              <Route path="tseej-zurag" element={<IdPhoto />} />
-              {/* Ажилтны хэрэгсэл — бүрэн офлайн, захиалгын мэдээлэлгүй. */}
-              <Route path="tseej-zurag/avtomat" element={<IdPhotoStudio />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BasketProvider>
+      {/*
+        * Хэл нь сагснаас ГАДНА байрлана: сагс дотор `File` объект байдаг тул
+        * хэл солиход дахин үүсэх ёсгүй. Гадна талд байснаар хэл солиход зөвхөн
+        * текст дахин зурагдана, сонгосон зураг хэвээр үлдэнэ.
+        */}
+      <LangProvider>
+        <BasketProvider>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<Home />} />
+                <Route path="zakhialga" element={<Order />} />
+                {/* Захиалгын төлөв — хэрэглэгч хэдийд ч буцаж орж болно. */}
+                <Route path="zakhialga/:orderNumber" element={<OrderStatus />} />
+                <Route path="hevlel" element={<Print />} />
+                {/* Хуучин линк — шинэ хэвлэлийн хуудас руу шилжүүлнэ. */}
+                <Route path="zurag-ugaalt" element={<Navigate to="/hevlel" replace />} />
+                <Route path="tseej-zurag" element={<IdPhoto />} />
+                {/* Ажилтны хэрэгсэл — бүрэн офлайн, захиалгын мэдээлэлгүй. */}
+                <Route path="tseej-zurag/avtomat" element={<IdPhotoStudio />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </BasketProvider>
+      </LangProvider>
     </BrowserRouter>
   );
 }

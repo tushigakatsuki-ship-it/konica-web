@@ -19,8 +19,15 @@ import { HERO_IMAGES } from '../data/site';
  *   • Зургууд бүгд `aria-hidden` — чимэглэл учир дэлгэц уншигчид хэрэггүй.
  */
 
-/** Хэдэн секунд тутам солих вэ. Уншиж амжихуйц, гэхдээ уйдахааргүй. */
-const INTERVAL_MS = 6000;
+/**
+ * Хэдэн секунд тутам солих вэ.
+ *
+ * 6 секунд нь дэлгүүрийн ажлыг харуулах гэсэн зорилгод удаан байв: ихэнх
+ * хүн нүүр хуудсан дээр 10-15 секунд л байдаг тул гурван зургийн НЭГИЙГ л
+ * хараад явна. 3.5 секунд нь бүгдийг харах боломж өгнө, гэхдээ анивчсан
+ * мэдрэмж төрүүлэхээргүй.
+ */
+const INTERVAL_MS = 3500;
 
 const prefersReducedMotion = (): boolean =>
   typeof matchMedia === 'function' &&
@@ -50,13 +57,13 @@ export default function HeroSlideshow() {
     return (
       <div
         aria-hidden
-        className="absolute inset-0 bg-gradient-to-br from-brand-500 via-brand-700 to-brand-900"
+        className="absolute inset-0 bg-gradient-to-br from-brand-400 via-brand-500 to-brand-700"
       />
     );
   }
 
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden bg-brand-900">
+    <div aria-hidden className="absolute inset-0 overflow-hidden bg-brand-600">
       {HERO_IMAGES.map((image, i) => (
         <img
           key={image.src}
@@ -65,16 +72,23 @@ export default function HeroSlideshow() {
           loading={i === 0 ? 'eager' : 'lazy'}
           fetchPriority={i === 0 ? 'high' : 'low'}
           decoding="async"
-          className="absolute inset-0 size-full object-cover transition-opacity duration-1000"
+          className="absolute inset-0 size-full object-cover transition-opacity duration-700"
           style={{ opacity: i === index ? 1 : 0 }}
         />
       ))}
 
       {/*
-       * Харанхуй давхарга — цагаан текстийг ЯМАР Ч зураг дээр уншигдахуйц
+       * Цэнхэр халхавч — цагаан текстийг ЯМАР Ч зураг дээр уншигдахуйц
        * байлгана. Үүнгүйгээр цайвар зураг дээр гарчиг алга болно.
+       *
+       * ⚠️ Өмнө нь `brand-900/85` байсан нь бараг тунгалаг бус бараан хөх
+       * болж, доорх зургийг бүрэн дардаг байв — «ямар чанартай ажилладаг вэ»
+       * гэдгийг харуулах гэсэн зорилго нь өөрөө устсан. Одоо ТОД цэнхэр
+       * (`brand-600`) дээр илүү тунгалаг: зураг харагдана, текст ч уншигдана.
+       *
+       * Зүүн доод булан нь бага зэрэг гүнзгий — гарчиг, товч тэнд сууна.
        */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-900/85 via-brand-900/70 to-brand-700/60" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-brand-700/85 via-brand-600/55 to-brand-500/35" />
 
       {HERO_IMAGES.length > 1 && (
         <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 sm:bottom-6">

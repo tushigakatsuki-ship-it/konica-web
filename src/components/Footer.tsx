@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { CONTACT } from '../data/site';
+import { useLang } from '../state/lang';
 import { IconClock, IconMail, IconMapPin, IconPhone } from './icons';
 
 /**
@@ -13,10 +13,23 @@ import { IconClock, IconMail, IconMapPin, IconPhone } from './icons';
  * хөл гурав зэрэг шинэчлэгдэнэ.
  */
 export default function Footer() {
+  const { t } = useLang();
   const socials = Object.entries(CONTACT.social).filter(([, url]) => url);
 
   return (
-    <footer className="mt-16 border-t border-hairline bg-ink text-white/80">
+    /*
+      * `id="kholboo"` нь өмнө нь нүүр хуудасны тусдаа хэсэг дээр байсан.
+      * Тэр хэсэг хөлтэй яг ижил мэдээллийг давхардуулдаг байсан тул
+      * хасагдаж, тэмдэглэгээ нь энд шилжив — толгойн «Холбоо барих» линк
+      * бүх хуудаснаас ажилласаар байна.
+      *
+      * `scroll-mt` нь хөвөгч толгойн өндрийг нөхнө: үүнгүйгээр гүйлт
+      * дуусахад эхний мөр толгойн доогуур орж далдарна.
+      */
+    <footer
+      id="kholboo"
+      className="mt-16 scroll-mt-20 border-t border-hairline bg-ink text-white/80"
+    >
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-2 lg:grid-cols-4">
         {/* Байгууллага */}
         <div>
@@ -26,7 +39,7 @@ export default function Footer() {
             </span>
             <span className="text-lg font-extrabold text-white">{CONTACT.company}</span>
           </p>
-          <p className="mt-3 text-sm leading-relaxed">{CONTACT.tagline}</p>
+          <p className="mt-3 text-sm leading-relaxed">{t('common.tagline')}</p>
 
           {socials.length > 0 && (
             <ul className="mt-4 flex gap-3 text-sm">
@@ -48,7 +61,7 @@ export default function Footer() {
 
         {/* Холбоо барих */}
         <div>
-          <h2 className="text-sm font-bold text-white">Холбоо барих</h2>
+          <h2 className="text-sm font-bold text-white">{t('footer.contact')}</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {CONTACT.phones.map((phone) => (
               <li key={phone.href}>
@@ -74,7 +87,7 @@ export default function Footer() {
 
         {/* Байршил */}
         <div>
-          <h2 className="text-sm font-bold text-white">Байршил</h2>
+          <h2 className="text-sm font-bold text-white">{t('footer.location')}</h2>
           <p className="mt-3 flex gap-2 text-sm leading-relaxed">
             <IconMapPin className="mt-0.5 size-4 shrink-0" />
             <span>
@@ -89,7 +102,7 @@ export default function Footer() {
                 rel="noreferrer"
                 className="font-semibold text-accent hover:underline"
               >
-                Google Maps-аар нээх
+                {t('footer.openMaps')}
               </a>
             </span>
           </p>
@@ -97,28 +110,35 @@ export default function Footer() {
 
         {/* Ажлын цаг */}
         <div>
-          <h2 className="text-sm font-bold text-white">Ажлын цаг</h2>
+          <h2 className="text-sm font-bold text-white">{t('footer.hours')}</h2>
           <dl className="mt-3 space-y-1.5 text-sm">
             {CONTACT.hours.map((row) => (
-              <div key={row.days} className="flex items-start gap-2">
+              <div key={row.daysKey} className="flex items-start gap-2">
                 <IconClock className="mt-0.5 size-4 shrink-0" />
-                <dt className="flex-1">{row.days}</dt>
-                <dd className="font-semibold text-white">{row.time}</dd>
+                <dt className="flex-1">{t(row.daysKey)}</dt>
+                <dd className="font-semibold text-white">
+                  {row.timeKey ? t(row.timeKey) : row.time}
+                </dd>
               </div>
             ))}
           </dl>
         </div>
       </div>
 
+      {/*
+        * Хамгийн доод мөр — ГОЛЛУУЛСАН, ганц мөр.
+        *
+        * Өмнө нь зүүн талд эрхийн мэдэгдэл, баруун талд «Зураг захиалах»
+        * линк хоёр талдаа тархсан байв. Хөлийн дээд хэсэгт аль хэдийн дөрвөн
+        * баганын мэдээлэл, хуудсанд хэдэн захиалах товч байгаа тул энд дахин
+        * дуудах шаардлагагүй — эцсийн мөр нь зөвхөн эрхийн мэдэгдэл байх нь
+        * тайван, бүрэн төгссөн мэдрэмж өгнө.
+        */}
       <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
           <p>
-            © {new Date().getFullYear()} {CONTACT.legalName}. Бүх эрх хуулиар
-            хамгаалагдсан.
+            © {new Date().getFullYear()} {CONTACT.legalName}. {t('footer.rights')}
           </p>
-          <Link to="/hevlel" className="font-semibold text-accent hover:underline">
-            Зураг захиалах
-          </Link>
         </div>
       </div>
     </footer>

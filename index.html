@@ -21,6 +21,20 @@
         if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     </script>
+
+    <!--
+      Хадгалсан хэлийг мөн энд буулгана.
+
+      React дотор хийвэл хайлтын систем болон дэлгэц уншигч эхлээд `lang="mn"`
+      гэж уншаад, дараа нь өөрчлөгдөнө. Англи хэлтэй хэрэглэгчид дэлгэц уншигч
+      эхний хормыг монгол дуудлагаар уншина.
+    -->
+    <script>
+      try {
+        var l = localStorage.getItem('printmn-lang');
+        if (l === 'en' || l === 'mn') document.documentElement.lang = l;
+      } catch (e) {}
+    </script>
     <title>Printmn — Чанартай хэвлэл, хурдан үйлчилгээ</title>
     <meta
       name="description"

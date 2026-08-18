@@ -18,7 +18,7 @@ import type { SVGProps } from 'react';
  * Бүгд `currentColor` ашигладаг тул `text-*` класс шууд ажиллана.
  */
 
-type IconProps = SVGProps<SVGSVGElement>;
+export type IconProps = SVGProps<SVGSVGElement>;
 
 const Base = ({ children, ...props }: IconProps) => (
   <svg
