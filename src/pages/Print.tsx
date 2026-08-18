@@ -4,7 +4,7 @@ import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import LastOrderBanner from '../components/LastOrderBanner';
 import { SERVICES, byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
-import CategoryGrid from '../components/CategoryGrid';
+import CategoryGrid, { CATEGORY_HINT } from '../components/CategoryGrid';
 import { useLang } from '../state/lang';
 import { fitBox, parsePhotoSize } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
@@ -20,6 +20,21 @@ import {
   IconRuler,
 } from '../components/icons';
 import { PRIMARY_PHONE } from '../data/site';
+
+/**
+ * Ангилал сонгосны дараа дээр гарах ХУРДАН табууд.
+ *
+ * ── Яагаад бүх 12 биш вэ ─────────────────────────────────────────
+ *
+ * Захиалгын дийлэнх нь эдгээр гурав дээр төвлөрдөг бөгөөд хоорондоо
+ * ойрхон сонголтууд юм: «10×15 угаалгах уу, эсвэл засвартай нь уу»,
+ * «энэ зураг цээж зурагт тохирох уу». Хүн эдгээрийн хооронд байнга
+ * үсэрдэг тул тор руу буцаад дахин сонгуулах нь илүүц алхам.
+ *
+ * Бусад ангилал (медаль, өргөмжлөл, хулдаас) нь хоорондоо харьцуулагддаггүй
+ * тул тэдгээрт орсон хүн «Бүх төрөл» дээр дарж буцна.
+ */
+const QUICK_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 'Цээж зураг'];
 
 /**
  * Ангилал бүрт хэдэн үйлчилгээ байгаа — цонхон дээр харагдана.
@@ -160,24 +175,55 @@ export default function Print() {
         </div>
 
         {tab !== null && (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0">
-            {/* Буцах — торны сонголт руу. */}
+        <>
+        {/*
+          * Хурдан табууд — утсан дээр хэвтээ гүйлгэнэ.
+          *
+          * Сонгосон ангилал эдгээрийн дунд байхгүй бол (жишээ нь Медаль)
+          * түүнийг ЭХЭНД нь нэмнэ: эс тэгвээс хэрэглэгч хаана байгаагаа
+          * табуудаас олж харахгүй, аль нь ч идэвхгүй харагдана.
+          */}
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
             <button
               type="button"
               onClick={() => {
                 setTab(null);
                 setShowAll(false);
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-neon"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 py-2.5 text-sm font-semibold text-muted transition-colors hover:text-neon"
             >
               <IconArrowRight className="size-3.5 rotate-180" />
-              {t('print.categories')}
+              {t('print.allCategories')}
             </button>
-            <h2 className="mt-1.5 text-xl font-black tracking-tight sm:text-2xl">
-              {tc(tab)}
-            </h2>
+
+            {(QUICK_TABS.includes(tab) ? QUICK_TABS : [tab, ...QUICK_TABS]).map(
+              (category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => {
+                    setTab(category);
+                    setShowAll(false);
+                  }}
+                  aria-current={category === tab ? 'true' : undefined}
+                  className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    category === tab
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-brand-50 text-ink-soft hover:bg-brand-100'
+                  }`}
+                >
+                  {tc(category)}
+                </button>
+              ),
+            )}
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <p className="min-w-0 text-sm leading-relaxed text-muted">
+            {t(CATEGORY_HINT[tab])}
+          </p>
 
           {/*
             * Ажилтны хэрэгсэл рүү орох гарц.
@@ -197,6 +243,7 @@ export default function Print() {
             {t('print.staffTool')}
           </Link>
         </div>
+        </>
         )}
 
         {/*

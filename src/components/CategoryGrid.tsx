@@ -49,6 +49,17 @@ export const CATEGORY_TILES: readonly Omit<Tile, 'count'>[] = [
   { key: 'Дурсгалын үг', hint: 'cat.memorial', Icon: IconPalette },
 ];
 
+/**
+ * Ангилал → тайлбарын түлхүүр.
+ *
+ * Ангилал сонгосны дараа хуудасны дээд талд ижил тайлбар харагдана.
+ * `CATEGORY_TILES`-аас гаргаж авч байгаа тул хоёр газарт бичих
+ * шаардлагагүй — шинэ ангилал нэмэхэд автоматаар дагана.
+ */
+export const CATEGORY_HINT = Object.fromEntries(
+  CATEGORY_TILES.map((tile) => [tile.key, tile.hint]),
+) as Record<ServiceCategory, StringKey>;
+
 interface Props {
   counts: Record<string, number>;
   onPick(category: ServiceCategory): void;
@@ -71,21 +82,11 @@ export default function CategoryGrid({ counts, onPick }: Props) {
   const { t, tc } = useLang();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-brand-400 via-brand-500 to-brand-700 py-10 sm:py-14">
-      {/*
-        * Гэрлийн толбо — жигд цэнхэр нь хавтгай харагддаг. Хоёр зөөлөн
-        * радиал градиент нь гүн үүсгэнэ. `aria-hidden` — чимэглэл.
-        */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-70"
-        style={{
-          background:
-            'radial-gradient(60% 50% at 15% 0%, rgb(255 255 255 / 0.22), transparent 70%), ' +
-            'radial-gradient(50% 60% at 90% 100%, rgb(255 255 255 / 0.14), transparent 70%)',
-        }}
-      />
-
+    /*
+      * Дэвсгэр нь `category-sky` утилитаас — Tailwind-ийн скандалтаас
+      * хамаарахгүй байлгах үүднээс (`src/index.css` доторх тайлбарыг үз).
+      */
+    <section className="category-sky relative overflow-hidden py-10 sm:py-14">
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
           {t('print.categories')}

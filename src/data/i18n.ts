@@ -50,7 +50,7 @@ export const STRINGS = {
 
   /* ── Нүүр — эхний дэлгэц ── */
   'hero.badge': {
-    mn: 'Konica Minolta · Лабораторийн зураг угаалт',
+    mn: 'Konica Minolta · Мэргэжлийн зураг угаалт',
     en: 'Konica Minolta · Professional photo lab',
   },
   'hero.titleTop': { mn: 'Чанартай хэвлэл,', en: 'Quality printing,' },
@@ -89,6 +89,7 @@ export const STRINGS = {
     en: 'Every price is shown up front. Tap a size, add your photo and choose how many prints you need.',
   },
   'print.categories': { mn: 'Үйлчилгээний төрөл', en: 'Service categories' },
+  'print.allCategories': { mn: 'Бүх төрөл', en: 'All categories' },
   'print.categoriesHint': {
     mn: 'Төрөл дээрээ дарж үнийн жагсаалтаа хараарай.',
     en: 'Tap a category to see its price list.',
@@ -375,5 +376,25 @@ export const serviceNameIn = (name: string, lang: Lang): string => {
   return result.replace(/\s{2,}/g, ' ').trim();
 };
 
+/**
+ * Ангиллын МОНГОЛ харагдах нэр.
+ *
+ * Каталогийн түлхүүр нь товч (`Угаалт`, `Засвар`) бөгөөд код дотор
+ * ашиглахад тохиромжтой ч хэрэглэгчид ойлгомжгүй: «Засвар» гэхэд юуны
+ * засвар нь тодорхойгүй. Мөн `Хэвлэл` нь ХЭВЛЭЛИЙН хуудсан дээр өөрөө
+ * «Хэвлэл» гэж гарвал давхардмал сонсогдоно — тэр нь үнэндээ фото цаас.
+ *
+ * Түлхүүрийг өөрчлөхгүй байгаа шалтгаан: `catalog.ts`, `WALK_IN`,
+ * `POPULAR_IDS`, тестүүд бүгд түүгээр холбогдсон. Зөвхөн ХАРАГДАХ давхарга
+ * нь өөр байна.
+ */
+const CATEGORY_MN: Record<string, string> = {
+  Угаалт: 'Зураг угаалт',
+  Засвар: 'Засвартай зураг',
+  Хэвлэл: 'Фото цаас',
+};
+
 export const categoryIn = (category: string, lang: Lang): string =>
-  lang === 'mn' ? category : (CATEGORY_EN[category] ?? category);
+  lang === 'mn'
+    ? (CATEGORY_MN[category] ?? category)
+    : (CATEGORY_EN[category] ?? category);
