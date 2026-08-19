@@ -6,8 +6,11 @@ import { notify, paidText } from './_notify';
  * /api/admin — ажилтны хуудсыг тэжээнэ.
  *
  *   GET  ?days=7                              → сүүлийн захиалгууд
- *   POST {action:'pay',  ref, paid}           → төлбөр баталгаажуулах
- *   POST {action:'mark', ref, printed}        → хэвлэсэн гэж тэмдэглэх
+ *   GET  ?days=7&state=pending-sync           → NAS татаагүй, ТӨЛӨГДСӨН нь
+ *   GET  ?ref=manifests/…json                 → ганц захиалга
+ *   POST {action:'pay',    ref, paid}         → төлбөр баталгаажуулах
+ *   POST {action:'mark',   ref, printed}      → хэвлэсэн гэж тэмдэглэх
+ *   POST {action:'synced', ref, synced}       → NAS татаж дууссаныг тэмдэглэх
  *
  * ⚠️ Нэвтрэлт: `x-admin-token` толгой нь `ADMIN_TOKEN`-той таарах ёстой.
  * Зөвхөн энэ function л сангийн түлхүүрийг мэднэ — браузер нь зөвхөн 1 цаг
@@ -79,6 +82,8 @@ export default async function handler(request: Request): Promise<Response> {
       ref?: string;
       printed?: boolean;
       paid?: boolean;
+      /** `false` бол тэмдэглэгээг арилгана — NAS дахин татна. */
+      synced?: boolean;
       note?: string;
     };
     try {
@@ -87,8 +92,9 @@ export default async function handler(request: Request): Promise<Response> {
       return json({ error: 'Өгөгдөл JSON биш байна.' }, 400);
     }
 
+    const ACTIONS = ['mark', 'pay', 'synced'] as const;
     const ref = String(body.ref ?? body.manifestKey ?? '');
-    if (!ref || (body.action !== 'mark' && body.action !== 'pay'))
+    if (!ref || !(ACTIONS as readonly string[]).includes(body.action ?? ''))
       return json({ error: 'Хүсэлт буруу байна.' }, 400);
 
     const order = await store.getByRef(ref);
@@ -97,8 +103,21 @@ export default async function handler(request: Request): Promise<Response> {
     const amount = order.payment?.amount ?? order.total;
     let payment: PaymentInfo | undefined;
     let printedAt: number | null | undefined;
+    let syncedAt: number | null | undefined;
 
-    if (body.action === 'pay') {
+    if (body.action === 'synced') {
+      /*
+       * NAS файлыг бүрэн татсаны дараа өөрөө мэдэгдэнэ.
+       *
+       * ⚠️ Төлөгдөөгүй захиалгыг «татсан» гэж тэмдэглүүлэхгүй: NAS татах линк
+       * авах ч боломжгүй байсан тул ийм хүсэлт ирсэн бол алдаа эсвэл хорлол.
+       * Тэмдэглэчихвэл төлбөр нь дараа орох үед NAS уг захиалгыг мөнхөд
+       * алгасна — зураг нь хэзээ ч ирэхгүй.
+       */
+      if (body.synced !== false && !isPaid(order.payment))
+        return json({ error: 'Төлөгдөөгүй захиалгыг татсан гэж тэмдэглэхгүй.' }, 409);
+      syncedAt = body.synced === false ? null : Date.now();
+    } else if (body.action === 'pay') {
       /*
        * Гараар баталгаажуулах — данс руу шилжүүлэг хийсэн тохиолдолд.
        * QPay-ээр төлөгдсөн бол `paidAt` аль хэдийн тавигдсан байна.
@@ -120,7 +139,7 @@ export default async function handler(request: Request): Promise<Response> {
       printedAt = body.printed ? Date.now() : null;
     }
 
-    if (!(await store.update(ref, { payment, printedAt })))
+    if (!(await store.update(ref, { payment, printedAt, syncedAt })))
       return json({ error: 'Хадгалж чадсангүй.' }, 502);
 
     const updated = await store.getByRef(ref);
@@ -146,13 +165,19 @@ export default async function handler(request: Request): Promise<Response> {
     /*
      * Төлбөр саяхан баталгаажсан бол татах линкүүдийг шууд буцаана — ажилтан
      * хуудсаа дахин ачаалах шаардлагагүй.
+     *
+     * `synced` үед линк үүсгэхгүй: NAS файлаа аль хэдийн татсан байгаа тул
+     * 60 ширхэг presigned URL нь зөвхөн хариуг л томсгоно.
      */
-    const shaped = await shape(updated);
+    const files =
+      body.action === 'synced' ? undefined : (await shape(updated)).files;
+
     return json(
       {
         printedAt: updated.printedAt ?? null,
+        syncedAt: updated.syncedAt ?? null,
         payment: updated.payment ?? null,
-        files: shaped.files,
+        ...(files ? { files } : {}),
       },
       200,
     );
@@ -162,8 +187,35 @@ export default async function handler(request: Request): Promise<Response> {
 
   // ── Захиалгуудыг жагсаах ─────────────────────────────────────────
   const url = new URL(request.url);
+
+  /* Ганц захиалга — NAS-ын `--resync`, ажилтны «дахин шалгах» товчид. */
+  const single = url.searchParams.get('ref');
+  if (single) {
+    const order = await store.getByRef(single);
+    if (!order) return json({ error: 'Захиалга олдсонгүй.' }, 404);
+    return json({ orders: [await shape(order)] }, 200);
+  }
+
   const days = Math.min(31, Math.max(1, Number(url.searchParams.get('days')) || 7));
 
-  const orders = await Promise.all((await store.list(days)).map(shape));
-  return json({ orders }, 200);
+  /*
+   * Шүүлтүүр. Өгөгдмөл нь `all` — ажилтны апп бүх захиалгыг (төлөгдөөгүйг ч)
+   * харах ёстой тул хуучин зан төлөв хэвээр.
+   *
+   * `pending-sync` нь NAS-д зориулсан: төлөгдсөн, гэхдээ хараахан татагдаагүй.
+   * Шүүлтийг ЭНД, presigned линк үүсгэхЭЭС ӨМНӨ хийх нь чухал — эс тэгвээс
+   * cron 10 минут тутам 7 хоногийн бүх файлд гарын үсэг зурна.
+   */
+  const state = url.searchParams.get('state') ?? 'all';
+  const all = await store.list(days);
+
+  const selected =
+    state === 'pending-sync'
+      ? all.filter((order) => isPaid(order.payment) && !order.syncedAt)
+      : state === 'paid'
+        ? all.filter((order) => isPaid(order.payment))
+        : all;
+
+  const orders = await Promise.all(selected.map(shape));
+  return json({ orders, state, days, total: all.length }, 200);
 }

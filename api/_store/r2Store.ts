@@ -109,16 +109,26 @@ export class R2Store implements WebOrderStore {
 
   async update(
     ref: string,
-    patch: { payment?: PaymentInfo; printedAt?: number | null },
+    patch: {
+      payment?: PaymentInfo;
+      printedAt?: number | null;
+      syncedAt?: number | null;
+    },
   ): Promise<boolean> {
     const current = await this.getByRef(ref);
     if (!current) return false;
 
     const { ref: _ref, ...manifest } = current;
     if (patch.payment) manifest.payment = patch.payment;
+
+    // `undefined` = хөндөхгүй, `null` = талбарыг устгана.
     if (patch.printedAt !== undefined) {
       if (patch.printedAt === null) delete manifest.printedAt;
       else manifest.printedAt = patch.printedAt;
+    }
+    if (patch.syncedAt !== undefined) {
+      if (patch.syncedAt === null) delete manifest.syncedAt;
+      else manifest.syncedAt = patch.syncedAt;
     }
 
     return putObject(this.config, ref, JSON.stringify(manifest));

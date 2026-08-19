@@ -18,6 +18,7 @@ nas-sync.py — вэбээр ирсэн ТӨЛӨГДСӨН захиалгын з
 гаргах, тогтмол IP авах, HTTPS сертификат тохируулах, порт нээх шаардлагагүй.
 
 Хэрэглээ:
+    ./nas-sync.py --check          # холболт, токен, тохиргоог шалгана (юу ч татахгүй)
     ./nas-sync.py                  # тохиргоог ~/.config эсвэл --config-оос уншина
     ./nas-sync.py --days 14        # сүүлийн 14 өдрийг шалгана
     ./nas-sync.py --dry-run        # юу татахыг харуулна, татахгүй
@@ -49,7 +50,7 @@ HTTP_TIMEOUT = 60          # секунд, нэг хүсэлт
 DOWNLOAD_TIMEOUT = 300     # секунд, нэг файл (30MB хүртэл байж болно)
 MAX_RETRIES = 3
 RETRY_BACKOFF = 5          # секунд, дараа нь 10, 20 ...
-USER_AGENT = "konica-nas-sync/1.0"
+USER_AGENT = "konica-nas-sync/1.1"
 
 # Windows/macOS/DSM бүгдэд аюулгүй файлын нэр болгоно.
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -86,8 +87,14 @@ def safe_name(value: str, *, fallback: str = "unnamed", limit: int = 60) -> str:
     return value or fallback
 
 
-def http_json(url: str, token: str) -> dict:
-    """/api/admin руу GET хийж JSON буцаана. Түр алдаанд дахин оролдоно."""
+def http_json(url: str, token: str, tolerate: tuple[int, ...] = ()) -> dict:
+    """
+    /api/admin руу GET хийж JSON буцаана. Түр алдаанд дахин оролдоно.
+
+    `tolerate` — эдгээр статустай хариуг АЛДАА гэж үзэхгүй, биеийг нь уншина.
+    `/api/health` нь тохиргоо дутуу үед 503 буцаадаг ч биед нь ЯГ юу дутуугийн
+    жагсаалт байдаг — тэрийг хаях нь дэмий.
+    """
     request = urllib.request.Request(
         url,
         headers={"x-admin-token": token, "user-agent": USER_AGENT},
@@ -99,6 +106,11 @@ def http_json(url: str, token: str) -> dict:
             with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
+            if error.code in tolerate:
+                try:
+                    return json.loads(error.read().decode("utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    pass
             # 401/403 дахин оролдоод нэмэргүй — токен буруу байна.
             if error.code in (401, 403):
                 raise RuntimeError(
@@ -116,6 +128,41 @@ def http_json(url: str, token: str) -> dict:
         if attempt < MAX_RETRIES - 1:
             time.sleep(RETRY_BACKOFF * (2 ** attempt))
     raise RuntimeError(f"/api/admin руу холбогдож чадсангүй: {last_error}")
+
+
+def http_post(url: str, token: str, payload: dict) -> dict | None:
+    """
+    /api/admin руу POST хийнэ. Амжилтгүй бол `None` — ЗОГСООХ шалтгаан биш.
+
+    Энэ дуудлага нь зөвхөн «NAS татаж дууслаа» гэж тэмдэглэдэг. Файл нь аль
+    хэдийн диск дээр байгаа тул тэмдэглэгээ бичигдээгүй нь ажлыг унагахгүй —
+    хамгийн муудаа дараагийн ажиллалт тэр захиалгыг дахин үзээд, файлууд нь
+    байгааг олж хараад алгасна.
+    """
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "x-admin-token": token,
+            "content-type": "application/json",
+            "user-agent": USER_AGENT,
+        },
+        method="POST",
+    )
+    for attempt in range(MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            # 4xx дахин оролдоод нэмэргүй — хүсэлт өөрөө буруу.
+            if 400 <= error.code < 500:
+                return None
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            pass
+        if attempt < MAX_RETRIES - 1:
+            time.sleep(RETRY_BACKOFF * (2 ** attempt))
+    return None
 
 
 def download(url: str, target: Path) -> int:
@@ -320,6 +367,8 @@ def main() -> int:
                         help="Юу татахыг харуулна, файл татахгүй")
     parser.add_argument("--resync", metavar="ЗАХИАЛГА",
                         help="Нэг захиалгыг төлөв үл харгалзан дахин татна")
+    parser.add_argument("--check", action="store_true",
+                        help="Тохиргоо, холболт, токеныг шалгана — файл татахгүй")
     arguments = parser.parse_args()
 
     # ── Тохиргоо цуглуулах ──────────────────────────────────────────────
@@ -355,7 +404,78 @@ def main() -> int:
         )
         return 2
 
+    # Токеныг HTTP толгойд тавихын өмнө шалгана.
+    #
+    # Яагаад: заавар дахь ЖИШЭЭ утга нь кирилл (`энд-жинхэнэ-токеноо-тавина`).
+    # Түүнийг солихоо мартвал Python `latin-1` кодчлолын түүхий traceback
+    # шидэж, эзэн нь юу болсныг ойлгохгүй. Энд тодорхой хэлнэ.
+    try:
+        token.encode("ascii")
+    except UnicodeEncodeError:
+        print(
+            "KONICA_ADMIN_TOKEN дотор латин бус (кирилл) үсэг байна.\n"
+            "Жишээ утгыг нь солихоо мартсан бололтой — Vercel → Settings →\n"
+            "Environment Variables → ADMIN_TOKEN дахь ЯГ тэр утгыг хуулна уу.",
+            file=sys.stderr,
+        )
+        return 2
+
     dest_root = Path(dest_root)
+
+    # ── --check: юу ч татахгүй, зөвхөн орчноо шалгана ───────────────────
+    #
+    # Суулгах үе шатанд хамгийн их цаг иддэг зүйл нь «яагаад зураг ирэхгүй
+    # байна вэ» гэдгийг таах явдал. Шалтгаан нь ихэвчлэн 5 зүйлийн НЭГ нь:
+    # Vercel дээр хувьсагч дутуу, токен зөрсөн, хаяг буруу, хавтас бичигдэхгүй,
+    # эсвэл төлөгдсөн захиалга байхгүй. Энэ горим тавуулангийг нь нэрлэж хэлнэ.
+    if arguments.check:
+        print(f"Тохиргооны файл : {config_path or '(олдсонгүй — орчны хувьсагч)'}")
+        print(f"Вэбийн хаяг     : {api_base}")
+        print(f"Хадгалах хавтас : {dest_root}")
+        print(f"Токен           : бөглөгдсөн ({len(token)} тэмдэгт)")
+        print()
+
+        try:
+            health = http_json(f"{api_base}/api/health", token, tolerate=(503,))
+        except RuntimeError as error:
+            print(f"✗ Сервер:  {error}", file=sys.stderr)
+            return 1
+
+        for name, check in (health.get("checks") or {}).items():
+            mark = "✓" if check.get("ready") else "✗"
+            print(f"{mark} {name:<9}: {check.get('detail', '')}")
+
+        missing = health.get("missing") or []
+        if missing:
+            print("\nVercel дээр дутуу байгаа хувьсагчид:")
+            for name in missing:
+                print(f"  • {name}")
+
+        # Токен зөв эсэхийг ЖИНХЭНЭ дуудлагаар шалгана — `/api/health` нь
+        # токенгүйгээр ч хариулдаг тул дээрх шалгалт үүнийг батлахгүй.
+        print()
+        try:
+            probe = http_json(f"{api_base}/api/admin?days=1&state=pending-sync", token)
+        except RuntimeError as error:
+            print(f"✗ Токен:   {error}", file=sys.stderr)
+            return 1
+        print(f"✓ Токен:   зөв — {len(probe.get('orders') or [])} татах захиалга хүлээгдэж байна "
+              f"(сүүлийн 1 хоногт нийт {probe.get('total', 0)}).")
+
+        # Диск рүү үнэхээр бичиж чадах эсэх.
+        try:
+            probe_file = dest_root / "_state" / ".write-test"
+            probe_file.parent.mkdir(parents=True, exist_ok=True)
+            probe_file.write_text("ok", encoding="utf-8")
+            probe_file.unlink(missing_ok=True)
+            print(f"✓ Хавтас:  бичих эрхтэй — {dest_root}")
+        except OSError as error:
+            print(f"✗ Хавтас:  бичиж чадсангүй — {error}", file=sys.stderr)
+            return 2
+
+        print("\nБүх шалгалт өнгөрлөө. `--dry-run`-аар үргэлжлүүлнэ үү.")
+        return 0
+
     logfile = dest_root / "_logs" / "sync.log"
     state_path = dest_root / "_state" / "synced.json"
     lock_path = dest_root / "_state" / "sync.lock"
@@ -402,30 +522,34 @@ def main() -> int:
 
         log(f"Эхэллээ — сүүлийн {days} өдөр, {api_base}", logfile=logfile)
 
+        # Сервер өөрөө шүүнэ: төлөгдсөн БӨГӨӨД хараахан татагдаагүй захиалгууд.
+        # Ингэснээр cron 10 минут тутам 7 хоногийн бүх файлд presigned линк
+        # үүсгэдэг байсныг зогсооно — ихэвчлэн хоосон жагсаалт ирнэ.
+        #
+        # `--resync` үед аль хэдийн «татсан» гэж тэмдэглэгдсэн захиалга ч
+        # хэрэгтэй тул шүүлтийг сулруулна.
+        state = "paid" if arguments.resync else "pending-sync"
+
         try:
-            payload = http_json(f"{api_base}/api/admin?days={days}", token)
+            payload = http_json(f"{api_base}/api/admin?days={days}&state={state}", token)
         except RuntimeError as error:
             log(f"АЛДАА: {error}", logfile=logfile)
             return 1
 
         orders = payload.get("orders") or []
 
-        # Төлбөр орсон бөгөөд татах линктэй захиалгууд.
-        # `url` нь зөвхөн төлөгдсөн үед л сервер талаас ирдэг — өөрөөр хэлбэл
-        # энэ шүүлтүүр нь тав тухын зүйл, жинхэнэ түгжээ нь серверт байна.
+        # Төлбөрийн шалгалт нь ЭНД биш серверт хийгддэг: `url` нь зөвхөн
+        # төлөгдсөн үед л ирдэг тул төлөөгүй зургийг физикээр татах арга байхгүй.
+        # Доорх шүүлт нь давхардлаас сэргийлэх дотоод хамгаалалт.
         pending = [
             order for order in orders
             if (order.get("payment") or {}).get("status") == "paid"
             and (order.get("orderNumber") not in synced or order.get("orderNumber") == arguments.resync)
         ]
 
-        unpaid = sum(
-            1 for order in orders if (order.get("payment") or {}).get("status") != "paid"
-        )
-
+        total = payload.get("total", len(orders))
         log(
-            f"{len(orders)} захиалга ирлээ — {len(pending)} шинэ төлөгдсөн, "
-            f"{unpaid} төлөгдөөгүй (алгасна)",
+            f"Сүүлийн {days} хоногт нийт {total} захиалга — {len(pending)} нь татагдах ёстой",
             logfile=logfile,
         )
 
@@ -435,9 +559,22 @@ def main() -> int:
 
         succeeded = 0
         for order in pending:
-            if sync_order(order, dest_root, logfile, arguments.dry_run):
-                synced.add(order.get("orderNumber"))
-                succeeded += 1
+            if not sync_order(order, dest_root, logfile, arguments.dry_run):
+                continue
+            synced.add(order.get("orderNumber"))
+            succeeded += 1
+
+            # Серверт мэдэгдэнэ. `synced.json` нь дискний нэг файл — NAS дахин
+            # суулгахад арчигдаж, сүүлийн 31 хоногийн бүх зураг дахин татагдана.
+            # Серверийн `syncedAt` тэрийг барина. Мөн ажилтан «NAS дээр очсон
+            # уу» гэдгийг апп дээрээсээ харах боломжтой болно.
+            ref = order.get("ref") or order.get("manifestKey")
+            if ref and not arguments.dry_run:
+                if http_post(f"{api_base}/api/admin", token,
+                             {"action": "synced", "ref": ref, "synced": True}) is None:
+                    log(f"  АНХААР: {order.get('orderNumber')} — серверт тэмдэглэж "
+                        "чадсангүй (файл нь татагдсан, дараа дахин оролдоно)",
+                        logfile=logfile)
 
         if not arguments.dry_run:
             try:

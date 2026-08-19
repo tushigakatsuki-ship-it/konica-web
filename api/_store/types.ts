@@ -57,9 +57,17 @@ export interface WebOrderStore {
   /** Сүүлийн `days` өдрийн захиалгууд, шинэ нь эхэндээ. */
   list(days: number): Promise<StoredOrder[]>;
 
+  /**
+   * Талбар бүр `undefined` бол хөндөхгүй, `null` бол устгана.
+   * (`printedAt: null` = «хэвлээгүй болгох», `syncedAt: null` = «дахин татуулах».)
+   */
   update(
     ref: string,
-    patch: { payment?: PaymentInfo; printedAt?: number | null },
+    patch: {
+      payment?: PaymentInfo;
+      printedAt?: number | null;
+      syncedAt?: number | null;
+    },
   ): Promise<boolean>;
 
   /** Зураг татах түр линк. Төлбөр баталгаажаагүй бол дуудагч тал энийг дуудахгүй. */
