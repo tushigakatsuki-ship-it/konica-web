@@ -140,6 +140,11 @@ https://vercel.com → `konica-web` төсөл → **Settings** → **Environmen
 | `R2_ACCESS_KEY_ID` | Алхам 6-аас |
 | `R2_SECRET_ACCESS_KEY` | Алхам 6-аас |
 | `ADMIN_TOKEN` | Доорх тушаалаар үүсгэнэ |
+| `RTDB_AUTH` | Firebase → Project settings → Service accounts → **Database secrets** |
+
+> `RTDB_AUTH` нь захиалгын бүртгэлийн түлхүүр. Үүнгүй бол `/api/order` нь юу ч
+> хийхээс өмнө 503 буцаана — хэрэглэгч «Сервер тохируулагдаагүй байна» гэж
+> харна. R2 бүрэн байсан ч энэ нэг мөрөөс болж бүх захиалга унана.
 
 `ADMIN_TOKEN`-ыг **гараар бүү бод.** Терминал дээр:
 

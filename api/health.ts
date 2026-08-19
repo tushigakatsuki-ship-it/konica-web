@@ -134,6 +134,24 @@ export default async function handler(request: Request): Promise<Response> {
           ]),
         },
 
+    /**
+     * Захиалгын бүртгэл (Firebase RTDB) — `/api/order` энэ НЭГ хувьсагчгүйгээр
+     * бүхэлдээ 503 буцаадаг.
+     *
+     * ⚠️ Энэ шалгалт эхэндээ ОРХИГДСОН байсан: `R2_*` бүрэн байхад `/api/health`
+     * нь `ok: true` гэж хэлдэг байсан ч хэрэглэгч захиалга илгээхэд «Сервер
+     * тохируулагдаагүй байна» гэж гардаг байв. Хамгийн муу төрлийн алдаа —
+     * шалгагч нь өөрөө худал хэлж, эзэн нь өөр газраас шалтгаан хайна.
+     */
+    orders: (env.RTDB_AUTH ?? '').trim()
+      ? { ready: true, detail: 'Захиалгын бүртгэл (Firebase) холбогдсон.' }
+      : {
+          ready: false,
+          detail:
+            'RTDB_AUTH алга — /api/order 503 буцаана. Хэрэглэгч захиалга ОГТ илгээж чадахгүй.',
+          missing: ['RTDB_AUTH'],
+        },
+
     /** Ажилтны нэвтрэлт — үүнгүйгээр NAS татаж чадахгүй. */
     admin: adminToken
       ? { ready: true, detail: 'ADMIN_TOKEN бөглөгдсөн — NAS холбогдох боломжтой.' }
@@ -190,8 +208,17 @@ export default async function handler(request: Request): Promise<Response> {
     checks.storage = r2 ? await probeStorage(r2) : checks.storage;
   }
 
-  /** Хэрэглэгч зураг оруулж, ажилтан татаж чадах эсэх — гол хариулт. */
-  const ok = checks.storage.ready && checks.admin.ready && checks.payment.ready;
+  /**
+   * Хэрэглэгч захиалга өгч, ажилтан татаж чадах эсэх — гол хариулт.
+   *
+   * `orders` энд ЗААВАЛ орно: түүнгүйгээр бусад нь бүрэн байсан ч захиалга
+   * үүсэхгүй. `notify` нь орохгүй — Telegram унтарсан ч урсгал ажиллана.
+   */
+  const ok =
+    checks.orders.ready &&
+    checks.storage.ready &&
+    checks.admin.ready &&
+    checks.payment.ready;
 
   const missing = Object.values(checks).flatMap((check) => check.missing ?? []);
 

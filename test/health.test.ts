@@ -40,6 +40,7 @@ const endpoint = (): string => `http://127.0.0.1:${(server.address() as AddressI
 const configure = (extra: Record<string, string> = {}): void => {
   process.env.S3_ENDPOINT = endpoint();
   process.env.R2_BUCKET = 'printmn-photos';
+  process.env.RTDB_AUTH = 'firebase-database-secret';
   Object.assign(process.env, SECRETS, extra);
 };
 
@@ -78,7 +79,7 @@ test('юу ч тохируулаагүй бол ЯГ юу дутууг жагс�
 
   assert.equal(response.status, 503);
   assert.equal(body.ok, false);
-  for (const name of ['R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'ADMIN_TOKEN']) {
+  for (const name of ['R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'ADMIN_TOKEN', 'RTDB_AUTH']) {
     assert.ok(body.missing.includes(name), `${name} жагсаалтад алга`);
   }
 });
@@ -105,6 +106,25 @@ test('бүх зайлшгүй зүйл бэлэн бол ok:true', async () => {
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.checks.storage.detail.includes('printmn-photos'), true);
+});
+
+test('RTDB_AUTH байхгүй бол ok:false — зөвхөн R2 бүрэн байхад ч', async () => {
+  /*
+   * Бодит тохиолдол: `R2_*`, `ADMIN_TOKEN`, банк бүгд бөглөгдсөн байтал
+   * `/api/health` нь `ok: true` гэж хэлж, хэрэглэгч захиалга илгээхэд
+   * «Сервер тохируулагдаагүй байна» гэж гарсан. `/api/order` нь `RTDB_AUTH`
+   * байхгүй бол ямар ч зүйл хийхээс өмнө 503 буцаадаг.
+   */
+  configure({ BANK_NAME: 'Хаан банк', BANK_ACCOUNT: '5001234567' });
+  delete process.env.RTDB_AUTH;
+
+  const response = await call();
+  const body = await response.json();
+
+  assert.equal(body.checks.orders.ready, false);
+  assert.equal(body.ok, false, 'R2 бүрэн ч захиалга үүсэхгүй бол ok байж болохгүй');
+  assert.ok(body.missing.includes('RTDB_AUTH'));
+  assert.equal(response.status, 503);
 });
 
 test('Telegram байхгүй нь ok-г унагахгүй (заавал биш)', async () => {
