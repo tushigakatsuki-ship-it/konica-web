@@ -10,16 +10,15 @@ import { fitBox, parsePhotoSize } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
 import {
+  IconAlert,
   IconArrowRight,
   IconChevronDown,
   IconClose,
   IconCrop,
   IconImage,
   IconPalette,
-  IconPhone,
   IconRuler,
 } from '../components/icons';
-import { PRIMARY_PHONE } from '../data/site';
 
 /**
  * Ангилал сонгосны дараа дээр гарах ХУРДАН табууд.
@@ -47,6 +46,20 @@ const QUICK_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 
  * `?t=` нь хэрэглэгчийн гараас ирж болно. Шалгаагүй утгыг `tab` болгон
  * хүлээж авбал `byCategory` хоосон жагсаалт буцааж, хуудас хоосон харагдана.
  */
+/**
+ * «Өөр хэмжээ» мөрийн id — `data/catalog.ts` дахьтай ижил.
+ *
+ * Энэ мөр нь ердийн хэмжээний тортой хамт харагдах ЁСГҮЙ: түүнд хэмжээ
+ * байхгүй тул `parsePhotoSize` `null` буцааж, картан дээр нэр нь бүтнээрээ
+ * гарч, үнэ нь `0₮` гэж худал харагдана. Оронд нь тусдаа карт болгож,
+ * дарахад хэмжээ асуух самбар нээнэ.
+ */
+const CUSTOM_SIZE_ID = 199;
+
+/** Хэвлэх боломжтой хэмжээний хязгаар, сантиметрээр. */
+const CUSTOM_MIN_CM = 5;
+const CUSTOM_MAX_CM = 120;
+
 const CATEGORY_ORDER: readonly ServiceCategory[] = [
   ...new Set(SERVICES.map((service) => service.category)),
 ];
@@ -155,7 +168,15 @@ export default function Print() {
     { service: ServiceItem; itemKey?: string } | null
   >(null);
 
-  const all = useMemo(() => (tab ? byCategory(tab) : []), [tab]);
+  /* Өөрийн хэмжээний самбар — `null` бол хаалттай. */
+  const [custom, setCustom] = useState<{ w: string; h: string; error: string } | null>(
+    null,
+  );
+
+  const all = useMemo(
+    () => (tab ? byCategory(tab).filter((service) => service.id !== CUSTOM_SIZE_ID) : []),
+    [tab],
+  );
   const walkIn = tab !== null && WALK_IN.includes(tab);
   /* Цээж зураг нь бусад walk-in ангиллаас ялгаатай — өөрийн хуудастай. */
   const idPhoto = tab === 'Цээж зураг';
@@ -176,6 +197,45 @@ export default function Print() {
   const editing = editorFor?.itemKey
     ? basket.items.find((item) => item.key === editorFor.itemKey)
     : undefined;
+
+  /**
+   * Өөрийн хэмжээгээр зураг сонгох цонхыг нээнэ.
+   *
+   * ── Синтетик үйлчилгээний мөр ─────────────────────────────────
+   *
+   * Каталогийн мөрийн НЭР дээр хэмжээг наана: `… өөр хэмжээ 25*35`.
+   * Ингэснээр гурван зүйл ҮНЭГҮЙ ажиллана:
+   *   • `sizeOf` нь нэрнээс хэмжээг таньж, урьдчилсан харагдац болон
+   *     хэвлэх файлыг ЗӨВ харьцаагаар тайрна;
+   *   • `lib/upload.ts` нь файлын нэр (`01_25x35_2sh_print.jpg`) болон
+   *     manifest-ийн `sizeLabel`-д тэр хэмжээг бичнэ — ажилтанд ил гарна;
+   *   • сагсан дахь мөр нь хэмжээгээ өөрөө харуулна.
+   *
+   * `id` нь каталогийнх ХЭВЭЭР (199) тул сервер мөрийг таньж, үнийг нь
+   * 0 гэж тооцно. Үнэ нь тохиролцооны тул энэ нь зөв.
+   */
+  const openCustomEditor = () => {
+    if (!custom) return;
+
+    const w = Number(custom.w.replace(',', '.'));
+    const h = Number(custom.h.replace(',', '.'));
+    const inRange = (n: number) =>
+      Number.isFinite(n) && n >= CUSTOM_MIN_CM && n <= CUSTOM_MAX_CM;
+
+    if (!inRange(w) || !inRange(h)) {
+      setCustom({
+        ...custom,
+        error: t('custom.invalid', { min: CUSTOM_MIN_CM, max: CUSTOM_MAX_CM }),
+      });
+      return;
+    }
+
+    const base = SERVICES.find((service) => service.id === CUSTOM_SIZE_ID);
+    if (!base) return;
+
+    setCustom(null);
+    setEditorFor({ service: { ...base, name: `${base.name} ${w}*${h}` } });
+  };
 
   /**
    * Цонхноос ирсэн зургууд.
@@ -338,16 +398,17 @@ export default function Print() {
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
                   {idPhoto ? t('walkIn.idPhotoBody') : t('walkIn.body')}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {idPhoto && (
+                {/*
+                  * Залгах товч хасагдсан — утасны дугаар ТОЛГОЙД бүх хуудсанд
+                  * байнга харагддаг болсон тул энд давхардуулах шаардлагагүй.
+                  */}
+                {idPhoto && (
+                  <div className="mt-3">
                     <Link to="/tseej-zurag" className="btn-brand !py-2 !text-xs">
                       {t('walkIn.idPhotoCta')}
                     </Link>
-                  )}
-                  <a href={PRIMARY_PHONE.href} className="btn-outline !py-2 !text-xs">
-                    <IconPhone className="size-4" /> {PRIMARY_PHONE.label}
-                  </a>
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -420,6 +481,108 @@ export default function Print() {
                 );
               })}
             </div>
+
+            {/*
+              * ── Өөрийн хэмжээ ────────────────────────────────────
+              *
+              * Зөвхөн зураг угаалтад. Бусад ангилалд (засвар, цээж зураг)
+              * хэмжээ нь стандартаар тогтдог тул утгагүй.
+              *
+              * Самбарыг картны ДООР нээж байгаа шалтгаан: модал цонх нээвэл
+              * хэрэглэгч хоёр давхар цонх (хэмжээ → зураг) дамжина. Энд
+              * шууд бөглөөд «Зургаа оруулах» дарахад ганц цонх л нээгдэнэ.
+              */}
+            {tab === 'Угаалт' && (
+              <div className="mt-4">
+                {custom === null ? (
+                  <button
+                    type="button"
+                    onClick={() => setCustom({ w: '', h: '', error: '' })}
+                    className="card-lift flex w-full items-center gap-3 p-4 text-left"
+                  >
+                    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-brand-50 text-brand-500">
+                      <IconRuler className="size-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold">{t('custom.card')}</span>
+                      <span className="block text-xs text-muted">
+                        {t('custom.cardHint')}
+                      </span>
+                    </span>
+                    <IconArrowRight className="ml-auto size-4 shrink-0 text-muted" />
+                  </button>
+                ) : (
+                  <div className="card p-4 sm:p-5">
+                    <p className="text-sm font-bold">{t('custom.title')}</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                      {t('custom.body')}
+                    </p>
+
+                    <div className="mt-3 flex gap-3">
+                      {(
+                        [
+                          ['custom.width', 'w'],
+                          ['custom.height', 'h'],
+                        ] as const
+                      ).map(([label, field]) => (
+                        <label key={field} className="flex-1">
+                          <span className="block text-xs font-semibold text-muted">
+                            {t(label)}
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={CUSTOM_MIN_CM}
+                            max={CUSTOM_MAX_CM}
+                            value={custom[field]}
+                            onChange={(e) =>
+                              setCustom({ ...custom, [field]: e.target.value, error: '' })
+                            }
+                            className="field mt-1 w-full"
+                          />
+                        </label>
+                      ))}
+                    </div>
+
+                    <p className="mt-1.5 text-[11px] text-muted">
+                      {t('custom.range', { min: CUSTOM_MIN_CM, max: CUSTOM_MAX_CM })}
+                    </p>
+
+                    {custom.error && (
+                      <p className="mt-2 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">
+                        {custom.error}
+                      </p>
+                    )}
+
+                    {/*
+                      * Үнийг ЭНД шууд хэлнэ. Сагсанд ороод «0₮» гэж харагдвал
+                      * хэрэглэгч үнэгүй гэж ойлгож, дараа нь гайхна.
+                      */}
+                    <p className="mt-3 flex items-start gap-2 rounded-md bg-accent/10 px-3 py-2 text-xs leading-relaxed text-accent-strong">
+                      <IconAlert className="mt-px size-4 shrink-0" />
+                      {t('custom.priceNote')}
+                    </p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={openCustomEditor}
+                        className="btn-brand flex-1 !py-2.5 !text-sm"
+                      >
+                        <IconImage className="size-4" /> {t('custom.next')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustom(null)}
+                        className="btn-outline !py-2.5 !text-sm"
+                      >
+                        {t('custom.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {hiddenCount > 0 && (
               <button
@@ -512,8 +675,14 @@ export default function Print() {
                                 +
                               </button>
                             </span>
+                            {/*
+                              * Үнэгүй мөр = тохиролцооны хэмжээ. «0₮» гэж
+                              * харуулбал хэрэглэгч үнэгүй гэж ойлгоно.
+                              */}
                             <span className="text-sm font-bold">
-                              {formatCurrency(price * item.value.qty)}
+                              {price > 0
+                                ? formatCurrency(price * item.value.qty)
+                                : t('custom.byAgreement')}
                             </span>
                           </div>
 
@@ -538,6 +707,16 @@ export default function Print() {
                 <span>{t('print.total')}</span>
                 <span className="text-brand-500">{formatCurrency(basket.total)}</span>
               </div>
+
+              {/*
+                * Зөвхөн тохиролцооны мөр байвал нийт дүн «0₮» гэж гарна.
+                * Тайлбаргүй бол хэрэглэгч үнэгүй гэж ойлгоно.
+                */}
+              {basket.items.some((item) => parsePrice(item.service.price) === 0) && (
+                <p className="mt-2 rounded-md bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent-strong">
+                  {t('custom.totalNote')}
+                </p>
+              )}
 
               <button
                 type="button"

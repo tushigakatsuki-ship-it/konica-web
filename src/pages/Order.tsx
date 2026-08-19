@@ -24,6 +24,7 @@ import { receiptPath, saveReceipt } from '../lib/lastOrder';
 import PaymentPanel from '../components/PaymentPanel';
 import { uploadBasketPhotos, type UploadProgress } from '../lib/upload';
 import { useBasket } from '../state/basket';
+import { useLang } from '../state/lang';
 import {
   IconAlert,
   IconArrowRight,
@@ -50,6 +51,13 @@ const validate = (
 
 export default function Order() {
   const basket = useBasket();
+  /*
+   * Энэ хуудас бүхэлдээ хараахан орчуулагдаагүй. Гэхдээ «Тохиролцоно» нь
+   * ҮНИЙН талбарт гардаг тул англи горимд кириллээр үлдэж болохгүй —
+   * хэрэглэгч дүнг буруу ойлгоно.
+   */
+  const { t } = useLang();
+  const byAgreement = t('custom.byAgreement');
 
   const [customer, setCustomer] = useState<CustomerInfo>(EMPTY_CUSTOMER);
   const [delivery, setDelivery] = useState(false);
@@ -341,8 +349,15 @@ export default function Order() {
                     <span className="min-w-0 text-muted">
                       {line.name} × {line.qty}
                     </span>
+                    {/*
+                      * Үнэгүй мөр = тохиролцооны хэмжээ (жишээ нь «өөр
+                      * хэмжээ»). «0₮» гэж харуулбал хэрэглэгч үнэгүй гэж
+                      * ойлгож, ажилтан үнэ хэлэхэд гайхна.
+                      */}
                     <span className="shrink-0 font-semibold">
-                      {formatCurrency(lineTotal(line))}
+                      {line.unitPrice > 0
+                        ? formatCurrency(lineTotal(line))
+                        : byAgreement}
                     </span>
                   </li>
                 ))}
@@ -407,6 +422,13 @@ export default function Order() {
                 <dt>Нийт</dt>
                 <dd className="text-brand-500">{formatCurrency(total)}</dd>
               </div>
+
+              {/* Тохиролцооны мөр дүнд ороогүйг ил хэлнэ. */}
+              {lines.some((line) => line.unitPrice === 0) && (
+                <p className="mt-2 rounded-md bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent-strong">
+                  {t('custom.totalNote')}
+                </p>
+              )}
             </dl>
           </div>
 

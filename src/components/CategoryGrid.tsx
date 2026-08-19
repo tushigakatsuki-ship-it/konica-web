@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import type { ServiceCategory } from '../data/catalog';
 import type { StringKey } from '../data/i18n';
+import { useTilt } from '../lib/useTilt';
 import { useLang } from '../state/lang';
 import {
   IconAward,
@@ -87,6 +88,96 @@ const GRID_TILES = CATEGORY_TILES.filter(
   (tile) => !MERGED_INTO_WASH.includes(tile.key),
 );
 
+/**
+ * Нэг хавтан.
+ *
+ * Тусдаа компонент болгосон ЦОРЫН ГАНЦ шалтгаан: `useTilt` нь элемент
+ * тус бүрт өөрийн `ref` шаарддаг hook. React-ийн дүрмээр давталт дотор
+ * hook дуудаж болохгүй тул хавтан бүр өөрийн компоненттой байх ёстой.
+ */
+function Tile({
+  tile,
+  ready,
+  count,
+  onPick,
+}: {
+  tile: Omit<Tile, 'count'>;
+  ready: boolean;
+  count: number;
+  onPick(category: ServiceCategory): void;
+}) {
+  const { t, tc } = useLang();
+
+  /*
+   * Хазайлт нь зөвхөн ДАРАГДАХ хавтан дээр. Бэлэн бус хавтан хөдөлбөл
+   * «энэ ажиллана» гэсэн худал дохио өгнө.
+   *
+   * Hook нь дотроо `hover: hover` болон `prefers-reduced-motion`-ыг
+   * шалгадаг тул утсан дээр ямар ч сонсогч хавсрахгүй — үнэ төлбөргүй.
+   */
+  const ref = useTilt<HTMLButtonElement>();
+
+  const inner = (
+    <>
+      <span aria-hidden className="glass-tile-sheen" />
+
+      <span
+        className={`relative grid size-10 place-items-center rounded-md ${
+          ready ? 'bg-brand-500/10 text-brand-500' : 'bg-brand-500/5 text-muted'
+        }`}
+      >
+        <tile.Icon className="size-5" />
+      </span>
+
+      <span
+        className={`relative mt-3 block text-sm font-bold leading-snug sm:text-base ${
+          ready ? 'text-ink' : 'text-ink-soft'
+        }`}
+      >
+        {tc(tile.key)}
+      </span>
+      <span
+        className={`relative mt-1 block text-[11px] leading-relaxed sm:text-xs ${
+          ready ? 'text-muted' : 'text-muted/80'
+        }`}
+      >
+        {t(tile.hint)}
+      </span>
+
+      <span className="relative mt-auto block pt-3 text-[11px] font-bold">
+        {ready ? (
+          <span className="text-brand-500">
+            {count} {t('print.itemCount')}
+          </span>
+        ) : (
+          <span className="rounded-md bg-accent/15 px-2 py-0.5 uppercase tracking-wider text-accent-strong">
+            {t('home.comingSoon')}
+          </span>
+        )}
+      </span>
+    </>
+  );
+
+  const shared = 'glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5';
+
+  /*
+   * Бэлэн бол `<button>`, эс бөгөөс `<span>`.
+   *
+   * `disabled` товч биш `<span>` ашиглаж байгаа шалтгаан: идэвхгүй товч нь
+   * гар, дэлгэц уншигчид «энд товч байна, гэхдээ ажиллахгүй» гэж мэдэгддэг
+   * бөгөөд табаар дамжихад саад болно. Мэдээллийн хавтан бол товч биш.
+   */
+  return ready ? (
+    <button ref={ref} type="button" onClick={() => onPick(tile.key)} className={shared}>
+      {inner}
+    </button>
+  ) : (
+    <span aria-disabled="true" className={`${shared} cursor-default opacity-70`}>
+      {inner}
+    </span>
+  );
+}
+
 interface Props {
   counts: Record<string, number>;
   onPick(category: ServiceCategory): void;
@@ -111,7 +202,7 @@ interface Props {
  * Гэхдээ дарагдвал хоосон урсгалд унах тул `<span>`-аар зурна.
  */
 export default function CategoryGrid({ counts, onPick }: Props) {
-  const { t, tc } = useLang();
+  const { t } = useLang();
 
   return (
     /*
@@ -129,80 +220,21 @@ export default function CategoryGrid({ counts, onPick }: Props) {
         </p>
 
         <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {GRID_TILES.map((tile, index) => {
-            const ready = READY.includes(tile.key);
-
-            /*
-             * Бэлэн бол `<button>`, эс бөгөөс `<span>`.
-             *
-             * `disabled` товч биш `<span>` ашиглаж байгаа шалтгаан: идэвхгүй
-             * товч нь гар, дэлгэц уншигчид «энд товч байна, гэхдээ ажиллахгүй»
-             * гэж мэдэгддэг бөгөөд табаар дамжихад саад болно. Мэдээллийн
-             * хавтан бол товч биш.
-             */
-            const inner = (
-              <>
-                <span aria-hidden className="glass-tile-sheen" />
-
-                {/*
-                 * Цагаан дэвсгэр дээр УТГА САНААНЫ токен ашиглана
-                 * (`text-ink`, `text-muted`) — эс тэгвээс харанхуй горимд
-                 * эргэхгүй. Бэлэн бус хувилбар нь нэг зэрэг бүдэг.
-                 */}
-                <span
-                  className={`relative grid size-10 place-items-center rounded-md ${
-                    ready ? 'bg-brand-500 text-white' : 'bg-sunken text-muted'
-                  }`}
-                >
-                  <tile.Icon className="size-5" />
-                </span>
-
-                <span
-                  className={`relative mt-3 block text-sm font-bold leading-snug sm:text-base ${
-                    ready ? 'text-ink' : 'text-ink-soft'
-                  }`}
-                >
-                  {tc(tile.key)}
-                </span>
-                <span className="relative mt-1 block text-[11px] leading-relaxed text-muted sm:text-xs">
-                  {t(tile.hint)}
-                </span>
-
-                <span className="relative mt-auto block pt-3 text-[11px] font-bold">
-                  {ready ? (
-                    <span className="text-brand-500">
-                      {counts[tile.key] ?? 0} {t('print.itemCount')}
-                    </span>
-                  ) : (
-                    <span className="rounded-md bg-sunken px-2 py-0.5 uppercase tracking-wider text-muted">
-                      {t('home.comingSoon')}
-                    </span>
-                  )}
-                </span>
-              </>
-            );
-
-            const shared = 'glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5';
-
-            return (
-              <li
-                key={tile.key}
-                className="tile-in"
-                /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 360ms-д. */
-                style={{ animationDelay: `${index * 40}ms` }}
-              >
-                {ready ? (
-                  <button type="button" onClick={() => onPick(tile.key)} className={shared}>
-                    {inner}
-                  </button>
-                ) : (
-                  <span aria-disabled="true" className={`${shared} cursor-default opacity-70`}>
-                    {inner}
-                  </span>
-                )}
-              </li>
-            );
-          })}
+          {GRID_TILES.map((tile, index) => (
+            <li
+              key={tile.key}
+              className="tile-3d tile-in"
+              /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 360ms-д. */
+              style={{ animationDelay: `${index * 40}ms` }}
+            >
+              <Tile
+                tile={tile}
+                ready={READY.includes(tile.key)}
+                count={counts[tile.key] ?? 0}
+                onPick={onPick}
+              />
+            </li>
+          ))}
         </ul>
       </div>
     </section>

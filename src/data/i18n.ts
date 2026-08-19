@@ -119,6 +119,33 @@ export const STRINGS = {
   'print.pieces': { mn: 'ш · нийт', en: 'pcs · total' },
   'print.continueShort': { mn: 'Үргэлжлүүлэх', en: 'Continue' },
 
+  /* ── Өөрийн хэмжээ ── */
+  'custom.card': { mn: 'Өөр хэмжээ', en: 'Custom size' },
+  'custom.cardHint': { mn: 'Жагсаалтад байхгүй хэмжээ', en: 'A size not in the list' },
+  'custom.title': { mn: 'Өөрийн хэмжээ оруулах', en: 'Enter your own size' },
+  'custom.body': {
+    mn: 'Жагсаалтад байхгүй хэмжээгээр хэвлүүлэх бол өргөн, өндрөө сантиметрээр бичээд зургаа оруулна уу.',
+    en: 'To print at a size that is not in the list, enter the width and height in centimetres and add your photo.',
+  },
+  'custom.width': { mn: 'Өргөн (см)', en: 'Width (cm)' },
+  'custom.height': { mn: 'Өндөр (см)', en: 'Height (cm)' },
+  'custom.range': { mn: '{min}–{max} см хооронд', en: 'Between {min} and {max} cm' },
+  'custom.invalid': {
+    mn: 'Өргөн, өндөр хоёулаа {min}–{max} см хооронд байх ёстой.',
+    en: 'Width and height must both be between {min} and {max} cm.',
+  },
+  'custom.next': { mn: 'Зургаа оруулах', en: 'Add your photo' },
+  'custom.cancel': { mn: 'Болих', en: 'Cancel' },
+  'custom.priceNote': {
+    mn: 'Үнэ тохиролцоно — ажилтан залгаж хэлнэ',
+    en: 'Price on request — our staff will call you',
+  },
+  'custom.byAgreement': { mn: 'Тохиролцоно', en: 'On request' },
+  'custom.totalNote': {
+    mn: 'Тохиролцооны хэмжээ дүнд ороогүй — ажилтан залгаж үнээ хэлнэ.',
+    en: 'Custom sizes are not included in the total — our staff will call you with the price.',
+  },
+
   /* ── Дэлгүүр дээр хийгддэг үйлчилгээ ── */
   'walkIn.title': { mn: 'Энэ үйлчилгээг дэлгүүр дээр хийнэ', en: 'This service is done in store' },
   'walkIn.body': {

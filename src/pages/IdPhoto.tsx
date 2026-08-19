@@ -2,9 +2,8 @@ import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
-import { PRIMARY_PHONE } from '../data/site';
 import { formatCurrency, parsePrice } from '../lib/price';
-import { IconCheck, IconCrop, IconPhone } from '../components/icons';
+import { IconCheck, IconCrop } from '../components/icons';
 import IdPhotoOrder from '../components/IdPhotoOrder';
 
 const REQUIREMENTS = [
@@ -65,9 +64,15 @@ export default function IdPhoto() {
                 Цаг захиалахгүйгээр ажлын цагт шууд ирээд 5–10 минутад
                 авахуулна. Мэргэжлийн гэрэлтүүлэг, дэвсгэртэй.
               </p>
-              <a href={PRIMARY_PHONE.href} className="btn-accent mt-4 w-full sm:w-auto">
-                <IconPhone className="size-4" /> {PRIMARY_PHONE.label} — залгах
-              </a>
+              {/*
+                * Залгах товч хасагдсан.
+                *
+                * Утасны дугаар ТОЛГОЙД бүх хуудсанд байнга харагддаг болсон
+                * (дарахад шууд залгана) тул энд давхардуулах шаардлагагүй.
+                * «Салбар дээр ирж авахуулна» гэсэн МЭДЭЭЛЭЛ нь үлдсэн —
+                * чанарын шалгалт унасан хүнд гарц хэрэгтэй гэсэн үндэслэл
+                * хэвээр биелж байна.
+                */}
             </div>
 
             {/*
