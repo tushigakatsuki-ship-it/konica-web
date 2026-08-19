@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import LastOrderBanner from '../components/LastOrderBanner';
 import { SERVICES, byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
 import CategoryGrid, { CATEGORY_HINT } from '../components/CategoryGrid';
+import IdPhotoOrder from '../components/IdPhotoOrder';
 import { useLang } from '../state/lang';
 import { fitBox, parsePhotoSize } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
@@ -398,29 +399,49 @@ export default function Print() {
               * чанарын хаалт) тул өөрийн хуудас руу чиглүүлнэ. Бусад нь
               * материал, хэмжээг биечлэн тохирдог тул утас руу чиглүүлнэ.
               */}
-            {walkIn && (
-              <div className="mb-4 rounded-lg bg-brand-50 p-4">
-                <p className="text-sm font-bold">
-                  {idPhoto ? t('walkIn.idPhotoTitle') : t('walkIn.title')}
-                </p>
-                <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
-                  {idPhoto ? t('walkIn.idPhotoBody') : t('walkIn.body')}
-                </p>
-                {/*
-                  * Залгах товч хасагдсан — утасны дугаар ТОЛГОЙД бүх хуудсанд
-                  * байнга харагддаг болсон тул энд давхардуулах шаардлагагүй.
-                  */}
-                {idPhoto && (
-                  <div className="mt-3">
-                    <Link to="/tseej-zurag" className="btn-brand !py-2 !text-xs">
-                      {t('walkIn.idPhotoCta')}
-                    </Link>
-                  </div>
-                )}
+            {/*
+              * ── Цээж зураг — ЭНД ШУУД захиална ────────────────────
+              *
+              * Өмнө нь энд «тусдаа хуудастай» гэсэн хайрцаг байж, `/tseej-zurag`
+              * руу явуулдаг байв. Хэрэглэгч хэмжээгээ сонгоод зургаа оруулах
+              * гэтэл өөр хуудас руу шидэгдэж, сагс нь хаана байгааг ч мэдэхгүй
+              * болдог байсан.
+              *
+              * ⚠️ Гэхдээ ердийн зургийн урсгал (`PhotoEditor`)-аар цээж зураг
+              * захиалах нь ХЭВЭЭР хориотой: тэнд нүүр илрүүлэх, дэвсгэр цайруулах,
+              * ЧАНАРЫН ХААЛТ байхгүй. Гэрээсээ илгээсэн зураг стандарт хангахгүй
+              * бол буцаагдах бөгөөд мөнгө авчихаад буцаах нь хэрэглэгчийг хуурсан
+              * хэрэг.
+              *
+              * Тиймээс шийдэл нь «хаалтыг сулруулах» биш, ХААЛТТАЙ урсгалыг
+              * энд авчрах явдал: `IdPhotoOrder` нь өөрийн хэмжээ сонгогч,
+              * `isPrintReady` шалгалттай бүрэн бие даасан компонент.
+              */}
+            {idPhoto && (
+              <div className="mb-4">
+                <IdPhotoOrder />
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {walkIn && !idPhoto && (
+              <div className="mb-4 rounded-lg bg-brand-50 p-4">
+                <p className="text-sm font-bold">{t('walkIn.title')}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                  {t('walkIn.body')}
+                </p>
+              </div>
+            )}
+
+            {/*
+              * Цээж зурагт ердийн хэмжээний тор ХЭРЭГГҮЙ: `IdPhotoOrder`
+              * дотроо хэмжээ сонгогчтой. Хоёуланг нь харуулбал хэрэглэгч
+              * аль нь жинхэнэ сонголт вэ гэж эргэлзэнэ.
+              */}
+            <div
+              className={
+                idPhoto ? 'hidden' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'
+              }
+            >
               {services.map((service) => {
                 /*
                  * ⚠️ `sizeOf` биш `parsePhotoSize`.
