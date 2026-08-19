@@ -47,6 +47,15 @@ export const IconImage = (props: IconProps) => (
   </Base>
 );
 
+/** Томруулах шил + тайрах булан — «дарж томруулаад тайрна» гэдгийг илэрхийлнэ. */
+export const IconZoom = (props: IconProps) => (
+  <Base {...props}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+    <path d="M11 8v6M8 11h6" />
+  </Base>
+);
+
 export const IconPrinter = (props: IconProps) => (
   <Base {...props}>
     <path d="M6 9V2h12v7" />

@@ -11,6 +11,7 @@
 
 import type { BasketItem } from '../state/basket';
 import { ServiceUnavailableError } from './api';
+import { DEFAULT_CROP } from './crop';
 import { renderPrintBlob } from './photoRender';
 import { sizeOf } from './photoSize';
 
@@ -154,7 +155,12 @@ export async function planFiles(
      * `close()` дуудна. 20 зурагтай захиалгад бүгдийг зэрэг задалбал хямд утас
      * санах ойгүй болно.
      */
-    const print = await renderPrintBlob(original, size);
+    /*
+     * Хэрэглэгчийн тайралтыг ЗААВАЛ дамжуулна. Үүнийг мартвал дэлгэц дээр
+     * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
+     * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
+     */
+    const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
     if (print) {
       planned.push({
         blob: print,

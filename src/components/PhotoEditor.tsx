@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice } from '../lib/price';
-import { renderPreview } from '../lib/photoRender';
+import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
+import { renderPreview, renderSource } from '../lib/photoRender';
 import { recommendedPixels, sizeOf } from '../lib/photoSize';
 import { useLang } from '../state/lang';
-import { IconAlert, IconClose, IconImage } from './icons';
+import CropStudio from './CropStudio';
+import { IconAlert, IconClose, IconImage, IconZoom } from './icons';
 import PrintPreview3D from './PrintPreview3D';
 
 export interface EditorValue {
@@ -17,6 +19,11 @@ export interface EditorValue {
   preview: string | null;
   /** Эх зургийн нягтрал — сэрэмжлүүлэг ба мэдээлэлд. */
   natural: { w: number; h: number } | null;
+  /**
+   * Гар аргаар тайрсан байрлал. Байхгүй бол төвөөр нь автоматаар (хуучин зан
+   * төлөв). `preview` нь ҮРГЭЛЖ энэ тайралтыг тусгасан байна.
+   */
+  crop?: Crop;
 }
 
 interface Props {
@@ -86,6 +93,60 @@ export default function PhotoEditor({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Тайрч байгаа зураг. `source` нь ТАЙРААГҮЙ жижигрүүлсэн хувилбар — зөвхөн
+   * хэрэглэгч зураг дээр дархад л үүсдэг тул тайрахгүй хүнд ямар ч зардалгүй.
+   */
+  const [cropping, setCropping] = useState<{ index: number; source: string } | null>(null);
+  const [cropLoading, setCropLoading] = useState<number | null>(null);
+
+  /** Зураг дээр дархад — томоор харах ба тайрах цонх нээнэ. */
+  const openCrop = async (index: number) => {
+    const photo = photos[index];
+    if (!photo?.file || cropLoading !== null) return;
+
+    setCropLoading(index);
+    try {
+      const source = await renderSource(photo.file);
+      if (source) setCropping({ index, source });
+      else setError(t('editor.unreadable'));
+    } catch {
+      setError(t('editor.unreadable'));
+    } finally {
+      setCropLoading(null);
+    }
+  };
+
+  /**
+   * Тайралт баталгаажсан — тухайн зургийн урьдчилсан харагдацыг ДАХИН үүсгэнэ.
+   *
+   * Preview-г шинэчлэхгүй бол сагсанд болон энэ цонхонд хуучин тайралт
+   * харагдсаар байх бөгөөд хэвлэгдэх файл нь өөр болно. Хэрэглэгчийн итгэл
+   * бүхэлдээ «харсан зүйл минь хэвлэгдэнэ» гэдэг дээр тогтдог.
+   */
+  const applyCrop = async (crop: Crop) => {
+    const target = cropping;
+    setCropping(null);
+    if (!target) return;
+
+    const photo = photos[target.index];
+    if (!photo?.file) return;
+
+    setCropLoading(target.index);
+    try {
+      const result = await renderPreview(photo.file, size, 640, crop);
+      setPhotos((list) =>
+        list.map((item, i) =>
+          i === target.index ? { ...item, crop, preview: result.preview } : item,
+        ),
+      );
+    } catch {
+      setError(t('editor.unreadable'));
+    } finally {
+      setCropLoading(null);
+    }
+  };
+
   /* Escape товч болон дэвсгэрийн гүйлтийг түгжих. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -140,6 +201,7 @@ export default function PhotoEditor({
           fileName: chosenFile.name,
           preview: result.preview,
           natural: result.natural,
+          crop: DEFAULT_CROP,
         });
       } catch {
         if (seq !== pickSeq.current) return;
@@ -252,12 +314,32 @@ export default function PhotoEditor({
                    * Хэрэглэгчийн жинхэнэ асуулт нь «тайрагдах уу» биш
                    * «би юу гартаа авах вэ». Цаасны зузаан, ирмэг, гялбаа
                    * харагдсан нь захиалахад итгэл өгнө.
+                   *
+                   * Дархад томоор нээгдэж, тайрах боломжтой — зургийн аль хэсэг
+                   * үлдэхийг хэрэглэгч өөрөө шийднэ.
                    */
-                  <PrintPreview3D
-                    src={single.preview}
-                    alt=""
-                    className="absolute inset-0 size-full [&_img]:size-full [&_.print-card]:size-full [&_.stage-face]:size-full"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => void openCrop(0)}
+                    disabled={cropLoading !== null || loading}
+                    aria-label={t('crop.open')}
+                    className="absolute inset-0 size-full"
+                  >
+                    <PrintPreview3D
+                      src={single.preview}
+                      alt=""
+                      className="absolute inset-0 size-full [&_img]:size-full [&_.print-card]:size-full [&_.stage-face]:size-full"
+                    />
+                    <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-full bg-ink/70 px-2 py-1 text-[10px] font-bold text-white">
+                      <IconZoom className="size-3.5" />
+                      {cropLoading === 0 ? t('editor.loading') : t('crop.short')}
+                    </span>
+                    {!isDefaultCrop(single.crop ?? DEFAULT_CROP) && (
+                      <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-on-accent">
+                        {t('crop.edited')}
+                      </span>
+                    )}
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -311,9 +393,13 @@ export default function PhotoEditor({
               <ul className="grid grid-cols-3 gap-2.5">
                 {photos.map((photo, index) => (
                   <li key={`${photo.fileName ?? 'photo'}-${index}`} className="relative">
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => void openCrop(index)}
+                      disabled={cropLoading !== null || loading}
+                      aria-label={t('crop.openNth', { n: index + 1 })}
                       style={{ aspectRatio: `${size.w} / ${size.h}` }}
-                      className="relative w-full overflow-hidden rounded-md bg-brand-50"
+                      className="relative block w-full overflow-hidden rounded-md bg-brand-50"
                     >
                       {photo.preview && (
                         <img
@@ -323,6 +409,19 @@ export default function PhotoEditor({
                           draggable={false}
                         />
                       )}
+                      <span className="pointer-events-none absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-ink/65 text-white">
+                        <IconZoom className="size-3" />
+                      </span>
+                      {cropLoading === index && (
+                        <span className="absolute inset-0 grid place-items-center bg-card/70 text-[10px] font-bold text-brand-500">
+                          {t('editor.loading')}
+                        </span>
+                      )}
+                      {!isDefaultCrop(photo.crop ?? DEFAULT_CROP) && (
+                        <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-on-accent">
+                          {t('crop.edited')}
+                        </span>
+                      )}
                       {isLowRes(photo.natural) && (
                         <span
                           title={t('editor.softTitle')}
@@ -331,7 +430,7 @@ export default function PhotoEditor({
                           {t('editor.soft')}
                         </span>
                       )}
-                    </div>
+                    </button>
 
                     <button
                       type="button"
@@ -516,6 +615,21 @@ export default function PhotoEditor({
           </button>
         </div>
       </div>
+
+      {/*
+        * Тайрах цонх нь ЭНЭ цонхны дээр (z-70 vs z-60) өөрийн portal-аар гарна.
+        * Тиймээс доорх зураг сонгох цонх задрахгүй — хэрэглэгч тайрч дуусаад
+        * шууд үргэлжлүүлнэ.
+        */}
+      {cropping && (
+        <CropStudio
+          source={cropping.source}
+          size={size}
+          initial={photos[cropping.index]?.crop ?? DEFAULT_CROP}
+          onCancel={() => setCropping(null)}
+          onApply={(crop) => void applyCrop(crop)}
+        />
+      )}
     </div>,
     document.body,
   );

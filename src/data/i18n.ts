@@ -234,9 +234,27 @@ export const STRINGS = {
   'editor.decreaseNth': { mn: '{n} дэх зургийн тоог хорогдуулах', en: 'Decrease count for photo {n}' },
   'editor.increaseNth': { mn: '{n} дэх зургийн тоог нэмэгдүүлэх', en: 'Increase count for photo {n}' },
   'editor.previewNote': {
-    mn: 'Хэвлэгдэх байдал — зураг цаасны хэмжээнд төвөөрөө багтана',
-    en: 'Print preview — the photo is centred to the paper size',
+    mn: 'Хэвлэгдэх байдал — зураг дээр дарж томруулж, тайрч болно',
+    en: 'Print preview — tap the photo to zoom in and crop',
   },
+
+  // ── Тайрах цонх ──────────────────────────────────────────────────
+  'crop.title': { mn: 'Зургаа тохируулах', en: 'Adjust your photo' },
+  'crop.short': { mn: 'Тайрах', en: 'Crop' },
+  'crop.open': { mn: 'Зургийг томоор харах ба тайрах', en: 'View larger and crop' },
+  'crop.openNth': {
+    mn: '{n} дэх зургийг томоор харах ба тайрах',
+    en: 'View and crop photo {n}',
+  },
+  'crop.zoom': { mn: 'Томруулах', en: 'Zoom' },
+  'crop.hint': {
+    mn: 'Хуруугаараа чирж байрлуулна. Хоёр хуруугаар эсвэл гулсуураар томруулна.',
+    en: 'Drag to position. Pinch or use the slider to zoom.',
+  },
+  'crop.reset': { mn: 'Буцаах', en: 'Reset' },
+  'crop.cancel': { mn: 'Болих', en: 'Cancel' },
+  'crop.apply': { mn: 'Болсон', en: 'Done' },
+  'crop.edited': { mn: 'Тайрсан', en: 'Cropped' },
   'editor.recommended': { mn: 'Санал болгох нягтрал', en: 'Recommended resolution' },
   'editor.recommendedShort': { mn: 'Санал болгох нягтрал: {n}', en: 'Recommended resolution: {n}' },
   'editor.sizeLabel': { mn: 'Хэмжээ', en: 'Size' },
