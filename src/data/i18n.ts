@@ -238,6 +238,16 @@ export const STRINGS = {
     en: 'Print preview — tap the photo to zoom in and crop',
   },
 
+  // ── Цээж зураг ───────────────────────────────────────────────────
+  'idPhoto.note.title': {
+    mn: 'Хэмжээгээ сонгоод зургаа оруулаарай',
+    en: 'Pick a size and upload your photo',
+  },
+  'idPhoto.note.body': {
+    mn: 'Ажилтан манай лабораторид стандартын дагуу тайрч, дэвсгэрийг нь бэлтгэж хэвлэнэ. Та өөрөө засах шаардлагагүй. Жигд цайвар дэвсгэр дээр, урд талаас нь, хангалттай гэрэлтэй авсан зураг байвал хамгийн сайн.',
+    en: 'Our staff will crop it to the required standard and prepare the background before printing — you do not need to edit anything. A photo taken face-on against a plain light background in good light works best.',
+  },
+
   // ── Тайрах цонх ──────────────────────────────────────────────────
   'crop.title': { mn: 'Зургаа тохируулах', en: 'Adjust your photo' },
   'crop.short': { mn: 'Тайрах', en: 'Crop' },

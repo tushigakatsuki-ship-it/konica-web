@@ -3,8 +3,7 @@ import PageHero from '../components/PageHero';
 import SectionTitle from '../components/SectionTitle';
 import { byCategory } from '../data/catalog';
 import { formatCurrency, parsePrice } from '../lib/price';
-import { IconCheck, IconCrop } from '../components/icons';
-import IdPhotoOrder from '../components/IdPhotoOrder';
+import { IconCheck } from '../components/icons';
 
 const REQUIREMENTS = [
   'Цагаан эсвэл цайвар цэнхэр дэвсгэр',
@@ -31,15 +30,31 @@ export default function IdPhoto() {
             {/*
               * ── Дараалал: ҮЙЛДЭЛ эхэнд, лавлагаа дараа ──────────────
               *
-              * Хүн энэ хуудсанд «цээж зураг хийлгэе» гэсэн зорилготой
-              * ирдэг. Үнийн жагсаалтыг эхэнд тавьбал зорилгодоо хүрэхийн
-              * тулд эхлээд гүйлгэх шаардлагатай болно.
+              * Хүн энэ хуудсанд «цээж зураг хийлгэе» гэсэн зорилготой ирдэг.
+              * Үнийн жагсаалтыг эхэнд тавьбал зорилгодоо хүрэхийн тулд эхлээд
+              * гүйлгэх шаардлагатай болно.
               *
-              * Үнэ нь ЛАВЛАГАА — хэрэгтэй, гэхдээ хоёрдугаарт. Захиалгын
-              * хэсэгт сонгосон хэмжээний үнэ аль хэдийн харагддаг тул
-              * дийлэнх хүн жагсаалт хүртэл огт хүрэхгүй.
+              * Захиалга нь одоо `/hevlel?t=Цээж зураг` дээр — бусад зурагтай
+              * ЯГ ижил урсгалаар. Өмнө нь энд бүрэн автомат бэлтгэлийн самбар
+              * байсныг түр хассан: нүүр илрүүлэлт найдваргүй үед бүтэн биеийн
+              * зургийг «стандарт хангасан» гэж дүгнээд зардаг байв. Одоо
+              * ажилтан серверээс эх файлыг татаж аваад өөрөө бэлтгэнэ.
               */}
-            <IdPhotoOrder />
+            <div className="card p-5 sm:p-6">
+              <h2 className="text-lg font-bold">Онлайнаар захиалах</h2>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                Хэмжээгээ сонгоод зургаа оруулаарай. Ажилтан манай лабораторид
+                стандартын дагуу бэлтгэж, хэвлээд өгнө — та өөрөө тайрах,
+                дэвсгэр солих шаардлагагүй.
+              </p>
+              <Link to="/hevlel?t=%D0%A6%D1%8D%D1%8D%D0%B6%20%D0%B7%D1%83%D1%80%D0%B0%D0%B3" className="btn-accent mt-4 w-full sm:w-auto">
+                Хэмжээ сонгож захиалах
+              </Link>
+              <p className="mt-3 text-xs text-muted">
+                Хамгийн сайн үр дүнд: жигд цайвар дэвсгэр дээр, урд талаас нь,
+                хангалттай гэрэлтэй авсан зураг оруулна уу.
+              </p>
+            </div>
 
             <div className="mt-10">
               <h2 className="text-xl font-bold">Бүх хэмжээний үнэ</h2>
@@ -75,19 +90,6 @@ export default function IdPhoto() {
                 */}
             </div>
 
-            {/*
-              * Ажилтны хэрэгсэл рүү холбоос.
-              *
-              * Үйлчлүүлэгчид хэрэггүй ч энэ хуудас нь цээж зурагтай холбоотой
-              * цорын ганц газар тул ажилтан эндээс олох нь хамгийн энгийн.
-              * Цэсэнд ороогүй, хайлтын системд индексэлдэггүй.
-              */}
-            <Link
-              to="/tseej-zurag/avtomat"
-              className="mt-6 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-brand-500"
-            >
-              <IconCrop className="size-3.5" /> Ажилтны хэрэгсэл — автомат бэлтгэл
-            </Link>
           </div>
 
           <aside className="card h-fit p-5 sm:p-6">

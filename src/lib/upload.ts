@@ -47,6 +47,23 @@ const extOf = (type: string): string =>
 const asciiSize = (label: string): string =>
   label.replace(/×/g, 'x').replace(/[^\w.-]/g, '') || 'size';
 
+/**
+ * Нэг файлыг хэдэн удаа оролдох, хэдэн миллисекунд хүлээх вэ.
+ *
+ * ⚠️ Урьд нь 3 оролдлого, 500ms суурьтай байсан (0.5с → 1с). Улаанбаатарын
+ * автобус, лифт, подвалд сүлжээ 10–20 секунд бүрмөсөн тасардаг — тэр цонхыг
+ * дааж гарахгүй. Одоо 4 оролдлого, 1с суурьтай (1с → 2с → 4с = ~7 секунд).
+ * Presigned URL 20 минут амьдардаг тул энэ хүлээлт бүрэн аюулгүй.
+ */
+const RETRY_ATTEMPTS = 4;
+const RETRY_BASE_MS = 1_000;
+
+/** Бүх файл дуусмагц уначихсан нь байвал хэдэн секунд амраад ДАХИН үзнэ. */
+const SECOND_PASS_DELAY_MS = 4_000;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /** Дахин оролдох утгатай эсэхийг ялгах. */
 class UploadError extends Error {
   /** `true` бол давтаад ижил хариу ирнэ — шууд бууж өгнө. */
@@ -104,7 +121,7 @@ const putWithProgress = async (
   url: string,
   blob: Blob,
   onFraction: (fraction: number) => void,
-  attempts = 3,
+  attempts = RETRY_ATTEMPTS,
 ): Promise<void> => {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -116,7 +133,7 @@ const putWithProgress = async (
 
       // Явцын мөрийг тэглэж, дахин эхлэхийг харуулна.
       onFraction(0);
-      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (attempt - 1)));
+      await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
     }
   }
 };
@@ -260,13 +277,59 @@ export async function uploadBasketPhotos(
    * Зэрэг илгээвэл хурдан ч, гар утасны сүлжээнд олон том PUT зэрэг явуулбал
    * timeout-д орох магадлал огцом нэмэгддэг. Явц ч ойлгомжтой байна.
    */
-  for (const [index, plan] of planned.entries()) {
-    await putWithProgress(urls[index].url, plan.blob, (fraction) => {
-      sent[index] = plan.blob.size * fraction;
-      report(index);
-    });
-    sent[index] = plan.blob.size;
-    report(index + 1);
+  const sendOne = async (index: number): Promise<boolean> => {
+    const plan = planned[index];
+    try {
+      await putWithProgress(urls[index].url, plan.blob, (fraction) => {
+        sent[index] = plan.blob.size * fraction;
+        report(index);
+      });
+      sent[index] = plan.blob.size;
+      report(index + 1);
+      return true;
+    } catch {
+      sent[index] = 0;
+      return false;
+    }
+  };
+
+  /*
+   * ── Нэг файл унахад БҮХНИЙГ хаядаггүй ────────────────────────────
+   *
+   * ⚠️ Урьд нь энэ давталт `await putWithProgress(...)`-ыг шууд дууддаг
+   * байсан тул 20 зурагтай захиалгын 19 дэх нь уначихвал алдаа дээшээ шидэгдэж,
+   * АЛЬ ХЭДИЙН амжилттай орсон 18 зураг ч хамт хаягддаг байв. Хэрэглэгч 45 MB
+   * илгээчихээд эхнээс нь дахин эхлэх шаардлагатай болно — гар утасны сүлжээн
+   * дээр энэ нь хамгийн түгээмэл бүтэлгүйтэл.
+   *
+   * Одоо: эхний давталт бүх файлыг оролдож, унасныг нь ТЭМДЭГЛЭЖ авна.
+   * Дараа нь хэдэн секунд амраад зөвхөн УНАСАН файлуудыг дахин илгээнэ.
+   * Presigned URL 20 минут хүчинтэй тул ижил хаяг руу үргэлжлүүлж болно —
+   * шинэ хаяг гуйх, сервер рүү дахин хандах шаардлагагүй.
+   */
+  const failed: number[] = [];
+  for (let index = 0; index < planned.length; index += 1) {
+    if (!(await sendOne(index))) failed.push(index);
+  }
+
+  if (failed.length > 0) {
+    await sleep(SECOND_PASS_DELAY_MS);
+
+    const stillFailed: number[] = [];
+    for (const index of failed) {
+      if (!(await sendOne(index))) stillFailed.push(index);
+    }
+
+    /*
+     * Хоёр дахь давталт ч бүтэхгүй бол л бууж өгнө. Хэдэн файл дутсаныг
+     * хэлэх нь чухал: «алдаа гарлаа» гэхээс илүү «19 зургаас 2 нь орсонгүй»
+     * гэвэл хэрэглэгч сүлжээгээ соливол болно гэдгээ ойлгоно.
+     */
+    if (stillFailed.length > 0)
+      throw new Error(
+        `${planned.length} файлаас ${stillFailed.length} нь илгээгдсэнгүй. ` +
+          'Сүлжээгээ шалгаад дахин оролдоно уу.',
+      );
   }
 
   return {

@@ -32,7 +32,23 @@ let objects = new Map<string, string>();
 let server: http.Server;
 let handler: (request: Request) => Promise<Response>;
 
-const key = (n: string) => `manifests/2026-08-19/${n}-abcdefghijkmnpqr.json`;
+/**
+ * Өнөөдрийн огноо, УЛААНБААТАРЫН цагаар.
+ *
+ * ⚠️ Энэ эхлээд `2026-08-19` гэж БИЧМЭЛ байсан нь далд алдаа байв: `store.list()`
+ * нь сүүлийн N өдрийн огноогоор `manifests/<огноо>/` угтвар угсардаг тул шөнө
+ * дунд өнгөрөхөд тест бүхэлдээ хоосон жагсаалт авч уначихдаг. Огноо солигдоход
+ * унадаг тест нь хамгийн муу төрлийн тест — өөрчлөөгүй кодыг буруутай мэт
+ * харагдуулна.
+ */
+const TODAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Ulaanbaatar',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(new Date());
+
+const key = (n: string) => `manifests/${TODAY}/${n}-abcdefghijkmnpqr.json`;
 
 const makeOrder = (
   orderNumber: string,
@@ -40,7 +56,7 @@ const makeOrder = (
 ): Manifest => ({
   orderNumber,
   uploadId: 'abcdefghijkmnpqr',
-  date: '2026-08-19',
+  date: TODAY,
   createdAt: 1_760_000_000_000,
   customer: { name: 'Батбаяр', phone: '99112233', email: '', note: '' },
   total: 24_000,
@@ -184,7 +200,7 @@ test('?ref= нь ганц захиалга буцаана', async () => {
   assert.equal(body.orders.length, 1);
   assert.equal(body.orders[0].orderNumber, 'PMN-260819-0001');
 
-  assert.equal((await get('?ref=manifests/2026-08-19/PMN-YOK-abcdefghijkmnpqr.json')).status, 404);
+  assert.equal((await get(`?ref=manifests/${TODAY}/PMN-YOK-abcdefghijkmnpqr.json`)).status, 404);
 });
 
 // ── NAS-ын тэмдэглэгээ ─────────────────────────────────────────────

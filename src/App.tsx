@@ -17,7 +17,6 @@ const Print = lazy(() => import('./pages/Print'));
 const Order = lazy(() => import('./pages/Order'));
 const OrderStatus = lazy(() => import('./pages/OrderStatus'));
 const IdPhoto = lazy(() => import('./pages/IdPhoto'));
-const IdPhotoStudio = lazy(() => import('./pages/IdPhotoStudio'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /** Хуудас солигдох агшинд харагдах — байрлалаа барьж, үсрэлт үүсгэхгүй. */
@@ -76,7 +75,6 @@ export default function App() {
                 <Route path="zurag-ugaalt" element={<Navigate to="/hevlel" replace />} />
                 <Route path="tseej-zurag" element={<IdPhoto />} />
                 {/* Ажилтны хэрэгсэл — бүрэн офлайн, захиалгын мэдээлэлгүй. */}
-                <Route path="tseej-zurag/avtomat" element={<IdPhotoStudio />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

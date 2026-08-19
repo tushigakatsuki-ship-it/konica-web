@@ -17,6 +17,19 @@ import path from 'node:path';
 const root = process.cwd();
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
 
+/**
+ * Тайлбаргүй эх код.
+ *
+ * ⚠️ Хэрэгтэй шалтгаан: энэ файл дахь олон тест «ийм зүйл кодод БАЙХГҮЙ байх
+ * ёстой» гэж шалгадаг. Тайлбар дотор хуучин нэрийг дурдмагц (жишээ нь «яагаад
+ * `IdPhotoOrder`-ыг хассан бэ» гэж бичихэд) тэр шалгалт худал уначихдаг.
+ * Үүнээс болж хөгжүүлэгч тайлбар бичихээс зайлсхийх нь буруу урамшуулал.
+ */
+const readCode = (file: string) =>
+  read(file)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
 const sourceFiles = (dir: string): string[] => {
   const full = path.join(root, dir);
   if (!existsSync(full)) return [];
@@ -205,24 +218,37 @@ test('өөрийн хэмжээ үнийн хамгаалалтыг тойрох
  * `PhotoEditor`-т нүүр илрүүлэх, дэвсгэр цайруулах, чанарын хаалт байхгүй.
  * Шийдэл нь ХААЛТТАЙ компонентыг (`IdPhotoOrder`) энд авчрах явдал.
  */
-test('цээж зургийг Хэвлэл хуудсан дээр шууд захиална', () => {
-  const print = read('src/pages/Print.tsx');
-
-  assert.ok(print.includes('IdPhotoOrder'), 'хаалттай компонент холбогдоогүй');
-  assert.match(print, /\{idPhoto && \(\s*<div[^>]*>\s*<IdPhotoOrder \/>/s, 'компонент зурагдахгүй байна');
-
+test('цээж зургийг Хэвлэл хуудсан дээр ердийн урсгалаар захиална', () => {
   /*
-   * Ердийн зургийн урсгал цээж зурагт НЭЭГДЭХ ЁСГҮЙ хэвээр: `WALK_IN`
-   * дотор үлдэж, картууд `disabled` байх ёстой.
+   * ⚠️ Энэ тест урьд нь ЭСРЭГ зүйлийг шаарддаг байсан: `IdPhotoOrder` гэсэн
+   * бүрэн автомат компонент (нүүр илрүүлэх, тайрах, дэвсгэр цайруулах,
+   * `isPrintReady` хаалт) энд зурагдаж, ердийн хэмжээний тор нуугдсан байх.
+   *
+   * Тэр загвар бодит байдалд нурсан: нүүр олдоогүй үед силуэтийн арга `null`
+   * биш, БҮТЭН зургийн хэмжээтэй «нүүр» буцаадаг тул бүтэн биеийн зураг
+   * «стандарт хангасан» гэж дүгнэгдэн зарагддаг байв. Мөн хэрэглэгчээс зөвхөн
+   * боловсруулсан файл ирдэг тул ажилтан буруу тайралтыг засах ч аргагүй.
+   *
+   * Шинэ дүрэм: цээж зураг нь бусад зурагтай ЯГ ижил урсгалтай. Хэрэглэгч
+   * зургаа оруулна, ажилтан серверээс эх файлыг татаж аваад бэлтгэнэ.
    */
-  assert.match(print, /const WALK_IN[^=]*=\s*\[[^\]]*'Цээж зураг'/s, 'цээж зураг WALK_IN-ээс гарсан');
-  assert.match(print, /disabled=\{walkIn\}/, 'ердийн картууд дарагдахаар болсон');
+  const print = readCode('src/pages/Print.tsx');
 
-  // Өөр хуудас руу шидэх линк үлдээгүй.
-  assert.ok(
-    !print.includes('to="/tseej-zurag"'),
-    'өөр хуудас руу шиддэг линк үлдсэн',
-  );
+  assert.ok(!print.includes('IdPhotoOrder'), 'автомат компонент буцаж орсон');
+  assert.ok(!/idPhoto \? 'hidden'/.test(print), 'хэмжээний тор дахин нуугдсан');
+  assert.ok(print.includes("t('idPhoto.note.title')"), 'хэрэглэгчид тайлбар алга');
+  assert.ok(!print.includes('to="/tseej-zurag"'), 'өөр хуудас руу шиддэг линк үлдсэн');
+});
+
+test('дэлгүүрт хийгддэг үйлчилгээг онлайнаар захиалж болохгүй', () => {
+  /*
+   * «Файлаар зураг авах» гэдэг нь ирж зураг АВАХУУЛАХ ажил. Жагсаалтад
+   * үлдээвэл хэрэглэгч сагсанд нэмж, төлбөр төлчихөөд, ажилтан юу хэвлэхээ
+   * мэдэхгүй байх болно — файл нь огт байхгүй.
+   */
+  const print = read('src/pages/Print.tsx');
+  assert.match(print, /const IN_BRANCH_ONLY[^=]*=\s*\[\s*405/s, 'хасалт алга');
+  assert.match(print, /!IN_BRANCH_ONLY\.includes\(service\.id\)/, 'шүүлт хэрэглэгдээгүй');
 });
 
 /* ── Дүрс тэмдэг ──────────────────────────────────────────────────── */
@@ -312,50 +338,6 @@ test('дэвсгэр зураг солигдох нь хүртээмж, гүйц
 
 /* ── Ажилтны хэрэгсэл ──────────────────────────────────────────────── */
 
-test('цээж зургийн хэрэгсэл нь захиалгын мэдээлэлд огт хүрэхгүй', () => {
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-
-  /*
-   * Энэ хуудас нь «ажилтны хуудас» биш — офлайн ажилладаг хэрэгсэл.
-   * Захиалгын жагсаалт, токен, сервер рүү илгээх зүйл ОГТ байх ёсгүй:
-   * бүх боловсруулалт браузер дотор canvas дээр хийгдэнэ.
-   */
-  assert.ok(!studio.includes('fetch('), 'сервер рүү хүсэлт явуулж байна');
-  assert.ok(!studio.includes('x-admin-token'));
-  assert.ok(!studio.includes('/api/'));
-
-  // Хэрэглэгчид үүнийг тодорхой хэлсэн байх ёстой.
-  assert.ok(studio.includes('сервер рүү'));
-});
-
-test('хэрэгслийн хязгаарлалтыг нуугаагүй', () => {
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-
-  /*
-   * Гурван хязгаарлалтыг ЗААВАЛ интерфейс дээр хэлнэ — нуувал ажилтан муу
-   * үр дүнд гайхаж, хэрэгсэлд итгэхээ болино.
-   */
-  assert.match(studio, /жигд дэвсгэр/i, 'илрүүлэлтийн хязгаар');
-  assert.ok(studio.includes('«Хэвээр»'), 'гараар засах гарц');
-  assert.ok(studio.includes('MediaPipe'), 'сайжруулах зам');
-  assert.ok(studio.includes('зориуд таслахгүй'), 'нүүр олдоогүй үеийн зарчим');
-});
-
-test('хэрэгсэл цэсэнд ороогүй, индексэлдэггүй', () => {
-  const app = read('src/App.tsx');
-  assert.ok(app.includes('tseej-zurag/avtomat'));
-
-  const nav = read('src/data/site.ts');
-  assert.ok(!nav.includes('avtomat'), 'ажилтны хэрэгсэл цэсэнд орсон байна');
-
-  const vercel = JSON.parse(read('vercel.json')) as {
-    headers: { source: string; headers: { key: string; value: string }[] }[];
-  };
-  const rule = vercel.headers.find((h) => h.source === '/tseej-zurag/avtomat');
-  assert.ok(rule, 'noindex дүрэм алга');
-  assert.ok(rule.headers.some((h) => h.value.includes('noindex')));
-});
-
 test('зам бүр рүү орох гарц байна — хаягдсан хуудас байхгүй', () => {
   /*
    * ЯАГААД ЭНЭ ТЕСТ ХЭРЭГТЭЙ ВЭ
@@ -378,7 +360,12 @@ test('зам бүр рүү орох гарц байна — хаягдсан х�
     .map((m) => m[1])
     .filter((p) => p !== '' && p !== '/');
 
-  assert.ok(routes.length >= 4, `зам олдсонгүй: ${routes.length}`);
+  /*
+   * Доод хязгаар нь «regex эвдэрсэн үү» гэдгийг барих эрүүл мэндийн шалгалт.
+   * Ажилтны хэрэгслийн зам (`tseej-zurag/avtomat`) хасагдсаны дараа гурав
+   * үлдсэн: `zakhialga`, `hevlel`, `tseej-zurag`.
+   */
+  assert.ok(routes.length >= 3, `зам олдсонгүй: ${routes.length}`);
 
   // `src/` доторх БҮХ файлаас холбоосуудыг цуглуулна.
   const links = new Set<string>();
@@ -461,187 +448,7 @@ test('арилжаанд хориотой загвар кодод ороогүй
   }
 });
 
-test('баримтын горимд царай өөрчлөх засвар ХААЛТТАЙ', () => {
-  /*
-   * Иргэний үнэмлэх, паспортын зураг бол хүнийг таних баримт. Царай,
-   * хувцсыг өөрчилсөн зураг тавих нь баримт гуйвуулсан хэрэг бөгөөд
-   * эрсдэл нь зураг авсан дэлгүүр дээр буудаг.
-   *
-   * Энэ туг нь шинэ засвар нэмэх бүрд шалгагдах цорын ганц газар.
-   */
-  const src = read('src/lib/idPhoto.ts');
-  assert.match(src, /key:\s*'document'[\s\S]*?allowRetouch:\s*false/, 'баримтад засвар нээлттэй');
-  assert.match(src, /key:\s*'general'[\s\S]*?allowRetouch:\s*true/, 'энгийн зурагт засвар хаалттай');
-
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-  assert.ok(studio.includes('allowRetouch'), 'интерфейс тугийг хэрэглээгүй');
-  // Анхдагч нь баримт байх ёстой — санамсаргүй сонголт эрсдэлгүй тал руу.
-  assert.match(studio, /useState<PurposeKey>\('document'\)/, 'анхдагч горим баримт биш');
-});
-
-test('ONNX нь ДИНАМИК import — үндсэн багцад ороогүй', () => {
-  /*
-   * `onnxruntime-web` нь маш том. Статик import хийвэл ажилтны хэрэгслийн
-   * chunk хэдэн зуун KB болж, загвар суулгаагүй дэлгүүр ч татаж эхэлнэ.
-   */
-  const src = read('src/lib/segment.ts');
-  assert.ok(
-    !/^import .*onnxruntime-web/m.test(src),
-    'onnxruntime-web статикаар импортлогдсон',
-  );
-  assert.ok(src.includes("await import('onnxruntime-web')"), 'динамик import алга');
-
-  // Загвар байгаа эсэхийг ЭХЛЭЭД шалгана — байхгүй бол ort огт татагдахгүй.
-  const load = src.slice(src.indexOf('async function loadSession'));
-  assert.ok(
-    load.indexOf("method: 'HEAD'") < load.indexOf("import('onnxruntime-web')"),
-    'загварыг шалгахаас өмнө ort татагдана',
-  );
-
-  for (const file of ['src/pages/IdPhotoStudio.tsx', 'src/main.tsx', 'src/App.tsx']) {
-    assert.ok(!read(file).includes('onnxruntime'), `${file} ort-г шууд импортолсон`);
-  }
-});
-
-test('загвар байхгүй үед хэрэгсэл ажилласаар байна', () => {
-  /*
-   * Загвар нь ЗААВАЛ БИШ сайжруулалт. Сүлжээ тасарсан, WASM дэмжигдээгүй,
-   * файл эвдэрсэн — аль нь ч ажилтныг зогсоох ёсгүй.
-   */
-  const src = read('src/lib/segment.ts');
-  const catches = src.match(/catch\s*{\s*(\/\*[\s\S]*?\*\/\s*)?return null;/g) ?? [];
-  assert.ok(catches.length >= 2, `алдааг залгих хамгаалалт дутуу: ${catches.length}`);
-
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-  assert.match(studio, /mask \?\?= backgroundMask/, 'силуэт руу буцах зам алга');
-});
-
-test('томруулалт нь төв дээр суурилсан — гулсахгүй', () => {
-  /*
-   * Тайралтыг `x/y` төлөвөөр барьвал томруулах бүрд зураг гулсана.
-   * Төв + томруулалтаар барих нь энэ асуудлыг үндсээр нь хаана.
-   */
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-
-  assert.ok(!studio.includes('setCrop('), 'хүрээг шууд төлөвт хадгалж байна');
-  assert.match(studio, /const crop = useMemo/, 'хүрээ дүгнэгддэг байх ёстой');
-  assert.ok(studio.includes('zoomCrop('), 'томруулалт хэрэглэгдээгүй');
-
-  // Шинэ зураг эсвэл хэмжээ сонгоход гар тохиргоо тэглэгдэнэ.
-  assert.ok(studio.includes('setZoom(ZOOM.default)'), 'томруулалт тэглэгддэггүй');
-
-  // Стандартаас хазайхад сэрэмжлүүлнэ — хориглохгүй.
-  assert.ok(studio.includes('offStandard'), 'стандартын сэрэмжлүүлэг алга');
-  assert.ok(studio.includes('Автомат хэмжээ'), 'буцах товч алга');
-});
-
-test('нарийн тохиргоо анхдагчаар НУУГДСАН', () => {
-  /*
-   * Ажилтан «Зөвшөөрөл: 60» гэдгээс юу ч ойлгохгүй. Автомат утга нь
-   * тохиолдлын дийлэнхэд ажилладаг тул үндсэн урсгалд байх шаардлагагүй.
-   */
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-
-  assert.ok(
-    studio.includes('const [advanced, setAdvanced] = useState(false)'),
-    'нарийн тохиргоо нээлттэй эхэлж байна',
-  );
-  assert.ok(studio.includes('Нарийн тохиргоо'), 'хумих хэсэг алга');
-  assert.ok(studio.includes('aria-expanded={advanced}'), 'дэлгэц уншигчид төлөв мэдэгдэхгүй');
-
-  // Техникийн нэр томьёо үндсэн урсгалд гарах ёсгүй.
-  /*
-   * ⚠️ Тайлбарыг ЗААВАЛ хасна. Эхний хувилбар түүхий эхийг зүсээд шалгасан
-   * тул кодын тайлбар доторх «U²-Net» дурдлагыг интерфейсийн текст гэж
-   * тоолоод худал уналаа.
-   */
-  const ui = withoutComments(studio);
-  const beforeAdvanced = ui.slice(0, ui.indexOf('Нарийн тохиргоо'));
-  assert.ok(!beforeAdvanced.includes('U²-Net загвар'), 'хөдөлгүүрийн нэр үндсэн урсгалд байна');
-});
-
-test('алдааг хэрэглэгчийн хэлээр харуулна', () => {
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-
-  // Техникийн дэлгэрэнгүйг консолд, хэрэглэгчид энгийн өгүүлбэр.
-  assert.ok(studio.includes('console.error('), 'хөгжүүлэгчид мэдээлэл үлдээгээгүй');
-  assert.match(studio, /Зургийг боловсруулахад асуудал гарлаа/, 'найрсаг мессеж алга');
-
-  // Түүхий алдааг дэлгэц рүү дамжуулах ёсгүй.
-  assert.ok(!/setProblem\(\s*String\(error\)/.test(studio));
-  assert.ok(!/setProblem\(\s*error/.test(studio));
-});
-
-test('чанарын шалгалт интерфейст холбогдсон', () => {
-  const studio = read('src/pages/IdPhotoStudio.tsx');
-  assert.ok(studio.includes('checkQuality('), 'шалгалт дуудагдаагүй');
-  assert.ok(studio.includes('Хэвлэхэд бэлэн'), 'төлөв харуулаагүй');
-  assert.ok(studio.includes('isPrintReady('), 'бэлэн эсэхийг шийдээгүй');
-});
-
 /* ── Багц боловсруулалт ба Worker ─────────────────────────────────── */
-
-test('Worker-ийн зам DOM-д хүрэхгүй', () => {
-  /*
-   * ⚠️ Worker дотор `document`, `window` БАЙХГҮЙ. Тэдгээрт хүрвэл багц
-   * боловсруулалт шууд унана — гэхдээ зөвхөн ТУРШИЛТЫН үед биш, бодит
-   * ажлын үед. Тиймээс энэ түгжээ хэрэгтэй.
-   *
-   * `lib/canvas.ts` нь цорын ганц зөвшөөрөгдсөн газар: тэр нь
-   * OffscreenCanvas руу шилжиж, DOM-ыг зөвхөн НӨӨЦ зам болгон хэрэглэдэг.
-   */
-  const chain = [
-    'src/workers/photo.worker.ts',
-    'src/lib/processPhoto.ts',
-    'src/lib/faceDetect.ts',
-    'src/lib/segment.ts',
-    'src/lib/idPhoto.ts',
-    'src/lib/quality.ts',
-    'src/lib/batch.ts',
-  ];
-
-  for (const file of chain) {
-    const source = withoutComments(read(file));
-    assert.doesNotMatch(source, /\bdocument\./, `${file} нь document-д хүрч байна`);
-    assert.doesNotMatch(source, /\bwindow\./, `${file} нь window-д хүрч байна`);
-  }
-
-  // Зөвшөөрөгдсөн газарт нь DOM нь НӨӨЦ зам байх ёстой, анхдагч биш.
-  const canvas = withoutComments(read('src/lib/canvas.ts'));
-  assert.ok(canvas.includes('new OffscreenCanvas('), 'OffscreenCanvas хэрэглээгүй');
-  assert.ok(
-    canvas.indexOf('OffscreenCanvas') < canvas.indexOf('document.createElement'),
-    'DOM нь анхдагч зам болсон байна',
-  );
-});
-
-test('Worker болон нөөц зам НЭГ логик хуваалцана', () => {
-  /*
-   * Хоёр тусдаа хэрэгжүүлэлт бичвэл цаг хугацаа өнгөрөхөд зөрнө: нэгд нь
-   * засвар орж, нөгөөд нь ордоггүй. Тэр зөрүү нь зөвхөн Worker дэмждэггүй
-   * хөтөч дээр илэрдэг тул хамгийн сүүлд анзаарагдана.
-   */
-  const worker = read('src/workers/photo.worker.ts');
-  const batch = read('src/lib/photoBatch.ts');
-
-  assert.ok(worker.includes('processPhoto'), 'Worker нь дамжлагыг импортлоогүй');
-  assert.ok(batch.includes('processPhoto'), 'нөөц зам дамжлагыг импортлоогүй');
-
-  // Дамжлагын дүрэм Worker дотор ДАВХАРДАЖ бичигдээгүй байх ёстой.
-  assert.ok(!worker.includes('cropForFace'), 'Worker дотор логик давхардсан');
-  assert.ok(!worker.includes('backgroundMask'), 'Worker дотор логик давхардсан');
-});
-
-test('нэг зураг унахад багц зогсохгүй', () => {
-  const batch = read('src/lib/photoBatch.ts');
-  // `Promise.all` нь БҮГДийг зэрэг эхлүүлж, эхний алдаанд бүхлээр унана.
-  assert.ok(!/Promise\.all\(\s*files/.test(batch), 'files дээр Promise.all хэрэглэсэн');
-  assert.ok(batch.includes('runBatch('), 'дараалал хэрэглээгүй');
-
-  const queue = read('src/lib/batch.ts');
-  assert.ok(queue.includes('catch (error)'), 'алдааг барихгүй байна');
-  assert.match(queue, /concurrency/, 'зэрэгцээлт хязгаарлаагүй');
-});
 
 test('цээж зургийг онлайнаар сагсанд хийлгэхгүй', () => {
   /*
@@ -1008,47 +815,89 @@ test('ангилал бүр метадататай, англи нэртэй', ()
   }
 });
 
-test('цээж зургийн ЧАНАРЫН ХААЛТ сулраагүй', () => {
+test('ЭХ ФАЙЛ ажилтанд ЗААВАЛ очно', () => {
   /*
-   * ⚠️ Энэ бол хамгийн чухал түгжээ.
+   * ⚠️ Энэ нь өмнөх «чанарын хаалт» тестийг ОРЛОВ.
    *
-   * Цээж зургийг онлайнаар авах боломжтой болсны ЦОРЫН ГАНЦ үндэслэл нь
-   * чанарын хаалт. Эхэндээ энэ боломжийг зориуд хаасан байсан: гэрээсээ
-   * илгээсэн зураг стандарт хангахгүй тул буцаагдана, мөнгө авчихаад
-   * буцаах нь хэрэглэгчийг хуурсан хэрэг гэж үзсэн.
-   *
-   * `isPrintReady` шалгалт нь тэр эсэргүүцлийг арилгасан. Хаалтыг
-   * сулруулбал анхны асуудал буцаад ирнэ.
+   * Автомат бэлтгэлийг түр хассан тул зураг стандартад нийцэхийг вэб
+   * баталгаажуулахаа больсон. Тэр баталгааг одоо АЖИЛТАН өгнө — гэхдээ зөвхөн
+   * эх файл гартаа ирвэл. Хэрэв зөвхөн автоматаар тайрсан `print` файл очвол
+   * ажилтан толгой тасарсан зургийг засах аргагүй болж, хэрэглэгч рүү залгаж
+   * дахин файл гуйх ажил үүснэ.
    */
-  const order = read('src/components/IdPhotoOrder.tsx');
+  const upload = read('src/lib/upload.ts');
 
-  assert.ok(order.includes('isPrintReady('), 'чанарын шалгалт дуудагдаагүй');
-  assert.match(order, /disabled=\{!ready/, 'шалгалт унасан ч сагсанд нэмж болно');
+  assert.match(upload, /kind: 'original'/, 'эх файл илгээгддэггүй');
+  assert.match(upload, /blob: original,/, 'эх файлын оронд өөр зүйл илгээж байна');
+  assert.match(upload, /kind: 'print'/, 'хэвлэх файл илгээгддэггүй');
+});
 
-  // Нэмэх функц өөрөө ч хамгаалалттай байх ёстой — товч л биш.
-  assert.match(order, /if \(!service \|\| !blob \|\| !ready\) return;/, 'функцэд хамгаалалтгүй');
+test('цээж зургийн АВТОМАТ бэлтгэл бүхэлдээ хасагдсан', () => {
+  /*
+   * ⚠️ Энэ тест хоёр удаа ЭРГЭСЭН — түүхийг нь тэмдэглэж үлдээв:
+   *
+   *   1. Эхлээд «хэрэглэгчийн талд чанарын хаалт байх ёстой» гэж шаарддаг байв.
+   *   2. Дараа нь автоматыг хэрэглэгчээс хасахад «ажилтны хэрэгсэл ХЭВЭЭР
+   *      байх ёстой» болов.
+   *   3. Одоо ажилтан бүх засварыг өөрийн компьютер дээрээ (Photoshop гэх мэт)
+   *      хийдэг болсон тул вэб доторх автомат бэлтгэл БҮХЭЛДЭЭ хасагдав.
+   *
+   * Вэбийн үүрэг одоо ганцхан: захиалга авах, файлыг найдвартай хүлээж авах.
+   * Зургийн боловсруулалт вэбийн ажил биш болов.
+   */
+  const app = read('src/App.tsx');
+  assert.ok(!app.includes('avtomat'), 'ажилтны хэрэгслийн зам буцаж орсон');
+  assert.ok(!app.includes('IdPhotoStudio'), 'хэрэгслийн хуудас буцаж орсон');
 
-  // Сагсанд ЭХ файл биш, боловсруулсан файл орно.
-  assert.ok(order.includes('new File([blob]'), 'боловсруулсан файл сагсанд ороогүй');
+  // Хамааралтай сангууд ч үлдээгүй байх ёстой — үхсэн код хуримтлагдана.
+  for (const file of [
+    'src/pages/IdPhotoStudio.tsx',
+    'src/components/BatchProcessor.tsx',
+    'src/lib/idPhoto.ts',
+    'src/lib/quality.ts',
+    'src/lib/faceDetect.ts',
+    'src/lib/segment.ts',
+    'src/lib/processPhoto.ts',
+    'src/workers/photo.worker.ts',
+  ]) {
+    assert.ok(!existsSync(path.join(root, file)), `${file} үлдсэн байна`);
+  }
+});
+
+test('onnxruntime-web хамаарал бүрмөсөн салсан', () => {
+  /*
+   * ⚠️ Бодит алдааны эцсийн шийдэл.
+   *
+   * `onnxruntime-web` нь build дээр 25.6MB WASM гаргадаг. Өмнө нь `segment.ts`
+   * дотор динамикаар татагддаг байсан бөгөөд «загвар байгаа эсэх» шалгалт нь
+   * vercel.json дахь SPA rewrite-аас болж ҮРГЭЛЖ давдаг байв. Улмаар загвар
+   * огт суулгаагүй атал хэрэглэгч бүр 26MB татдаг байсан.
+   *
+   * Одоо хамаарал өөрөө салсан тул энэ ангийн алдаа дахин үүсэх боломжгүй.
+   */
+  const pkg = JSON.parse(read('package.json'));
+  assert.ok(!pkg.dependencies['onnxruntime-web'], 'хамаарал буцаж орсон');
+  assert.ok(!pkg.devDependencies?.['onnxruntime-web'], 'devDependencies-д орсон');
+  assert.ok(!existsSync(path.join(root, 'public/models')), 'загварын хавтас үлдсэн');
 });
 
 test('цээж зураг хоёр замтай — онлайн ба салбар', () => {
-  const page = read('src/pages/IdPhoto.tsx');
-  assert.ok(page.includes('IdPhotoOrder'), 'онлайн захиалга алга');
+  const page = readCode('src/pages/IdPhoto.tsx');
+
+  // Онлайн зам — одоо ердийн урсгал руу хөтөлнө.
+  assert.ok(!page.includes('IdPhotoOrder'), 'автомат самбар буцаж орсон');
+  assert.match(page, /Хэмжээ сонгож захиалах/, 'онлайн захиалгын гарц алга');
+  assert.match(page, /hevlel\?t=/, 'Хэвлэл хуудас руу холбоогүй');
 
   /*
-   * Салбар дээр ирэх зам ч үлдэх ёстой — чанарын шалгалт унасан хүнд гарц
-   * хэрэгтэй. Гэхдээ энэ нь ЗААВАЛ залгах товч байх гэсэн үг биш: дугаар нь
-   * толгойд бүх хуудсанд байнга харагдаж, дарахад шууд залгадаг болсон.
-   * Энд шаардагдах зүйл нь «салбар дээр ирж болно» гэсэн МЭДЭЭЛЭЛ.
+   * Салбар дээр ирэх зам ч үлдэх ёстой. Дугаар нь толгойд бүх хуудсанд
+   * харагдаж, дарахад шууд залгадаг тул энд шаардагдах зүйл нь «салбар дээр
+   * ирж болно» гэсэн МЭДЭЭЛЭЛ.
    */
   assert.match(page, /салбар дээр ирж авахуулна/, 'салбарын гарц алга');
 
   const header = read('src/components/Header.tsx');
   assert.ok(header.includes('PRIMARY_PHONE'), 'залгах гарц толгойноос ч алга');
-
-  const order = read('src/components/IdPhotoOrder.tsx');
-  assert.match(order, /салбар дээр\s*\n?\s*ирээд авахуулж болно/, 'нөөц гарц санал болгоогүй');
 });
 
 test('сагс БҮХ хуудаснаас харагдана', () => {
@@ -1070,23 +919,19 @@ test('сагс БҮХ хуудаснаас харагдана', () => {
   assert.match(button, /aria-label=\{`Сагс/, 'дэлгэц уншигчид тоо хүрэхгүй');
 });
 
-test('сагсанд нэмсний дараа юу болохыг хэлнэ', () => {
-  const order = read('src/components/IdPhotoOrder.tsx');
-  assert.ok(order.includes('Сагсанд нэмэгдлээ'), 'баталгаа алга');
-  assert.ok(order.includes('Захиалга үргэлжлүүлэх'), 'дараагийн алхам алга');
-  assert.ok(order.includes('Өөр зураг нэмэх'), 'дахин нэмэх зам алга');
-});
-
-test('сагсанд өгсөн зургийн хаяг устгагдахгүй', () => {
-  /*
-   * `URL.createObjectURL` нь гараар чөлөөлөгддөг. Сагсанд өгсөн хаягийг
-   * компонент цэвэрлэвэл сагсан дахь зураг эвдэрнэ — алдаа шидэхгүй,
-   * зүгээр л хоосон дөрвөлжин үлдэнэ.
-   */
-  const order = read('src/components/IdPhotoOrder.tsx');
-  const add = order.slice(order.indexOf('const addToBasket'), order.indexOf('return (', order.indexOf('const addToBasket')));
-  assert.match(add, /urlRef\.current = null;/, 'эзэмшил шилжээгүй — хаяг устгагдана');
-});
+/*
+ * ⚠️ Хоёр тест ЭНД БАЙСАН, `IdPhotoOrder` хасагдсанаар утгагүй болсон:
+ *
+ *   • «сагсанд нэмсний дараа юу болохыг хэлнэ» — тэр баталгааны мессежүүд
+ *     тухайн компонентод байсан. Ердийн урсгалд `PhotoEditor` хаагдаж,
+ *     сагсны тоо толгойд өөрчлөгддөг тул баталгаа нь харагдацаараа өгөгддөг.
+ *   • «сагсанд өгсөн зургийн хаяг устгагдахгүй» — `createObjectURL`-ийн
+ *     эзэмшил шилжүүлэх асуудал. `PhotoEditor` нь object URL биш, data URL
+ *     ашигладаг тул чөлөөлөх зүйл байхгүй, алдаа нь бүрмөсөн алга болсон.
+ *
+ * Автомат бэлтгэлийг буцааж оруулбал хоёуланг нь сэргээх хэрэгтэй —
+ * `git log -- src/components/IdPhotoOrder.tsx` дотор байна.
+ */
 
 /* ── 3D гүн ─────────────────────────────────────────────────────── */
 
@@ -1231,56 +1076,6 @@ test('hero дээр хэвлэмэлийн овоолол байхгүй', () =>
 });
 
 /* ── Build тохиргоо ──────────────────────────────────────────────── */
-
-test('worker нь ES модуль форматтай — эс бөгөөс build УНАНА', () => {
-  /*
-   * ⚠️ Энэ бол бодит build алдааны түгжээ.
-   *
-   * Vite-ийн анхдагч `worker.format` нь `'iife'`. Тэр формат нь код
-   * хуваахыг дэмждэггүй. Бидний worker нь `lib/processPhoto.ts`-ээр
-   * дамжин `onnxruntime-web`-ийг ДИНАМИК import хийдэг тул заавал
-   * хуваагдана — Vercel дээр яг дараах алдаагаар унасан:
-   *
-   *   Invalid value "iife" for option "worker.format" —
-   *   UMD and IIFE output formats are not supported for code-splitting
-   *
-   * ⚠️ typecheck болон unit тест энэ алдааг ХАРАХГҮЙ: зөвхөн бодит
-   * bundler ажиллах үед л илэрдэг. Тиймээс тохиргоог эндээс түгжив.
-   */
-  const config = read('vite.config.ts');
-  assert.match(config, /worker:\s*\{[\s\S]{0,200}?format:\s*'es'/, 'worker.format нь es биш');
-
-  // `new Worker(..., { type: 'module' })`-тэй нийцэх ёстой.
-  const batch = read('src/lib/photoBatch.ts');
-  assert.ok(batch.includes("type: 'module'"), 'worker модуль биш байна');
-
-  // Код хуваалт үнэхээр гардаг эсэх — динамик import байгаа эсэхээр.
-  const segment = read('src/lib/segment.ts');
-  assert.ok(
-    segment.includes("await import('onnxruntime-web')"),
-    'динамик import алга — тохиргооны шалтгаан алдагдсан',
-  );
-});
-
-test('worker ачаалж чадаагүй үед ГАЦАХГҮЙ', () => {
-  /*
-   * `onerror` барихгүй бол worker ачаалагдаж чадаагүй үед promise хэзээ ч
-   * шийдэгдэхгүй. Хэрэглэгч «боловсруулж байна…» гэсэн бичгийг үүрд
-   * хардаг — алдаа ч гарахгүй, явц ч урагшлахгүй.
-   *
-   * Модуль worker-ийг хуучин хөтөч дэмждэггүй бөгөөд `workersSupported()`
-   * шалгалт үүнийг урьдчилж мэдэж ЧАДАХГҮЙ.
-   */
-  const batch = read('src/lib/photoBatch.ts');
-
-  assert.ok(batch.includes('worker.onerror'), 'worker-ийн алдааг барихгүй байна');
-  assert.match(batch, /waiting\.reject\(/, 'хүлээгдэж буй хүсэлт шийдэгдэхгүй үлдэнэ');
-
-  // Алдаа гарвал үндсэн урсгал руу буцах ёстой — багц бүхэлдээ унах ёсгүй.
-  assert.ok(batch.includes('class PoolFailure'), 'сангийн алдааг ялгаагүй');
-  assert.match(batch, /instanceof PoolFailure/, 'нөөц зам руу шилжихгүй');
-  assert.match(batch, /response = await direct\(\)/, 'үндсэн урсгалын нөөц зам алга');
-});
 
 test('CSS нь үндсэн оролтод холбогдсон', () => {
   /*

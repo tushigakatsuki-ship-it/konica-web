@@ -17,15 +17,20 @@
       ]
     },
     {
-      "source": "/tseej-zurag/avtomat",
-      "headers": [{ "key": "x-robots-tag", "value": "noindex, nofollow" }]
-    },
-    {
       "source": "/(.*)",
       "headers": [
-        { "key": "x-content-type-options", "value": "nosniff" },
-        { "key": "referrer-policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "x-frame-options", "value": "SAMEORIGIN" },
+        {
+          "key": "x-content-type-options",
+          "value": "nosniff"
+        },
+        {
+          "key": "referrer-policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "x-frame-options",
+          "value": "SAMEORIGIN"
+        },
         {
           "key": "permissions-policy",
           "value": "geolocation=(), microphone=(), interest-cohort=()"

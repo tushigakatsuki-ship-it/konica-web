@@ -151,16 +151,52 @@ type Session = {
 let sessionPromise: Promise<Session | null> | null = null;
 
 /**
+ * Загварын файл ҮНЭХЭЭР байгаа эсэх.
+ *
+ * ⚠️ Өмнө нь энэ нь `fetch(MODEL_URL, {method:'HEAD'})` байсан бөгөөд
+ * `head.ok`-ийг шалгадаг байв. Тэр нь SPA дээр ХЭЗЭЭ Ч ажиллахгүй:
+ * `vercel.json` дотор `"source": "/((?!api/).*)"` гэсэн rewrite байгаа тул
+ * `/models/u2netp.onnx` хүсэлт `index.html`-ийг **200 статустай** буцаадаг.
+ * Улмаар `head.ok` үргэлж үнэн болж, `onnxruntime-web` татагдаж —
+ * **25.6 MB WASM + 0.4 MB JS** — дараа нь HTML дээр задарч чадалгүй
+ * чимээгүйхэн унана. Загвар суулгаагүй байхад ч хэрэглэгч бүр энэ 26 MB-ыг
+ * дэмий татдаг байв.
+ *
+ * Одоо эхний 4 байтыг татаж, ONNX-ийн (protobuf) гарын үсгийг шалгана.
+ * `index.html` нь `<` (0x3C) тэмдэгтээр эхэлдэг тул шууд илэрнэ.
+ */
+async function modelFilePresent(): Promise<boolean> {
+  try {
+    const probe = await fetch(MODEL_URL, { headers: { range: 'bytes=0-3' } });
+    if (!probe.ok) return false;
+
+    // HTML буцаасан бол энэ нь rewrite — загвар алга.
+    const type = probe.headers.get('content-type') ?? '';
+    if (type.includes('text/html')) return false;
+
+    const head = new Uint8Array(await probe.arrayBuffer());
+    if (head.length === 0) return false;
+
+    /*
+     * ONNX нь protobuf. Эхний байт нь талбарын шошго — бодит u2netp файл
+     * `0x08` (ir_version) эсвэл `0x12`-ээр эхэлдэг. Хамгийн гол нь `<`
+     * (HTML) болон `{` (JSON алдааны хариу) БИШ гэдгийг батлах явдал.
+     */
+    return head[0] !== 0x3c && head[0] !== 0x7b;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Загварыг НЭГ УДАА ачаална.
  *
- * Эхлээд файл байгаа эсэхийг шалгана. Байхгүй бол `onnxruntime-web`-ийг
- * ОГТ татахгүй — динамик import хүртэл хүрэхгүй. Ингэснээр загвар
- * суулгаагүй дэлгүүрт нэмэлт байт очихгүй.
+ * Файл байхгүй бол `onnxruntime-web`-ийг ОГТ татахгүй — динамик import хүртэл
+ * хүрэхгүй. Ингэснээр загвар суулгаагүй дэлгүүрт нэмэлт байт очихгүй.
  */
 async function loadSession(): Promise<Session | null> {
   try {
-    const head = await fetch(MODEL_URL, { method: 'HEAD' });
-    if (!head.ok) return null;
+    if (!(await modelFilePresent())) return null;
 
     const ort = await import('onnxruntime-web');
     const session = await ort.InferenceSession.create(MODEL_URL, {
