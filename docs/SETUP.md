@@ -172,7 +172,32 @@ openssl rand -hex 32
 | Нэр | Юунд | Хаанаас |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Төлбөр орох бүрд утсанд мэдэгдэнэ | Telegram дээр `@BotFather` |
-| `TELEGRAM_CHAT_ID` | Хаашаа мэдэгдэх | `@userinfobot` |
+| `TELEGRAM_CHAT_ID` | Хаашаа мэдэгдэх | доор үзнэ үү |
+| `TELEGRAM_WEBHOOK_SECRET` | Мэдэгдэл дээрх «Төлсөн» товчийг ажиллуулна | `openssl rand -hex 24` |
+
+**Chat ID-г яаж олох вэ:** ботдоо `/start` бичээд браузераар нээ —
+`https://api.telegram.org/bot<ТОКЕН>/getUpdates` → хариунаас `chat.id`.
+Хувийн чат бол эерэг тоо, групп бол **сөрөг** (`-100…`) — хасах тэмдгийг нь
+хамт хуулна.
+
+**«✅ Төлбөр орсон» товч.** `TELEGRAM_WEBHOOK_SECRET` тавьж redeploy хийсний
+дараа webhook-оо НЭГ УДАА бүртгүүлнэ:
+
+```bash
+curl "https://api.telegram.org/bot<ТОКЕН>/setWebhook" \
+  -H "content-type: application/json" \
+  -d '{
+    "url": "https://konica-web.vercel.app/api/telegram",
+    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>",
+    "allowed_updates": ["callback_query"]
+  }'
+```
+
+Түүнээс хойш шинэ захиалгын мэдэгдэл доор товч гарна. Ажилтан банкны аппаасаа
+мөнгө орсныг хараад дарахад төлбөр тэмдэглэгдэж, зураг нээгдэж, NAS татна.
+
+> ⚠️ Webhook тавьсны дараа `getUpdates` ажиллахаа болино. Chat ID-гаа урьдчилж
+> аваад байх хэрэгтэй. Буцаах бол: `.../deleteWebhook`.
 
 Үүнгүй бол ажилтан `/admin` хуудсыг гараар сэргээж хараад суух хэрэгтэй болно.
 

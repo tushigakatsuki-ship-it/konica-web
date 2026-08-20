@@ -12,6 +12,7 @@ import {
   type ManifestFile,
 } from './_files';
 import { getStore } from './_store';
+import { payCallback } from './_callback';
 import { pendingPayment, readBankInstructions } from './_payment';
 import { createInvoice, readQPayConfig, type QPayInvoice } from './_qpay';
 import { notify } from './_notify';
@@ -354,7 +355,28 @@ export default async function handler(request: Request): Promise<Response> {
         ? `\n🖼 ${photoCount} зураг — ⏳ төлбөр хүлээгдэж байна`
         : `\n⚠️ ${photoCount} зураг ирсэн ч сан руу орсонгүй — утсаар холбогдоно уу`;
 
-  await notify(alertText(built, name, phone) + photoLine);
+  /*
+   * ── «✅ Төлбөр орсон» товч ────────────────────────────────────────
+   *
+   * Зөвхөн manifest бичигдсэн үед (`photos === 'saved'`). Учир нь төлбөрийн
+   * төлөв нь ЯГ ТЭР manifest дотор амьдардаг — зураггүй захиалгад тэмдэглэх
+   * газар байхгүй, товч нь юу ч хийж чадахгүй.
+   *
+   * Ажилтан банкны аппаасаа мөнгө орсныг хараад Telegram дээрээ л нэг товшино.
+   * Урьд нь энэ алхам зөвхөн `curl`-ээр л боломжтой байсан тул практикт
+   * хийгддэггүй байв.
+   */
+  const buttons =
+    photos === 'saved'
+      ? [
+          {
+            text: '✅ Төлбөр орсон',
+            data: payCallback(uploadDate, built.orderNumber, uploadId),
+          },
+        ]
+      : [];
+
+  await notify(alertText(built, name, phone) + photoLine, buttons);
 
   const body = {
     orderNumber: built.orderNumber,

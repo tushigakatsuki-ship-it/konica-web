@@ -41,6 +41,8 @@ const configure = (extra: Record<string, string> = {}): void => {
   process.env.S3_ENDPOINT = endpoint();
   process.env.R2_BUCKET = 'printmn-photos';
   process.env.RTDB_AUTH = 'firebase-database-secret';
+  // Группийн id нь СӨРӨГ тоо — бодит хэлбэрийг нь дуурайна.
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
   Object.assign(process.env, SECRETS, extra);
 };
 
@@ -190,6 +192,66 @@ test('гүн шалгалт нь R2 руу ҮНЭХЭЭР холбогдоно',
   assert.match(body.checks.storage.detail, /printmn-photos/);
 
   storageStatus = 200;
+});
+
+test('?ping=1 нь Telegram руу ЖИНХЭНЭ мессеж илгээж, алдааг хэлнэ', async () => {
+  /*
+   * ⚠️ Энэ нь бодит гомдлоос төрсөн: `/api/health` нь `notify.ready: true` гэж
+   * хэлж байхад мэдэгдэл ирдэггүй байв. Учир нь `ready` гэдэг нь зөвхөн «хоёр
+   * хувьсагч бөглөгдсөн» гэсэн үг — токен буруу, chat id буруу, бот группэд
+   * байхгүй гурвуулаа ижилхэн `true` харагдана.
+   *
+   * Дээр нь `notify()` нь Telegram-ийн `response.ok`-ийг ОГТ шалгадаггүй
+   * байсан тул `400 chat not found` ирсэн ч чимээгүй өнгөрдөг байв.
+   */
+  configure();
+
+  // Telegram руу явах хүсэлтийг барьж авна.
+  const real = globalThis.fetch;
+  let sentTo = '';
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes('api.telegram.org')) {
+      sentTo = target;
+      return new Response(
+        JSON.stringify({ ok: false, description: 'Bad Request: chat not found' }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    return real(input as RequestInfo, init);
+  }) as typeof fetch;
+
+  try {
+    const body = await (await call('?ping=1', SECRETS.ADMIN_TOKEN)).json();
+
+    assert.ok(sentTo.includes('/sendMessage'), 'мессеж илгээгээгүй');
+    assert.equal(body.checks.notify.ready, false, 'алдааг амжилт гэж бодож байна');
+    assert.match(body.checks.notify.detail, /chat not found/, 'Telegram-ийн шалтгаан алга');
+    assert.match(body.checks.notify.detail, /СӨРӨГ/, 'юу засахыг хэлээгүй');
+
+    // Токен хариунд ОРОХГҮЙ — хаягт байсан ч.
+    assert.ok(!JSON.stringify(body).includes(SECRETS.TELEGRAM_BOT_TOKEN));
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('?ping=1 нь токенгүйгээр мессеж илгээхгүй', async () => {
+  /* Эс тэгвээс хэн ч дуудаж, танай чат руу спам явуулна. */
+  configure();
+  const real = globalThis.fetch;
+  let touched = false;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('api.telegram.org')) touched = true;
+    return real(input as RequestInfo, init);
+  }) as typeof fetch;
+
+  try {
+    assert.equal((await call('?ping=1')).status, 401);
+    assert.equal(touched, false, 'токенгүйгээр Telegram руу хүрчихлээ');
+  } finally {
+    globalThis.fetch = real;
+  }
 });
 
 test('POST хүлээж авахгүй', async () => {

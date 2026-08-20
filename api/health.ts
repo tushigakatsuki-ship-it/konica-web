@@ -1,3 +1,4 @@
+import { notify } from './_notify';
 import { readR2Config, signRequest } from './_r2';
 
 /**
@@ -11,6 +12,7 @@ import { readR2Config, signRequest } from './_r2';
  *
  *   GET /api/health           → зөвхөн «хувьсагч бөглөгдсөн үү» (нууц үггүй)
  *   GET /api/health?deep=1    → R2 руу ҮНЭХЭЭР холбогдож үзнэ (x-admin-token хэрэгтэй)
+ *   GET /api/health?ping=1    → Telegram руу ТУРШИЛТЫН мессеж илгээнэ (мөн токентой)
  *
  * ⚠️ Нууц утгыг ХЭЗЭЭ Ч буцаахгүй — зөвхөн `true/false`. Урт, эхний тэмдэгт
  * гэх мэт «хэсэгчилсэн» мэдээлэл ч өгөхгүй: тэр нь токен таах ажлыг хөнгөвчилдөг.
@@ -184,7 +186,13 @@ export default async function handler(request: Request): Promise<Response> {
     /** Telegram — заавал биш, гэхдээ байхгүй бол ажилтан төлбөр орсныг мэдэхгүй. */
     notify:
       filled(env, ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']).length === 2
-        ? { ready: true, detail: 'Төлбөр орох бүрд Telegram-аар мэдэгдэнэ.' }
+        ? {
+            ready: true,
+            detail: (env.TELEGRAM_WEBHOOK_SECRET ?? '').trim()
+              ? 'Telegram мэдэгдэл + «✅ Төлбөр орсон» товч идэвхтэй.'
+              : 'Telegram мэдэгдэл ажиллана. TELEGRAM_WEBHOOK_SECRET нэмбэл ' +
+                'мэдэгдэл дээрээс шууд «Төлсөн» гэж тэмдэглэх товч гарна.',
+          }
         : {
             ready: false,
             detail:
@@ -198,14 +206,38 @@ export default async function handler(request: Request): Promise<Response> {
    * Токен шаардах шалтгаан: энэ нь бүртгэлтэй Class A үйлдэл зарцуулдаг тул
    * нээлттэй орхивол хэн ч дуудаж, тооцоог чинь өсгөж чадна.
    */
-  if (url.searchParams.get('deep')) {
+  const deep = url.searchParams.get('deep');
+  const ping = url.searchParams.get('ping');
+
+  if (deep || ping) {
     const given = request.headers.get('x-admin-token') ?? '';
     if (!adminToken || !sameToken(given, adminToken))
       return json(
         { error: 'Гүн шалгалтад x-admin-token шаардлагатай.', checks },
         adminToken ? 401 : 503,
       );
-    checks.storage = r2 ? await probeStorage(r2) : checks.storage;
+
+    if (deep) checks.storage = r2 ? await probeStorage(r2) : checks.storage;
+
+    /*
+     * ── Telegram-ыг ҮНЭХЭЭР шалгах ────────────────────────────────
+     *
+     * `notify` мөр `ready: true` гэдэг нь зөвхөн «хоёр хувьсагч бөглөгдсөн»
+     * гэсэн үг. Токен буруу, chat id буруу, бот группэд байхгүй — гурвуулаа
+     * `ready: true` харагдаад мэдэгдэл нь ирдэггүй. Дэлгүүрийн эзэн жинхэнэ
+     * захиалга үүсгэхээс өөр шалгах арга байхгүй байсан.
+     *
+     * Энэ горим туршилтын мессеж илгээж, Telegram-ийн хариуг шууд хэлнэ.
+     */
+    if (ping) {
+      const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      const result = await notify(
+        `🔧 <b>Туршилт</b>\nPrintmn вэбийн мэдэгдэл ажиллаж байна.\n${stamp} UTC`,
+      );
+      checks.notify = result.ok
+        ? { ready: true, detail: 'Туршилтын мессеж илгээгдлээ — чатаа шалгана уу.' }
+        : { ready: false, detail: result.error ?? 'Тодорхойгүй алдаа.' };
+    }
   }
 
   /**
