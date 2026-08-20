@@ -246,7 +246,13 @@ export default async function handler(request: Request): Promise<Response> {
 
   const customer = (
     payload as {
-      customer: { name: string; phone: string; email?: string; note?: string };
+      customer: {
+        name: string;
+        phone: string;
+        email?: string;
+        note?: string;
+        address?: string;
+      };
     }
   ).customer;
   const name = customer.name.trim();
@@ -323,6 +329,12 @@ export default async function handler(request: Request): Promise<Response> {
         customer: {
           name,
           phone,
+          /*
+           * Хүргэлтийн хаяг manifest-д ордог нь NAS-ын ЗАХИАЛГА.txt дээр
+           * гарахын тулд. Ажилтан хэвлээд савлахдаа хаягийг тэндээс шууд
+           * хараад бичнэ — апп нээх шаардлагагүй.
+           */
+          address: built.address,
           email: (customer.email ?? '').trim(),
           note: (customer.note ?? '').trim(),
         },

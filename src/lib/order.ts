@@ -59,6 +59,15 @@ export interface CustomerInfo {
   phone: string;
   email: string;
   note: string;
+  /**
+   * Хүргэлтийн хаяг. ЗӨВХӨН хүргэлт сонгосон үед шаардлагатай.
+   *
+   * Тайлбараас (`note`) тусад нь байх шалтгаан: аппын `WorkLog` дээр
+   * `delivery` гэсэн тусдаа талбар аль хэдийн байдаг бөгөөд хүргэгч түүнийг
+   * л хардаг. Хаягийг тайлбар дотор булшилбал ажилтан 1000 тэмдэгтийн
+   * дундаас хайх хэрэгтэй болно.
+   */
+  address: string;
 }
 
 export type FieldErrors = Partial<Record<keyof CustomerInfo | 'lines', string>>;

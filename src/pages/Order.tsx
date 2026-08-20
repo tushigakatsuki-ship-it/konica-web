@@ -32,14 +32,28 @@ import {
   IconImage,
 } from '../components/icons';
 
-const EMPTY_CUSTOMER: CustomerInfo = { name: '', phone: '', email: '', note: '' };
+const EMPTY_CUSTOMER: CustomerInfo = {
+  name: '',
+  phone: '',
+  email: '',
+  note: '',
+  address: '',
+};
 
 const validate = (
   customer: CustomerInfo,
   lines: readonly OrderLine[],
+  delivery: boolean,
 ): FieldErrors => {
   const errors: FieldErrors = {};
   if (!customer.name.trim()) errors.name = 'Нэрээ оруулна уу.';
+  /*
+   * Хүргэлт сонгосон атал хаяггүй захиалга нь ажилтныг заавал утсаар
+   * холбогдоход хүргэнэ. Хэрэглэгч ихэвчлэн ажлын бус цагт захиалдаг тул
+   * тэр дуудлага маргааш болж, хүргэлт нэг өдрөөр хойшилно.
+   */
+  if (delivery && !customer.address.trim())
+    errors.address = 'Хүргэх хаягаа бичнэ үү.';
   if (!customer.phone.trim()) errors.phone = 'Утасны дугаараа оруулна уу.';
   else if (!isValidPhone(customer.phone))
     errors.phone = '8 оронтой дугаар оруулна уу (жишээ: 99001234).';
@@ -116,7 +130,7 @@ export default function Order() {
     event.preventDefault();
     if (sending) return; // давхар дарахаас — сервер талд бас хамгаалалттай
 
-    const found = validate(customer, lines);
+    const found = validate(customer, lines, delivery);
 
     /*
      * Сүүлчийн хамгаалалт: зураггүй мөр сагсанд орох ёсгүй (`PhotoEditor` үүнийг
@@ -390,6 +404,41 @@ export default function Order() {
                 />
                 Хүргэлттэй (+{formatCurrency(DELIVERY_FEE)})
               </label>
+
+              {/*
+                * Хаягийн талбар нь ЗӨВХӨН хүргэлт сонгосон үед гарна.
+                *
+                * Үргэлж харуулбал салбар дээр очиж авах хүн ч бөглөх ёстой мэт
+                * санагдаж, хагас дутуу хаяг бүхий захиалга ирнэ. Нуувал бас
+                * болохгүй — хүргэлт сонгосон хүн хаягаа хаана бичихээ мэдэхгүй.
+                */}
+              {delivery && (
+                <div className="mt-3">
+                  <label className="label" htmlFor="address">
+                    Хүргэх хаяг <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    id="address"
+                    rows={3}
+                    value={customer.address}
+                    onChange={(e) => setField('address', e.target.value)}
+                    className="field resize-y"
+                    placeholder="Дүүрэг, хороо, байр, орц, давхар, тоот — жишээ: ХУД 11-р хороо, 120 мянгат, 45-р байр, 2 орц, 4 давхар, 42 тоот"
+                    aria-invalid={errors.address ? true : undefined}
+                    aria-describedby={errors.address ? 'address-error' : undefined}
+                  />
+                  {errors.address ? (
+                    <p id="address-error" role="alert" className="mt-1 text-xs text-danger">
+                      {errors.address}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted">
+                      Орц, давхар, тоотоо бичвэл хүргэгч утсаар дахин
+                      холбогдохгүй.
+                    </p>
+                  )}
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"

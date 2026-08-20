@@ -878,7 +878,19 @@ test('onnxruntime-web хамаарал бүрмөсөн салсан', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.ok(!pkg.dependencies['onnxruntime-web'], 'хамаарал буцаж орсон');
   assert.ok(!pkg.devDependencies?.['onnxruntime-web'], 'devDependencies-д орсон');
-  assert.ok(!existsSync(path.join(root, 'public/models')), 'загварын хавтас үлдсэн');
+
+  /*
+   * ⚠️ Энэ эхлээд `!existsSync('public/models')` байсан нь ХЭТ ХАТУУ байв:
+   * git хоосон хавтас хянадаггүй тул файлаа устгасны дараа хоосон `models/`
+   * хавтас дискэн дээр үлдэж, `git status` цэвэр атал тест уначихдаг байсан.
+   * Хоосон хавтас нь өөрөө хор хөнөөлгүй — жинхэнэ шалгах зүйл нь ЗАГВАРЫН
+   * ФАЙЛ багцад орсон эсэх (25MB+ нэмэгдэнэ).
+   */
+  const models = path.join(root, 'public/models');
+  const shipped = existsSync(models)
+    ? readdirSync(models).filter((name) => !name.startsWith('.'))
+    : [];
+  assert.deepEqual(shipped, [], `public/models дотор файл үлдсэн: ${shipped.join(', ')}`);
 });
 
 test('цээж зураг хоёр замтай — онлайн ба салбар', () => {

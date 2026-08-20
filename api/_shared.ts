@@ -19,7 +19,14 @@ export interface IncomingLine {
 }
 
 export interface IncomingOrder {
-  customer: { name: string; phone: string; email?: string; note?: string };
+  customer: {
+    name: string;
+    phone: string;
+    email?: string;
+    note?: string;
+    /** Хүргэлтийн хаяг — `delivery: true` үед заавал. */
+    address?: string;
+  };
   lines: IncomingLine[];
   delivery: boolean;
   vat: boolean;
@@ -92,6 +99,8 @@ export interface BuiltOrder {
   lines: PricedLine[];
   base: number;
   deliveryFee: number;
+  /** Хүргэлтийн хаяг — хүргэлтгүй бол хоосон. */
+  address: string;
   tax: number;
   total: number;
   /** Firebase зангилаа → бичих бичлэгүүд. */
@@ -187,11 +196,25 @@ export function buildOrder(
   const phone = clean(customerInput.phone, 20);
   const email = clean(customerInput.email, 120);
   const note = clean(customerInput.note, 1000);
+  const address = clean(customerInput.address, 300);
 
   if (!name) throw new ValidationError('Нэр хоосон байна.');
   if (!isValidPhone(phone)) throw new ValidationError('Утасны дугаар буруу байна.');
   if (email && !/^\S+@\S+\.\S+$/.test(email))
     throw new ValidationError('И-мэйл хаяг буруу байна.');
+
+  /*
+   * Хүргэлт сонгосон бол хаяг ЗААВАЛ.
+   *
+   * ⚠️ Энэ шалгалт интерфейст ч байгаа. Давхардуулсан нь санамсаргүй биш:
+   * `delivery` нь ҮНЭД нөлөөлдөг (+5,000₮) тул хэн ч DevTools нээгээд
+   * хүргэлттэй захиалгыг хаяггүй илгээж чадвал ажилтан төлбөр авчихаад
+   * хаана хүргэхээ мэдэхгүй үлдэнэ. Үнэд нөлөөлдөг талбарын шалгалт
+   * серверт байх ёстой.
+   */
+  const delivery = body.delivery === true;
+  if (delivery && !address)
+    throw new ValidationError('Хүргэлт сонгосон бол хаягаа бичнэ үү.');
 
   if (!Array.isArray(body.lines) || body.lines.length === 0)
     throw new ValidationError('Дор хаяж нэг үйлчилгээ сонгоно уу.');
@@ -220,7 +243,6 @@ export function buildOrder(
     return { id: service.id, name: service.name, unitPrice, qty, total: unitPrice * qty };
   });
 
-  const delivery = body.delivery === true;
   const vat = body.vat === true;
 
   const base = priced.reduce((sum, line) => sum + line.total, 0);
@@ -267,7 +289,15 @@ export function buildOrder(
       receivedTime: time,
       deadline: '',
       phone,
-      delivery: '',
+      /*
+       * Аппын `WorkLog.delivery` нь хүргэлтийн дэлгэрэнгүйд зориулсан чөлөөт
+       * талбар (`WorkLogForm.tsx` дэх «8. Хүргэлт & тайлбар»). Хаягийг ЭНД
+       * тавьснаар ажилтан аппаасаа шууд харна — тайлбар дотор хайх хэрэггүй.
+       *
+       * Зөвхөн ЭХНИЙ мөрөнд: `isDelivery` ч мөн адил, эс тэгвээс олон мөртэй
+       * захиалгад хаяг давхардаж, тайланд хүргэлт олон удаа тоологдоно.
+       */
+      delivery: delivery && index === 0 ? address : '',
       note: contactNote,
       status: '',
       color: '#ffffff',
@@ -290,7 +320,17 @@ export function buildOrder(
     };
   });
 
-  return { orderNumber, lines: priced, base, deliveryFee, tax, total, orders, worklogs };
+  return {
+    orderNumber,
+    lines: priced,
+    base,
+    deliveryFee,
+    tax,
+    total,
+    address: delivery ? address : '',
+    orders,
+    worklogs,
+  };
 }
 
 /**
@@ -322,6 +362,11 @@ export const alertText = (built: BuiltOrder, name: string, phone: string): strin
     `💰 Нийт: ${built.total.toLocaleString('en-US')}₮` +
     `${built.tax > 0 ? ' (НӨАТ-тай)' : ''}` +
     `${built.deliveryFee > 0 ? ' · хүргэлттэй' : ''}\n` +
-    `👤 ${name}\n📞 ${phone}`
+    `👤 ${name}\n📞 ${phone}` +
+    /*
+     * Хаягийг мэдэгдэлд оруулах нь чухал: ажилтан Telegram-аас шууд хараад
+     * хүргэгчид дамжуулна. Апп нээх, хайх алхам хасагдана.
+     */
+    (built.address ? `\n📍 ${built.address}` : '')
   );
 };

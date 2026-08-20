@@ -23,7 +23,12 @@ export interface SaveOrderInput {
   uploadId: string;
   date: string;
   createdAt: number;
-  customer: { name: string; phone: string; email: string; note: string };
+  /*
+   * `WebOrderManifest['customer']`-аас нэрлэн авна — хоёр газар тусад нь
+   * тодорхойлбол нэгд нь талбар нэмээд нөгөөг нь мартах нь цаг хугацааны
+   * асуудал (хүргэлтийн хаяг нэмэхэд яг тэр болсон).
+   */
+  customer: WebOrderManifest['customer'];
   total: number;
   lines: { name: string; qty: number; total: number }[];
   files: ManifestFile[];

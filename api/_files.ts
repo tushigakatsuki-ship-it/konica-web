@@ -132,7 +132,14 @@ export interface WebOrderManifest {
   uploadId: string;
   date: string;
   createdAt: number;
-  customer: { name: string; phone: string; email: string; note: string };
+  customer: {
+    name: string;
+    phone: string;
+    email: string;
+    note: string;
+    /** Хүргэлтийн хаяг — NAS дээрх ЗАХИАЛГА.txt дээр гарна. Хүргэлтгүй бол хоосон. */
+    address?: string;
+  };
   total: number;
   lines: { name: string; qty: number; total: number }[];
   files: ManifestFile[];

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   MAX_LINES,
   ValidationError,
+  alertText,
   buildOrder,
   numberWorkLogs,
   type IncomingOrder,
@@ -17,7 +18,13 @@ import {
  */
 const NOW = new Date('2026-08-06T06:05:00Z');
 
-const customer = { name: 'Батболд', phone: '99001234', email: '', note: '' };
+const customer = {
+  name: 'Батболд',
+  phone: '99001234',
+  email: '',
+  note: '',
+  address: 'ХУД 11-р хороо, 120 мянгат, 45-р байр, 2 орц, 42 тоот',
+};
 
 /** 103 = 'Зураг угаалт 10*15' → 500₮ (тогтмол үнэтэй) */
 const ORDINARY = 103;
@@ -45,6 +52,71 @@ test('НӨАТ ба хүргэлт зөв нэмэгдэнэ', () => {
   assert.equal(built.deliveryFee, 5000);
   assert.equal(built.tax, 600); // (1000 + 5000) × 10%
   assert.equal(built.total, 6600);
+});
+
+test('хүргэлт сонгосон атал хаяггүй бол ТАТГАЛЗАНА', () => {
+  /*
+   * ⚠️ Энэ шалгалт интерфейст ч байгаа. Давхардуулсан нь санамсаргүй биш:
+   * `delivery` нь ҮНЭД нөлөөлдөг (+5,000₮) тул DevTools нээсэн хэн ч
+   * хүргэлттэй захиалгыг хаяггүй илгээж чадвал ажилтан төлбөр авчихаад
+   * хаана хүргэхээ мэдэхгүй үлдэнэ.
+   */
+  assert.throws(
+    () => buildOrder(order({ delivery: true, customer: { ...customer, address: '' } }), NOW, 0.5),
+    /хаягаа бичнэ/,
+  );
+  assert.throws(
+    () => buildOrder(order({ delivery: true, customer: { ...customer, address: '   ' } }), NOW, 0.5),
+    /хаягаа бичнэ/,
+    'зөвхөн зайнаас бүрдсэн хаягийг зөвшөөрч байна',
+  );
+});
+
+test('хүргэлтгүй бол хаяг шаардахгүй', () => {
+  const built = buildOrder(
+    order({ delivery: false, customer: { ...customer, address: '' } }),
+    NOW,
+    0.5,
+  );
+  assert.equal(built.address, '', 'хүргэлтгүй захиалгад хаяг үлдсэн байна');
+});
+
+test('хаяг нь ЭХНИЙ worklog-ийн delivery талбарт очно', () => {
+  /*
+   * Аппын `WorkLog.delivery` нь хүргэлтийн дэлгэрэнгүйд зориулсан чөлөөт
+   * талбар. Хаягийг тэнд тавьснаар ажилтан аппаасаа шууд харна — 1000
+   * тэмдэгтийн тайлбар дундаас хайх шаардлагагүй.
+   */
+  const built = buildOrder(
+    order({ delivery: true, lines: [{ id: ORDINARY, qty: 1 }, { id: 104, qty: 1 }] }),
+    NOW,
+    0.5,
+  );
+  const logs = Object.values(built.worklogs);
+
+  assert.equal(logs[0]?.delivery, customer.address);
+  assert.equal(logs[1]?.delivery, '', 'хаяг давхардвал тайланд хоёр удаа тоологдоно');
+  assert.equal(built.address, customer.address);
+});
+
+test('хаяг Telegram мэдэгдэлд гарна', () => {
+  const built = buildOrder(order({ delivery: true }), NOW, 0.5);
+  const text = alertText(built, customer.name, customer.phone);
+
+  assert.match(text, /📍/, 'хаягийн тэмдэг алга');
+  assert.ok(text.includes(customer.address), 'хаяг мэдэгдэлд ороогүй');
+
+  // Хүргэлтгүй захиалгад хаягийн мөр гарах ёсгүй.
+  assert.ok(!alertText(buildOrder(order(), NOW, 0.5), 'А', '99001234').includes('📍'));
+});
+
+test('хэт урт хаягийг таслана', () => {
+  const built = buildOrder(
+    order({ delivery: true, customer: { ...customer, address: 'у'.repeat(500) } }),
+    NOW,
+    0.5,
+  );
+  assert.equal(built.address.length, 300, 'хязгаар тавиагүй');
 });
 
 test('клиентийн явуулсан үнийг тогтмол үнэтэй мөрөнд ҮЛ ТООМСОРЛОНО', () => {

@@ -35,6 +35,7 @@ import os
 import re
 import shutil
 import sys
+import textwrap
 import tempfile
 import time
 import unicodedata
@@ -265,6 +266,17 @@ def order_slip(order: dict) -> str:
         f"  {'НИЙТ':<28} {'':<5} {order.get('total', 0):>10,}₮",
         "",
     ]
+
+    # Хүргэлтийн хаяг — байвал тэмдэглэлээс ӨМНӨ, тод харагдахаар.
+    #
+    # Ажилтан хэвлээд савлахдаа энэ хуудсыг гартаа барьж байдаг. Хаяг нь
+    # тэмдэглэлийн дунд булшлагдвал хараагүй өнгөрөх магадлалтай — тиймээс
+    # тусдаа, дээгүүр нь тавина.
+    address = (customer.get("address") or "").strip()
+    if address:
+        lines += ["  ── 🚚 ХҮРГЭЛТИЙН ХАЯГ ────────────────────"]
+        lines += [f"  {row}" for row in textwrap.wrap(address, 42)]
+        lines += [""]
 
     note = (customer.get("note") or "").strip()
     if note:
