@@ -1,3 +1,4 @@
+import { printButton } from './_callback';
 import { isDateStamp, isOrderNumber, isUploadId } from './_files';
 import { getStore } from './_store';
 import { isPaid } from './_payment';
@@ -80,6 +81,8 @@ export default async function handler(request: Request): Promise<Response> {
       phone: order.customer.phone,
       method: 'qpay',
     }),
+    // Дараагийн алхам нь хэвлэх — товчийг тэр дороо санал болгоно.
+    printButton(order),
   );
 
   return ok({ status: 'paid' });

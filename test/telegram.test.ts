@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { payCallback, refFromCallback } from '../api/_callback';
+import { payCallback, printCallback, refFromCallback } from '../api/_callback';
 
 /**
  * `/api/telegram` — мэдэгдэл дээрх «✅ Төлбөр орсон» товч.
@@ -261,11 +261,75 @@ test('callback_data нь Telegram-ийн 64 БАЙТЫН хязгаарт баг
 });
 
 test('угсрах ба задлах нь хосолно', () => {
-  assert.equal(refFromCallback(payCallback(TODAY, ORDER, UPLOAD)), REF);
+  assert.deepEqual(refFromCallback(payCallback(TODAY, ORDER, UPLOAD)), {
+    action: 'pay',
+    ref: REF,
+  });
+  assert.deepEqual(refFromCallback(printCallback(TODAY, ORDER, UPLOAD)), {
+    action: 'print',
+    ref: REF,
+  });
+
   assert.equal(refFromCallback('pay:a:b:c'), null);
   assert.equal(refFromCallback('pay:'), null);
   assert.equal(refFromCallback('other:x:y:z'), null);
 
   // Хэсэг илүү орвол ч татгалзана — тасалж авбал зам гажина.
   assert.equal(refFromCallback(`pay:${TODAY}:${ORDER}:${UPLOAD}:extra`), null);
+});
+
+// ── «🖨 Хэвлэж дууслаа» ────────────────────────────────────────────
+
+test('хэвлэсэн товч printedAt тавьж, захиалагчийн мөшгөгчийг гүйцээнэ', async () => {
+  /*
+   * `/zakhialga/<дугаар>` хуудсанд «Хүлээн авсан → Төлбөр → Хэвлэсэн» гэсэн
+   * мөшгөгч байдаг. Гурав дахь алхам нь ЗӨВХӨН `printedAt`-аас хамаарна —
+   * урьд нь тэрийг `curl`-ээр л тавьж болдог тул практикт хэзээ ч тавигддаггүй,
+   * мөшгөгч мөнхөд хоёр алхам дээр зогсдог байв.
+   */
+  seed(true);
+  await press(printCallback(TODAY, ORDER, UPLOAD));
+
+  const after = stored();
+  assert.ok(after.printedAt > 0, 'printedAt тавигдаагүй');
+  assert.equal(after.payment.status, 'paid', 'төлбөрийн төлөв хөндөгдсөн');
+
+  const edit = telegramCalls.find((call) => call.method === 'editMessageText');
+  assert.match(String(edit?.body.text), /🖨 <b>Хэвлэсэн<\/b> — Батаа/);
+});
+
+test('хоёр дахь «хэвлэсэн» товшилт цагийг ДАРЖ БИЧИХГҮЙ', async () => {
+  seed(true);
+  await press(printCallback(TODAY, ORDER, UPLOAD));
+  const first = stored().printedAt;
+
+  telegramCalls = [];
+  await press(printCallback(TODAY, ORDER, UPLOAD));
+
+  assert.equal(stored().printedAt, first, 'хэвлэсэн цаг дарагдлаа');
+  assert.match(
+    String(telegramCalls.find((c) => c.method === 'answerCallbackQuery')?.body.text),
+    /аль хэдийн хэвлэсэн/i,
+  );
+});
+
+test('төлбөрийн мэдэгдэл дээр ХЭВЛЭХ товч гарна', async () => {
+  seed();
+  await press(payCallback(TODAY, ORDER, UPLOAD));
+
+  const sent = telegramCalls.find((call) => call.method === 'sendMessage');
+  const keyboard = (sent?.body.reply_markup as
+    | { inline_keyboard: { text: string; callback_data: string }[][] }
+    | undefined)?.inline_keyboard;
+
+  assert.ok(keyboard, 'товч огт алга');
+  assert.match(keyboard![0]![0]!.text, /Хэвлэж дууслаа/);
+  assert.ok(keyboard![0]![0]!.callback_data.startsWith('prn:'), 'буруу үйлдэл');
+});
+
+test('хэвлэх товчны өгөгдөл ч 64 байтад багтана', () => {
+  const bytes = new TextEncoder().encode(
+    printCallback('2026-12-31', 'PMN-261231-9999', 'zyxwvutsrqponmlk'),
+  ).length;
+  assert.ok(bytes <= 64, `${bytes} байт`);
 });

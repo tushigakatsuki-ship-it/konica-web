@@ -1,4 +1,4 @@
-import { refFromCallback } from './_callback';
+import { printButton, refFromCallback } from './_callback';
 import { answerCallback, editMessage, notify, paidText } from './_notify';
 import { isPaid, type PaymentInfo } from './_payment';
 import { getStore } from './_store';
@@ -79,11 +79,12 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   // ── 3. Өгөгдлийн хэлбэр ──
-  const ref = refFromCallback(query.data ?? '');
-  if (!ref) {
+  const parsed = refFromCallback(query.data ?? '');
+  if (!parsed) {
     await answerCallback(query.id, 'Товчны өгөгдөл танигдсангүй.');
     return ok();
   }
+  const { action, ref } = parsed;
 
   const store = getStore();
   if (!store) {
@@ -98,6 +99,38 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const who = query.from?.first_name || query.from?.username || 'ажилтан';
+
+  // ── «🖨 Хэвлэж дууслаа» ──────────────────────────────────────────
+  /*
+   * Захиалагчийн `/zakhialga/<дугаар>` хуудсанд «Хүлээн авсан → Төлбөр →
+   * Хэвлэсэн» гэсэн мөшгөгч аль хэдийн байдаг. Гурав дахь алхам нь `printedAt`
+   * тавигдмагц гэрэлтэнэ — үйлчлүүлэгч утсаа шалгаад бэлэн болсныг мэднэ,
+   * дэлгүүр рүү залгах шаардлагагүй.
+   *
+   * Урьд нь энэ талбарыг зөвхөн `curl`-ээр л тавьж болдог байсан тул практикт
+   * хэзээ ч тавигддаггүй байв — мөшгөгч мөнхөд хоёр алхам дээр зогсоно.
+   */
+  if (action === 'print') {
+    if (order.printedAt) {
+      await answerCallback(query.id, 'Аль хэдийн хэвлэсэн гэж тэмдэглэгдсэн.');
+      return ok();
+    }
+
+    const at = Date.now();
+    if (!(await store.update(ref, { printedAt: at }))) {
+      await answerCallback(query.id, 'Хадгалж чадсангүй. Дахин оролдоно уу.');
+      return ok();
+    }
+
+    await answerCallback(query.id, '🖨 Хэвлэсэн гэж тэмдэглэлээ.');
+    if (query.message)
+      await editMessage(
+        query.message.message_id,
+        `${query.message.text ?? order.orderNumber}\n\n` +
+          `🖨 <b>Хэвлэсэн</b> — ${who}, ${timeIn(at)}`,
+      );
+    return ok();
+  }
 
   /*
    * Аль хэдийн төлөгдсөн бол ДАХИН бичихгүй.
@@ -159,6 +192,7 @@ export default async function handler(request: Request): Promise<Response> {
       phone: order.customer.phone,
       method: 'manual',
     }),
+    printButton(order),
   );
 
   return ok();

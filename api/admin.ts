@@ -1,3 +1,4 @@
+import { printButton } from './_callback';
 import { getStore, type StoredOrder } from './_store';
 import { isPaid, type PaymentInfo } from './_payment';
 import { notify, paidText } from './_notify';
@@ -159,6 +160,7 @@ export default async function handler(request: Request): Promise<Response> {
           phone: updated.customer.phone,
           method: updated.payment?.method ?? 'manual',
         }),
+        printButton(updated),
       );
     }
 
