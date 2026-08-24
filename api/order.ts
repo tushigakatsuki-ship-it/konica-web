@@ -173,8 +173,28 @@ export default async function handler(request: Request): Promise<Response> {
   const uploadId = typeof upload.uploadId === 'string' ? upload.uploadId : '';
   const uploadDate = typeof upload.date === 'string' ? upload.date : '';
 
+  /*
+   * ── Захиалгын дугаарын давхцлаас сэргийлэх ──────────────────────
+   *
+   * `PMN-YYMMDD-NNNN` дахь сүүлийн 4 орон нь санамсаргүй — өдөрт 9000 боломж.
+   * Төрсөн өдрийн парадоксоор өдрийн 50 захиалгад давхцах магадлал 12.7%.
+   * Дугаар нь БАНКНЫ ГҮЙЛГЭЭНИЙ УТГА болдог тул давхцвал хоёр үйлчлүүлэгч
+   * ижил утгаар мөнгө шилжүүлж, аль нь төлснийг ялгах арга байхгүй болно.
+   *
+   * Тиймээс өнөөдөр ашиглагдсан дугааруудыг урьдчилж уншаад тойрно.
+   *
+   * ⚠️ Алдаа гарвал ЗОГСООХГҮЙ. Сан унасан үед захиалга бүхэлдээ унах нь
+   * давхцлын эрсдэлээс хамаагүй дор — хэрэглэгч мөнгөө төлж чадахгүй болно.
+   * Хоосон олонлог = хуучин зан төлөв.
+   */
+  const env = process.env as Record<string, string | undefined>;
+  const store = getStore(env);
+  const takenNumbers = store
+    ? await store.usedOrderNumbers(mongolianToday(now)).catch(() => new Set<string>())
+    : new Set<string>();
+
   try {
-    built = buildOrder(payload, now);
+    built = buildOrder(payload, now, Math.random, takenNumbers);
     if (uploadId || uploadDate) {
       if (!isUploadId(uploadId) || !isDateStamp(uploadDate))
         throw new ValidationError('Байршуулалтын мэдээлэл буруу байна.');
@@ -270,8 +290,6 @@ export default async function handler(request: Request): Promise<Response> {
    * Захиалга АЛЬ ХЭДИЙН хадгалагдсан тул энд алдаа гарлаа ч 201 буцаана —
    * хэрэглэгчийг дахин илгээхэд хүргэвэл орлого давхардана.
    */
-  const env = process.env as Record<string, string | undefined>;
-  const store = getStore(env);
 
   /**
    * Зургийн төлөв гурван утгатай:

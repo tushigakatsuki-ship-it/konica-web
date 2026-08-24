@@ -134,6 +134,23 @@ export class R2Store implements WebOrderStore {
     return putObject(this.config, ref, JSON.stringify(manifest));
   }
 
+  /**
+   * Тухайн өдрийн manifest-уудын нэрнээс захиалгын дугаарыг гаргана.
+   *
+   * ⚠️ Хамрах хүрээ: зурагтай захиалгууд. Зураггүй захиалга manifest
+   * үүсгэдэггүй тул энд харагдахгүй — практикт вэб бол зураг захиалах
+   * газар учир бараг бүх захиалга хамрагдана.
+   */
+  async usedOrderNumbers(date: string): Promise<Set<string>> {
+    const keys = await listKeys(this.config, `manifests/${date}/`, 1000);
+    const numbers = new Set<string>();
+    for (const key of keys) {
+      const parsed = parseManifestKey(key);
+      if (parsed) numbers.add(parsed.orderNumber);
+    }
+    return numbers;
+  }
+
   fileUrl(key: string): Promise<string> {
     return presign(this.config, 'GET', key, GET_EXPIRES_SEC);
   }

@@ -59,6 +59,14 @@ export interface WebOrderStore {
   /** Ажилтны талын хандалт — `ref`-ээр шууд. */
   getByRef(ref: string): Promise<StoredOrder | null>;
 
+  /**
+   * Тухайн өдөр аль хэдийн ашиглагдсан захиалгын дугаарууд.
+   *
+   * Зөвхөн НЭР хэрэгтэй тул объектуудыг уншихгүй — түлхүүрийн жагсаалт
+   * хангалттай. Захиалга үүсгэх бүрт нэг удаа дуудагдана.
+   */
+  usedOrderNumbers(date: string): Promise<Set<string>>;
+
   /** Сүүлийн `days` өдрийн захиалгууд, шинэ нь эхэндээ. */
   list(days: number): Promise<StoredOrder[]>;
 

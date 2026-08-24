@@ -5,6 +5,7 @@ import {
   ValidationError,
   alertText,
   buildOrder,
+  makeOrderNumber,
   numberWorkLogs,
   type IncomingOrder,
 } from '../api/_shared';
@@ -117,6 +118,64 @@ test('хэт урт хаягийг таслана', () => {
     0.5,
   );
   assert.equal(built.address.length, 300, 'хязгаар тавиагүй');
+});
+
+// ── Захиалгын дугаарын давхцал ───────────────────────────────────
+
+test('ашиглагдсан дугаарыг ТОЙРНО', () => {
+  /*
+   * ⚠️ Дугаар нь БАНКНЫ ГҮЙЛГЭЭНИЙ УТГА болдог. Хоёр үйлчлүүлэгч ижил утгаар
+   * мөнгө шилжүүлбэл аль нь төлснийг ялгах арга байхгүй — ажилтан буруу
+   * захиалгын зургийг нээж, зөв нь хүлээсээр үлдэнэ.
+   */
+  const taken = new Set(['PMN-260806-1000', 'PMN-260806-2000']);
+
+  // Эхний хоёр сугалалт «авагдсан», гурав дахь нь чөлөөтэй.
+  const draws = [0, 1 / 9, 0.5];
+  let i = 0;
+  const number = makeOrderNumber(NOW, () => draws[i++] ?? 0.5, taken);
+
+  assert.equal(number, 'PMN-260806-5500');
+  assert.equal(i, 3, 'чөлөөт дугаар олтол оролдоогүй');
+  assert.ok(!taken.has(number));
+});
+
+test('давхцалгүй бол ПЕРВЫЙ сугалалтыг л авна', () => {
+  let calls = 0;
+  makeOrderNumber(NOW, () => { calls += 1; return 0.5; }, new Set());
+  assert.equal(calls, 1, 'дэмий дахин сугалж байна');
+});
+
+test('бүх оролдлого дүүрсэн ч захиалгыг УНАГААХГҮЙ', () => {
+  /*
+   * Өдөрт 9000 дугаар дүүрэх нь бодит биш. Гэхдээ хэрэв тийм болбол
+   * захиалгыг татгалзах нь давхцлаас хамаагүй дор — хэрэглэгч мөнгөө
+   * төлж чадахгүй болно.
+   */
+  const number = makeOrderNumber(NOW, () => 0.5, new Set(['PMN-260806-5500']));
+  assert.equal(number, 'PMN-260806-5500', 'алдаа шидсэн эсвэл хоосон буцаасан');
+});
+
+test('buildOrder нь taken-ыг дамжуулна', () => {
+  const draws = [0.5, 0.9];
+  let i = 0;
+  const built = buildOrder(
+    order(),
+    NOW,
+    () => draws[i++] ?? 0.9,
+    new Set(['PMN-260806-5500']),
+  );
+  assert.equal(built.orderNumber, 'PMN-260806-9100');
+});
+
+test('дугаарын хэлбэр хэвээр — апп, NAS, товч бүгд түүнээс хамаарна', () => {
+  /*
+   * `isOrderNumber`, `parseManifestKey`, Telegram-ийн `callback_data`, NAS-ын
+   * хавтасны нэр — бүгд энэ хэлбэрийг барьдаг. Өөрчилвөл дөрвүүлэн эвдэрнэ.
+   */
+  for (const draw of [0, 0.25, 0.5, 0.999]) {
+    assert.match(makeOrderNumber(NOW, draw), /^PMN-\d{6}-\d{4}$/);
+  }
 });
 
 test('клиентийн явуулсан үнийг тогтмол үнэтэй мөрөнд ҮЛ ТООМСОРЛОНО', () => {

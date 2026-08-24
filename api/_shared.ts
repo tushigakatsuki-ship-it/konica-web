@@ -168,11 +168,51 @@ const makeIdGenerator = () => {
   };
 };
 
-/** `PMN-260806-4821` — огнооны хэсэг нь мөн Улаанбаатарын цагаар. */
-export const makeOrderNumber = (now: Date, random = Math.random()): string =>
-  `PMN-${toDateString(now).slice(2).replaceAll('-', '')}-${String(
-    Math.floor(1000 + random * 9000),
-  )}`;
+/**
+ * Нэг өдөрт хэдэн удаа дугаар сонгож үзэх вэ.
+ *
+ * 12 оролдлого нь өдөрт 4000 захиалга байсан ч (боломжит 9000-аас) чөлөөт
+ * дугаар олох магадлалыг 99.99%-иас дээш байлгана. Хязгаар тавьсан нь
+ * `taken` олонтой үед мөнхийн давталтад орохоос сэргийлэх зорилготой.
+ */
+const NUMBER_TRIES = 12;
+
+/**
+ * `PMN-260806-4821` — огнооны хэсэг нь мөн Улаанбаатарын цагаар.
+ *
+ * ── Яагаад `taken` параметр вэ ────────────────────────────────────
+ *
+ * Сүүлийн 4 орон нь санамсаргүй тул өдөрт 9000 л боломж байна. Төрсөн өдрийн
+ * парадоксоор өдрийн 50 захиалгад давхцах магадлал **12.7%** хүрнэ (20 захиалгад
+ * 2.1%). Дугаар нь БАНКНЫ ГҮЙЛГЭЭНИЙ УТГА болдог тул давхцвал хоёр
+ * үйлчлүүлэгч ижил утгаар мөнгө шилжүүлж, аль нь төлснийг ялгах арга байхгүй
+ * болно.
+ *
+ * Тиймээс дуудагч тал тухайн өдөр аль хэдийн ашиглагдсан дугааруудыг өгнө.
+ *
+ * `random` нь тоо ч, функц ч байж болно: тест тогтмол утга өгдөг, production
+ * дээр `Math.random` өөрөө орж, оролдлого бүрт шинэ утга гаргана.
+ */
+export const makeOrderNumber = (
+  now: Date,
+  random: number | (() => number) = Math.random,
+  taken: ReadonlySet<string> = new Set(),
+): string => {
+  const draw = typeof random === 'function' ? random : () => random;
+  const prefix = `PMN-${toDateString(now).slice(2).replaceAll('-', '')}-`;
+  const make = (): string => `${prefix}${String(Math.floor(1000 + draw() * 9000))}`;
+
+  let candidate = make();
+  for (let attempt = 1; attempt < NUMBER_TRIES && taken.has(candidate); attempt += 1) {
+    candidate = make();
+  }
+  /*
+   * Бүх оролдлого дүүрсэн ч буцаана. Өдөрт 9000 дугаар дүүрэх нь бодит биш
+   * бөгөөд захиалгыг ЭНЭ шалтгаанаар унагах нь давхцлаас хамаагүй дор —
+   * хэрэглэгч мөнгөө төлж чадахгүй болно.
+   */
+  return candidate;
+};
 
 // ── Баталгаажуулалт + бүтээх ───────────────────────────────────────
 
@@ -184,7 +224,9 @@ export const makeOrderNumber = (now: Date, random = Math.random()): string =>
 export function buildOrder(
   input: unknown,
   now: Date = new Date(),
-  random = Math.random(),
+  random: number | (() => number) = Math.random,
+  /** Тухайн өдөр аль хэдийн ашиглагдсан захиалгын дугаарууд. */
+  taken: ReadonlySet<string> = new Set(),
 ): BuiltOrder {
   if (typeof input !== 'object' || input === null)
     throw new ValidationError('Захиалгын өгөгдөл буруу байна.');
@@ -250,7 +292,7 @@ export function buildOrder(
   const tax = vat ? Math.round((base + deliveryFee) * VAT_RATE) : 0;
   const total = base + deliveryFee + tax;
 
-  const orderNumber = makeOrderNumber(now, random);
+  const orderNumber = makeOrderNumber(now, random, taken);
   const time = nowTimeString(now);
   const date = toDateString(now);
   const nextId = makeIdGenerator();
