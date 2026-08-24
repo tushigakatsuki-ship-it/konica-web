@@ -68,6 +68,15 @@ export interface CustomerInfo {
    * дундаас хайх хэрэгтэй болно.
    */
   address: string;
+
+  /**
+   * Хүлээж авахаар төлөвлөж буй өдөр — `YYYY-MM-DD`, сонголтоор.
+   *
+   * Аппын `WorkLog.deadline` талбар руу очно: ажилтан вэб захиалгыг өөрийн
+   * ердийн ажлын жагсаалт дотроос хугацаагаар нь эрэмбэлж харна. Тусдаа
+   * газар хадгалбал тэр эрэмбэ ажиллахгүй.
+   */
+  pickupDate: string;
 }
 
 export type FieldErrors = Partial<Record<keyof CustomerInfo | 'lines', string>>;

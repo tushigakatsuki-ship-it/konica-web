@@ -8,8 +8,11 @@ import { HERO_IMAGES } from '../data/site';
  * градиент биш, бодит ажлын зураг л хэлж чадна.
  *
  * Гүйцэтгэлийн шийдлүүд:
- *   • ЗӨВХӨН эхний зураг `fetchPriority="high"`-тэй, бусад нь `lazy` —
- *     утасны сүлжээнд 4 зургийг зэрэг татвал анхны зурагдалт удаашрана.
+ *   • ЗӨВХӨН эхний зураг `fetchPriority="high"`-тэй.
+ *   • ⚠️ Бусад зургийг эхний зураг ГАРЧ ИРТЭЛ огт үүсгэхгүй. `loading="lazy"`
+ *     нь энд ТУСЛАХГҮЙ: дөрвүүлээ дэлгэцийн харагдах хэсэгт (`absolute
+ *     inset-0`) байрладаг тул хөтөч бүгдийг нь ШУУД татна. Үр дүнд нь нүүр
+ *     хуудас нээхэд дөрвөн зураг зэрэг татагдаж, эхнийх нь удаашрана.
  *   • Солих нь `opacity` шилжилт: layout дахин тооцоологддоггүй тул хямд.
  *   • Таб нуугдсан үед зогсоно — арын табанд таймер эргүүлэх нь батарей иддэг.
  *
@@ -22,14 +25,13 @@ import { HERO_IMAGES } from '../data/site';
 /**
  * Хэдэн секунд тутам солих вэ.
  *
- * 6 секунд нь дэлгүүрийн ажлыг харуулах гэсэн зорилгод удаан байв: ихэнх
- * хүн нүүр хуудсан дээр 10-15 секунд л байдаг тул гурван зургийн НЭГИЙГ л
- * хараад явна. 2 секунд нь гурвуулангийн эргэлтийг 6 секундэд дуусгана.
+ * 2 секунд нь хэт хурдан байв — зураг тогтож амжаагүй байхад дараагийнх нь
+ * ирж, дэвсгэр анивчсан мэдрэмж төрүүлдэг. 5 секунд нь зураг бүрийг үнэхээр
+ * ХАРАХ зав өгнө.
  *
- * ⚠️ Шилжилтийн хугацаа (700ms) нь мөчлөгийн 35% — зураг тогтох зайтай
- * хэвээр. Үүнээс богиносговол анивчсан мэдрэмж төрнө.
+ * ⚠️ Шилжилтийн хугацаа (700ms) нь мөчлөгийн 14% — зураг тогтох зай элбэг.
  */
-const INTERVAL_MS = 2000;
+const INTERVAL_MS = 5000;
 
 const prefersReducedMotion = (): boolean =>
   typeof matchMedia === 'function' &&
@@ -37,6 +39,15 @@ const prefersReducedMotion = (): boolean =>
 
 export default function HeroSlideshow() {
   const [index, setIndex] = useState(0);
+
+  /**
+   * Эхний зураг гарсны дараа л үлдсэнийг DOM-д нэмнэ.
+   *
+   * Ингэснээр анхны зурагдалт нь ЗӨВХӨН нэг зургийн татахыг хүлээнэ.
+   * Үлдсэн нь араас чимээгүй ирнэ — эхний солилт 5 секундын дараа тул
+   * амжина.
+   */
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (HERO_IMAGES.length < 2 || prefersReducedMotion()) return;
@@ -65,32 +76,41 @@ export default function HeroSlideshow() {
   }
 
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden bg-brand-600">
-      {HERO_IMAGES.map((image, i) => (
-        <img
-          key={image.src}
-          src={image.src}
-          alt=""
-          loading={i === 0 ? 'eager' : 'lazy'}
-          fetchPriority={i === 0 ? 'high' : 'low'}
-          decoding="async"
-          className="absolute inset-0 size-full object-cover transition-opacity duration-700"
-          style={{ opacity: i === index ? 1 : 0 }}
-        />
-      ))}
+    <div aria-hidden className="absolute inset-0 overflow-hidden bg-brand-500">
+      {HERO_IMAGES.map((image, i) =>
+        i > 0 && !ready ? null : (
+          <img
+            key={image.src}
+            src={image.src}
+            alt=""
+            onLoad={i === 0 ? () => setReady(true) : undefined}
+            /*
+             * ⚠️ Алдаа гарсан ч үлдсэнийг нээнэ. Эс тэгвээс эхний зураг
+             * ирэхгүй бол дэвсгэр мөнхөд ганц өнгө хэвээр үлдэнэ.
+             */
+            onError={i === 0 ? () => setReady(true) : undefined}
+            fetchPriority={i === 0 ? 'high' : 'low'}
+            decoding="async"
+            className="absolute inset-0 size-full object-cover transition-opacity duration-700"
+            style={{ opacity: i === index ? 1 : 0 }}
+          />
+        ),
+      )}
 
       {/*
        * Цэнхэр халхавч — цагаан текстийг ЯМАР Ч зураг дээр уншигдахуйц
        * байлгана. Үүнгүйгээр цайвар зураг дээр гарчиг алга болно.
        *
-       * ⚠️ Өмнө нь `brand-900/85` байсан нь бараг тунгалаг бус бараан хөх
-       * болж, доорх зургийг бүрэн дардаг байв — «ямар чанартай ажилладаг вэ»
-       * гэдгийг харуулах гэсэн зорилго нь өөрөө устсан. Одоо ТОД цэнхэр
-       * (`brand-600`) дээр илүү тунгалаг: зураг харагдана, текст ч уншигдана.
+       * ⚠️ Өнгө нь ЛОГОНЫ өнгө (`brand-500` = #1a56db) — гурван өөр цэнхрийн
+       * холимог БИШ. Өмнө нь `brand-700 → brand-600 → brand-500` гэсэн
+       * градиент байсан тул халхавч нь логоноос бага зэрэг өөр, бүдэг хөх
+       * рүү хазайдаг байв. Одоо нэг л цэнхэр, зөвхөн тунгалаг нь өөрчлөгдөнө:
+       * логоны толгой дээрх дөрвөлжин, дэвсгэр хоёр ЯГ ижил өнгөтэй.
        *
-       * Зүүн доод булан нь бага зэрэг гүнзгий — гарчиг, товч тэнд сууна.
+       * Зүүн доод булан нь гүнзгий (85%) — гарчиг, товч тэнд сууна.
+       * Баруун дээд нь тунгалаг (35%) — доорх зураг тэндээс харагдана.
        */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-brand-700/85 via-brand-600/55 to-brand-500/35" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-brand-500/85 via-brand-500/55 to-brand-500/35" />
 
       {HERO_IMAGES.length > 1 && (
         <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 sm:bottom-6">

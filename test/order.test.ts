@@ -352,3 +352,137 @@ test('тоолол амжилтгүй бол no талбарыг огт бичи
   // `undefined` нь JSON.stringify дээр талбарыг бүрэн хасах ёстой.
   assert.ok(!Object.keys(JSON.parse(JSON.stringify(log))).includes('no'));
 });
+
+/*
+ * ── Утас ЭСВЭЛ и-мэйл ────────────────────────────────────────────────
+ *
+ * Урьд нь утас ЗААВАЛ байсан. Утасгүй хүн (гадаадад байгаа, зөвхөн
+ * и-мэйлээр харилцдаг) захиалга өгөх боломжгүй байв.
+ *
+ * ⚠️ Энэ шалгалт интерфейст ч байгаа. Давхардуулсан нь санамсаргүй биш:
+ * холбоо барих мэдээлэлгүй захиалга нь ажилтныг бэлэн зурагтай атлаа
+ * эзнийг нь олж чадахгүй байдалд оруулна.
+ */
+
+test('утас ЭСВЭЛ и-мэйлийн аль нэг нь байхад хүрэлцэнэ', () => {
+  const onlyEmail = buildOrder(
+    order({ customer: { ...customer, phone: '', email: 'test@example.com' } }),
+    NOW,
+    0.5,
+  );
+  assert.ok(onlyEmail.orderNumber, 'зөвхөн и-мэйлтэй захиалга бүтсэнгүй');
+
+  const onlyPhone = buildOrder(
+    order({ customer: { ...customer, phone: '99001234', email: '' } }),
+    NOW,
+    0.5,
+  );
+  assert.ok(onlyPhone.orderNumber, 'зөвхөн утастай захиалга бүтсэнгүй');
+});
+
+test('хоёулаа хоосон бол ТАТГАЛЗАНА', () => {
+  assert.throws(
+    () => buildOrder(order({ customer: { ...customer, phone: '', email: '' } }), NOW, 0.5),
+    /аль нэгийг оруулна уу/,
+    'холбоо барих аргагүй захиалга орж ирлээ',
+  );
+});
+
+test('бичсэн зүйл нь ЗӨВ хэлбэртэй байх ёстой хэвээр', () => {
+  /*
+   * Буруу дугаар нь хоосон талбараас ДОР: ажилтан залгаад холбогдохгүй
+   * байхад «утсаа авахгүй байна» гэж бодож цаг алдана.
+   */
+  assert.throws(
+    () => buildOrder(order({ customer: { ...customer, phone: '123' } }), NOW, 0.5),
+    /Утасны дугаар буруу/,
+  );
+  assert.throws(
+    () =>
+      buildOrder(
+        order({ customer: { ...customer, phone: '', email: 'not-an-email' } }),
+        NOW,
+        0.5,
+      ),
+    /И-мэйл хаяг буруу/,
+  );
+});
+
+/* ── Хүлээж авах өдөр ──────────────────────────────────────────────── */
+
+test('хүссэн өдөр аппын `deadline` талбарт очно', () => {
+  /*
+   * Тусдаа газар хадгалбал ажилтны ердийн ажлын жагсаалтын хугацааны
+   * эрэмбэ ажиллахгүй — вэб захиалга үргэлж хугацаагүй мэт харагдана.
+   */
+  const built = buildOrder(
+    order({ customer: { ...customer, pickupDate: '2026-08-28' } }),
+    NOW,
+    0.5,
+  );
+
+  const logs = Object.values(built.worklogs);
+  assert.ok(logs.length > 0, 'ажлын мөр үүсээгүй');
+  for (const log of logs) {
+    assert.equal(log.deadline, '2026-08-28', 'хугацаа ажлын мөрөнд очсонгүй');
+  }
+  assert.equal(built.pickupDate, '2026-08-28');
+});
+
+test('өдөр сонгоогүй бол хоосон — хуурамч хугацаа зохиохгүй', () => {
+  const built = buildOrder(order({ customer: { ...customer } }), NOW, 0.5);
+  assert.equal(built.pickupDate, '');
+  for (const log of Object.values(built.worklogs)) assert.equal(log.deadline, '');
+});
+
+test('буруу хэлбэрийн огноог ТАТГАЛЗАНА', () => {
+  assert.throws(
+    () => buildOrder(order({ customer: { ...customer, pickupDate: '28/08/2026' } }), NOW, 0.5),
+    /огноо буруу/i,
+  );
+});
+
+test('өнгөрсөн өдрийг сервер ТАТГАЛЗАХГҮЙ — зориуд', () => {
+  /*
+   * ⚠️ Энэ нь алдаа биш, шийдвэр.
+   *
+   * Хэрэглэгчийн цагийн бүс, шөнө дундын зөрүү, удаан сүлжээ гурав нийлээд
+   * ЗӨВ захиалгыг татгалзуулах эрсдэлтэй: хэрэглэгч 23:59-д «маргааш» гэж
+   * сонгоод илгээхэд сервер дээр аль хэдийн маргааш болсон байж болно.
+   *
+   * Энэ талбар нь ХҮСЭЛТ болохоос үнэд ч, үйл ажиллагаанд ч заавал биш.
+   * Интерфейс дээр `min`/`max` тавьсан нь хэрэглэгчид туслах зорилготой.
+   */
+  const built = buildOrder(
+    order({ customer: { ...customer, pickupDate: '2020-01-01' } }),
+    NOW,
+    0.5,
+  );
+  assert.equal(built.pickupDate, '2020-01-01');
+});
+
+test('хүссэн өдөр Telegram мэдэгдэлд гарна', () => {
+  const built = buildOrder(
+    order({ customer: { ...customer, pickupDate: '2026-08-28' } }),
+    NOW,
+    0.5,
+  );
+  const text = alertText(built, 'Батболд', '99001234');
+  assert.match(text, /📅 Хүлээж авах: 2026-08-28/, 'ажилтан хугацааг харахгүй');
+});
+
+test('утасгүй захиалгын мэдэгдэлд хоосон 📞 мөр үлдэхгүй', () => {
+  /*
+   * Хоосон `📞 ` мөр үлдвэл ажилтан «дугаар нь тасарчихаж» гэж бодож
+   * хайх тул огт харуулахгүй.
+   */
+  const built = buildOrder(
+    order({ customer: { ...customer, phone: '', email: 'test@example.com' } }),
+    NOW,
+    0.5,
+  );
+  const text = alertText(built, 'Батболд', '', 'test@example.com');
+
+  assert.ok(!text.includes('📞'), 'хоосон утасны мөр үлдлээ');
+  assert.match(text, /✉ test@example\.com/, 'и-мэйл харагдахгүй байна');
+});

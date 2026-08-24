@@ -26,6 +26,8 @@ export interface IncomingOrder {
     note?: string;
     /** Хүргэлтийн хаяг — `delivery: true` үед заавал. */
     address?: string;
+    /** Хүлээж авах өдөр `YYYY-MM-DD` — сонголтоор. */
+    pickupDate?: string;
   };
   lines: IncomingLine[];
   delivery: boolean;
@@ -101,6 +103,8 @@ export interface BuiltOrder {
   deliveryFee: number;
   /** Хүргэлтийн хаяг — хүргэлтгүй бол хоосон. */
   address: string;
+  /** Хэрэглэгчийн хүссэн хүлээж авах өдөр `YYYY-MM-DD` — сонгоогүй бол хоосон. */
+  pickupDate: string;
   tax: number;
   total: number;
   /** Firebase зангилаа → бичих бичлэгүүд. */
@@ -239,11 +243,37 @@ export function buildOrder(
   const email = clean(customerInput.email, 120);
   const note = clean(customerInput.note, 1000);
   const address = clean(customerInput.address, 300);
+  const pickupDate = clean(customerInput.pickupDate, 10);
 
   if (!name) throw new ValidationError('Нэр хоосон байна.');
-  if (!isValidPhone(phone)) throw new ValidationError('Утасны дугаар буруу байна.');
+
+  /*
+   * ── Утас ЭСВЭЛ и-мэйл ────────────────────────────────────────────
+   *
+   * Хоёуланг нь заавал болговол утасгүй хүн захиалж чадахгүй; хоёуланг нь
+   * сонголтоор орхивол ажилтан ямар ч холбоо барих аргагүй захиалга авна.
+   *
+   * ⚠️ Бичсэн зүйл нь ЗӨВ хэлбэртэй байх ёстой хэвээр. Буруу дугаар нь
+   * хоосон талбараас ДОР: ажилтан залгаад холбогдохгүй байхад «утсаа
+   * авахгүй байна» гэж бодож цаг алдана.
+   */
+  if (phone && !isValidPhone(phone))
+    throw new ValidationError('Утасны дугаар буруу байна.');
   if (email && !/^\S+@\S+\.\S+$/.test(email))
     throw new ValidationError('И-мэйл хаяг буруу байна.');
+  if (!phone && !email)
+    throw new ValidationError('Утас эсвэл и-мэйлийн аль нэгийг оруулна уу.');
+
+  /*
+   * Хүлээж авах өдөр — зөвхөн ХЭЛБЭРийг шалгана.
+   *
+   * ⚠️ «Өнгөрсөн өдөр биш» гэдгийг сервер дээр шалгахгүй: хэрэглэгчийн
+   * цагийн бүс, шөнө дундын зөрүү, удаан сүлжээ гурав нийлээд зөв
+   * захиалгыг татгалзуулах эрсдэлтэй. Энэ талбар нь ХҮСЭЛТ болохоос үнэд ч,
+   * үйл ажиллагаанд ч заавал биш — ажилтан хэрэгтэй бол ярина.
+   */
+  if (pickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate))
+    throw new ValidationError('Хүлээж авах огноо буруу байна.');
 
   /*
    * Хүргэлт сонгосон бол хаяг ЗААВАЛ.
@@ -296,7 +326,12 @@ export function buildOrder(
   const time = nowTimeString(now);
   const date = toDateString(now);
   const nextId = makeIdGenerator();
-  const contactNote = [note, `[web ${orderNumber}]`, email && `✉ ${email}`]
+  const contactNote = [
+    note,
+    `[web ${orderNumber}]`,
+    email && `✉ ${email}`,
+    pickupDate && `📅 ${pickupDate}`,
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -329,7 +364,12 @@ export function buildOrder(
       date,
       job: label,
       receivedTime: time,
-      deadline: '',
+      /*
+       * Хэрэглэгчийн хүссэн өдөр аппын `deadline` талбарт очно — ажилтан
+       * вэб захиалгыг өөрийн ердийн ажлын жагсаалт дотроос хугацаагаар нь
+       * эрэмбэлж харна. Тусдаа газар хадгалбал тэр эрэмбэ ажиллахгүй.
+       */
+      deadline: pickupDate,
       phone,
       /*
        * Аппын `WorkLog.delivery` нь хүргэлтийн дэлгэрэнгүйд зориулсан чөлөөт
@@ -370,6 +410,7 @@ export function buildOrder(
     tax,
     total,
     address: delivery ? address : '',
+    pickupDate,
     orders,
     worklogs,
   };
@@ -396,7 +437,12 @@ export function numberWorkLogs(built: BuiltOrder, startNo: number | null): Built
 }
 
 /** Telegram мэдэгдлийн бие — `telegramService.ts`-ийн хэв маягтай ижил. */
-export const alertText = (built: BuiltOrder, name: string, phone: string): string => {
+export const alertText = (
+  built: BuiltOrder,
+  name: string,
+  phone: string,
+  email = '',
+): string => {
   const jobs = built.lines.map((l) => `• ${l.name} × ${l.qty}`).join('\n');
   return (
     `🌐 <b>Вэбээс шинэ захиалга!</b> ${built.orderNumber}\n` +
@@ -404,7 +450,19 @@ export const alertText = (built: BuiltOrder, name: string, phone: string): strin
     `💰 Нийт: ${built.total.toLocaleString('en-US')}₮` +
     `${built.tax > 0 ? ' (НӨАТ-тай)' : ''}` +
     `${built.deliveryFee > 0 ? ' · хүргэлттэй' : ''}\n` +
-    `👤 ${name}\n📞 ${phone}` +
+    `👤 ${name}` +
+    /*
+     * ⚠️ Утас ХООСОН байж БОЛНО (и-мэйлээр л өгсөн захиалга). Тэр үед
+     * `📞 ` гэсэн хоосон мөр үлдвэл ажилтан «дугаар нь тасарчихаж» гэж
+     * бодож хайх тул огт харуулахгүй.
+     */
+    (phone ? `\n📞 ${phone}` : '') +
+    (email ? `\n✉ ${email}` : '') +
+    /*
+     * Хүссэн өдрийг мэдэгдэлд оруулах нь чухал: ажилтан яаралтай эсэхийг
+     * шууд хараад дарааллаа тохируулна.
+     */
+    (built.pickupDate ? `\n📅 Хүлээж авах: ${built.pickupDate}` : '') +
     /*
      * Хаягийг мэдэгдэлд оруулах нь чухал: ажилтан Telegram-аас шууд хараад
      * хүргэгчид дамжуулна. Апп нээх, хайх алхам хасагдана.

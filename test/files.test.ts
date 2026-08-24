@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  APPROX_MB_PER_PHOTO,
+  FILES_PER_PHOTO,
+  MAX_PHOTOS_PER_ORDER,
+  PUT_EXPIRES_SEC,
+  SLOW_MB_PER_MIN,
+  worstCaseUploadMinutes,
+} from '../src/lib/limits';
+import {
   MAX_FILES,
   isDateStamp,
   isOrderNumber,
@@ -298,4 +306,60 @@ test('өөр endpoint/бүс дээр гарын үсэг өөр гарна', as
     new URL(a).searchParams.get('X-Amz-Signature'),
     new URL(b).searchParams.get('X-Amz-Signature'),
   );
+});
+
+/*
+ * ── Гарын үсгийн хугацаа vs илгээх хугацаа ──────────────────────────
+ *
+ * ⚠️ ЭНЭ БОЛ ЗАХИАЛГА УНАГААХ ЧАДВАРТАЙ ХАРЬЦАА.
+ *
+ * Урьд нь `PUT_EXPIRES_SEC` нь 20 минут байсан бөгөөд хязгаар 30 зураг
+ * байх үед хангалттай байв. Хязгаарыг 100 болгоход энэ хоёр САЛСАН:
+ * 100 зураг ≈ 650MB нь дундаж 4G дээр 43 минут илгээгддэг тул хэрэглэгч
+ * 20 минут илгээж байгаад 46 дахь зураг дээр `403` авна.
+ *
+ * Хамгийн муу нь `403` бол 4xx учир байршуулагч түүнийг БАЙНГЫН алдаа гэж
+ * үзэж дахин оролддоггүй — 40 минут илгээсэн захиалга бүхэлдээ унана.
+ *
+ * Тиймээс хоёр тоог тусад нь тааварлаж БОЛОХГҮЙ. Энэ тест тэднийг хамт
+ * барина: хязгаарыг өсгөвөл гарын үсгийн хугацаа автоматаар дагана,
+ * дагаагүй бол энд унана.
+ */
+
+test('presigned хаяг нь хамгийн урт илгээлтийг ДААНА', () => {
+  const worst = worstCaseUploadMinutes();
+  const window = PUT_EXPIRES_SEC / 60;
+
+  assert.ok(
+    window >= worst * 2,
+    `гарын үсэг ${window} минут, хамгийн муу илгээлт ${worst} минут — ` +
+      'дахин оролдлого, тасалдалд нөөц үлдэхгүй',
+  );
+
+  /*
+   * Дээд талаас нь ч барина: хэдэн өдрийн турш хүчинтэй хаяг нь хэрэггүй
+   * эрсдэл. Хаяг алдагдвал тэр хугацаанд хэн ч тухайн түлхүүрийг дарж
+   * бичиж чадна.
+   */
+  assert.ok(window <= 12 * 60, `гарын үсэг ${window} минут — хэтэрхий урт`);
+});
+
+test('хамгийн муу тохиолдлын тооцоо хязгаараас ГАРНА', () => {
+  /*
+   * Тоог гараар бичвэл хязгаар өөрчлөгдөхөд дагахгүй.
+   */
+  assert.equal(
+    worstCaseUploadMinutes(MAX_PHOTOS_PER_ORDER),
+    Math.ceil((MAX_PHOTOS_PER_ORDER * APPROX_MB_PER_PHOTO) / SLOW_MB_PER_MIN),
+  );
+
+  // Цөөн зурагтай захиалга харьцангуй богино байх ёстой.
+  assert.ok(
+    worstCaseUploadMinutes(10) < worstCaseUploadMinutes(100),
+    'зургийн тоо хугацаанд нөлөөлөхгүй байна',
+  );
+});
+
+test('нэг захиалгын файлын тоо нь зургийн хязгаараас ГАРНА', () => {
+  assert.equal(MAX_FILES, MAX_PHOTOS_PER_ORDER * FILES_PER_PHOTO);
 });

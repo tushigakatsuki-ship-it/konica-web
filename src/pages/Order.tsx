@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import { PRIMARY_PHONE } from '../data/site';
 import {
-  DELIVERY_FEE,
   addLine,
   lineFromService,
   lineTotal,
@@ -13,6 +12,10 @@ import {
   type OrderLine,
 } from '../lib/order';
 import { formatCurrency, isValidPhone, vatPortion } from '../lib/price';
+import { pickupBounds, validatePickup } from '../lib/pickup';
+import { joinContact, splitContact } from '../lib/contact';
+import DatePicker from '../components/DatePicker';
+import PhotoLimitNote from '../components/PhotoLimitNote';
 import { sizeOf } from '../lib/photoSize';
 import {
   ServiceUnavailableError,
@@ -38,27 +41,36 @@ const EMPTY_CUSTOMER: CustomerInfo = {
   email: '',
   note: '',
   address: '',
+  pickupDate: '',
 };
 
-const validate = (
-  customer: CustomerInfo,
-  lines: readonly OrderLine[],
-  delivery: boolean,
-): FieldErrors => {
+const validate = (customer: CustomerInfo, lines: readonly OrderLine[]): FieldErrors => {
   const errors: FieldErrors = {};
   if (!customer.name.trim()) errors.name = 'Нэрээ оруулна уу.';
+
+  const phone = customer.phone.trim();
+  const email = customer.email.trim();
+
   /*
-   * Хүргэлт сонгосон атал хаяггүй захиалга нь ажилтныг заавал утсаар
-   * холбогдоход хүргэнэ. Хэрэглэгч ихэвчлэн ажлын бус цагт захиалдаг тул
-   * тэр дуудлага маргааш болж, хүргэлт нэг өдрөөр хойшилно.
+   * ── Нэг талбар, хоёр төрөл ─────────────────────────────────────
+   *
+   * Алдааг үргэлж `phone` дээр тавина: интерфейс дээр талбар НЭГ л
+   * ширхэг бөгөөд түүний `id` нь `contact`. Хоёр өөр түлхүүр ашиглавал
+   * «эхний алдаатай талбар руу очих» логик аль нэгийг нь олохгүй.
+   *
+   * Бичсэн зүйл нь ЗӨВ хэлбэртэй байх ёстой: буруу дугаар нь хоосон
+   * талбараас ДОР, учир нь ажилтан залгаад холбогдохгүй байхад
+   * «хэрэглэгч утсаа авахгүй байна» гэж бодож цаг алдана.
    */
-  if (delivery && !customer.address.trim())
-    errors.address = 'Хүргэх хаягаа бичнэ үү.';
-  if (!customer.phone.trim()) errors.phone = 'Утасны дугаараа оруулна уу.';
-  else if (!isValidPhone(customer.phone))
+  if (!phone && !email) errors.phone = 'Утас эсвэл и-мэйлээ оруулна уу.';
+  else if (phone && !isValidPhone(phone))
     errors.phone = '8 оронтой дугаар оруулна уу (жишээ: 99001234).';
-  if (customer.email && !/^\S+@\S+\.\S+$/.test(customer.email))
-    errors.email = 'И-мэйл хаяг буруу байна.';
+  else if (email && !/^\S+@\S+\.\S+$/.test(email))
+    errors.phone = 'И-мэйл хаяг буруу байна.';
+
+  const pickup = validatePickup(customer.pickupDate);
+  if (pickup) errors.pickupDate = pickup;
+
   if (lines.length === 0) errors.lines = 'Дор хаяж нэг зураг сонгоно уу.';
   return errors;
 };
@@ -74,7 +86,22 @@ export default function Order() {
   const byAgreement = t('custom.byAgreement');
 
   const [customer, setCustomer] = useState<CustomerInfo>(EMPTY_CUSTOMER);
-  const [delivery, setDelivery] = useState(false);
+
+  /**
+   * Холбоо барих талбарт ХЭРЭГЛЭГЧИЙН бичсэн ТҮҮХИЙ мөр.
+   *
+   * ⚠️ Энэ тусдаа төлөв ЗААВАЛ хэрэгтэй. Эхний хувилбар нь талбарын утгыг
+   * `joinContact(customer)`-оос гаргадаг байсан бөгөөд и-мэйл бичих
+   * боломжгүй болгож байв:
+   *
+   *   «n» → `@` алга → цифр гэж үзээд цифр биш бүхнийг хаяна → «»
+   *   «na» → «» … `@` хүртэл нэг ч тэмдэгт үлдэхгүй.
+   *
+   * Хэрэглэгч и-мэйлээ бичих гэж оролдоод талбар нь хоосон хэвээр байхыг
+   * хараад «сайт эвдэрсэн» гэж бодно. Тиймээс бичсэнийг нь ХЭВЭЭР
+   * харуулж, `splitContact`-ыг зөвхөн СЕРВЕР рүү явуулах утгад хэрэглэнэ.
+   */
+  const [contactText, setContactText] = useState(() => joinContact(EMPTY_CUSTOMER));
   const [vat, setVat] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [sending, setSending] = useState(false);
@@ -101,9 +128,11 @@ export default function Order() {
   );
 
   const base = subtotal(lines);
-  const deliveryFee = delivery ? DELIVERY_FEE : 0;
-  const tax = vat ? vatPortion(base + deliveryFee) : 0;
-  const total = base + deliveryFee + tax;
+  const tax = vat ? vatPortion(base) : 0;
+  const total = base + tax;
+
+  /* `<input type="date">`-ийн хил — хуудас нээгдэхэд нэг л удаа тооцно. */
+  const bounds = useMemo(() => pickupBounds(), []);
 
   const photoCount = basket.items.filter((item) => item.value.file).length;
 
@@ -130,7 +159,7 @@ export default function Order() {
     event.preventDefault();
     if (sending) return; // давхар дарахаас — сервер талд бас хамгаалалттай
 
-    const found = validate(customer, lines, delivery);
+    const found = validate(customer, lines);
 
     /*
      * Сүүлчийн хамгаалалт: зураггүй мөр сагсанд орох ёсгүй (`PhotoEditor` үүнийг
@@ -151,9 +180,10 @@ export default function Order() {
        * Утсан дээр маягт урт байдаг тул алдааны текст дэлгэцээс гадуур үлдэж,
        * хэрэглэгч «яагаад илгээгдэхгүй байна вэ» гэж эргэлзэх нь түгээмэл.
        */
-      const firstField = (['name', 'phone', 'email'] as const).find((key) => found[key]);
+      const firstField = (['name', 'phone', 'pickupDate'] as const).find((key) => found[key]);
       if (firstField) {
-        const element = document.getElementById(firstField);
+        // Утас/и-мэйл НЭГ талбар тул түүний `id` нь `contact`.
+        const element = document.getElementById(firstField === 'phone' ? 'contact' : firstField);
         element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
         element?.focus({ preventScroll: true });
       }
@@ -188,7 +218,16 @@ export default function Order() {
       }
 
       const result = await submitOrder(customer, lines, {
-        delivery,
+        /*
+         * ⚠️ Хүргэлтийг ТҮР ХААСАН — интерфейсээс ч, эндээс ч.
+         *
+         * Сервер тал нь `delivery` + хаягийг хүлээн авах чадвартай хэвээр
+         * (`api/_shared.ts`), тиймээс буцаан асаахад зөвхөн интерфейс л
+         * хэрэгтэй. Энд `false` гэж ХАТУУ бичсэн нь санамсаргүй биш:
+         * төлөв нь үлдээд, хаана ч солигддоггүй бол унтраасан эсэх нь
+         * кодоос харагдахгүй болно.
+         */
+        delivery: false,
         vat,
         upload,
         requestId,
@@ -394,51 +433,14 @@ export default function Order() {
               </Link>
             )}
 
+            {/*
+              ⚠️ ХҮРГЭЛТ ТҮР ХААГДСАН.
+              Сонголтын дөрвөлжин болон хаягийн талбарыг эндээс хассан.
+              Сервер тал (`api/_shared.ts`) нь `delivery` + хаягийг хүлээн
+              авах чадвартай хэвээр тул буцаан асаахад зөвхөн энэ хэсгийг
+              сэргээхэд хангалттай.
+            */}
             <div className="mt-4 space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={delivery}
-                  onChange={(e) => setDelivery(e.target.checked)}
-                  className="size-4 accent-[#1a56db]"
-                />
-                Хүргэлттэй (+{formatCurrency(DELIVERY_FEE)})
-              </label>
-
-              {/*
-                * Хаягийн талбар нь ЗӨВХӨН хүргэлт сонгосон үед гарна.
-                *
-                * Үргэлж харуулбал салбар дээр очиж авах хүн ч бөглөх ёстой мэт
-                * санагдаж, хагас дутуу хаяг бүхий захиалга ирнэ. Нуувал бас
-                * болохгүй — хүргэлт сонгосон хүн хаягаа хаана бичихээ мэдэхгүй.
-                */}
-              {delivery && (
-                <div className="mt-3">
-                  <label className="label" htmlFor="address">
-                    Хүргэх хаяг <span className="text-danger">*</span>
-                  </label>
-                  <textarea
-                    id="address"
-                    rows={3}
-                    value={customer.address}
-                    onChange={(e) => setField('address', e.target.value)}
-                    className="field resize-y"
-                    placeholder="Дүүрэг, хороо, байр, орц, давхар, тоот — жишээ: ХУД 11-р хороо, 120 мянгат, 45-р байр, 2 орц, 4 давхар, 42 тоот"
-                    aria-invalid={errors.address ? true : undefined}
-                    aria-describedby={errors.address ? 'address-error' : undefined}
-                  />
-                  {errors.address ? (
-                    <p id="address-error" role="alert" className="mt-1 text-xs text-danger">
-                      {errors.address}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted">
-                      Орц, давхар, тоотоо бичвэл хүргэгч утсаар дахин
-                      холбогдохгүй.
-                    </p>
-                  )}
-                </div>
-              )}
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -450,17 +452,22 @@ export default function Order() {
               </label>
             </div>
 
+            {/*
+              Хязгаар, илгээх хугацааг ЭНД дахин хэлнэ.
+
+              Хэрэглэгч хэвлэлийн хуудсан дээр анзаараагүй байж болно;
+              илгээх товч дарахын өмнөх сүүлчийн боломж нь энэ. 100 зураг
+              нь гар утасны сүлжээгээр 40+ минут — үүнийг мэдэлгүй эхэлсэн
+              хүн дундуур нь табаа хааж, аль хэдийн орсон зураг ч дэмий
+              болно.
+            */}
+            <PhotoLimitNote photos={photoCount} />
+
             <dl className="mt-4 space-y-1.5 border-t border-hairline pt-4 text-sm">
               <div className="flex justify-between text-muted">
                 <dt>Дүн</dt>
                 <dd>{formatCurrency(base)}</dd>
               </div>
-              {delivery && (
-                <div className="flex justify-between text-muted">
-                  <dt>Хүргэлт</dt>
-                  <dd>{formatCurrency(deliveryFee)}</dd>
-                </div>
-              )}
               {vat && (
                 <div className="flex justify-between text-muted">
                   <dt>НӨАТ (10%)</dt>
@@ -507,52 +514,53 @@ export default function Order() {
                 )}
               </div>
 
+              {/*
+                ── Утас ба и-мэйл НЭГ талбарт ────────────────────────
+
+                Хоёр талбар зэрэгцэн байхад аль нэгийг нь л бөглөх ёстой
+                гэдэг нь маягтаас ХАРАГДДАГГҮЙ: хэрэглэгч хоёуланг нь бөглөх
+                гэж оролдоод, и-мэйлгүй бол «дутуу бөглөлөө» гэж эргэлзэнэ.
+
+                Бичсэнийг нь `splitContact` задалж `phone` / `email` болгоно
+                — сервер тал ХУВААГДСАН хэвээр, учир нь Konica апп дээрх
+                `WorkLog.phone` нь тусдаа талбар бөгөөд ажилтан түүгээр
+                шүүж, дарж залгадаг.
+
+                ⚠️ `type="text"` — `type="tel"` БИШ. `tel` нь утсан дээр
+                зөвхөн цифрийн гар гаргадаг тул и-мэйл бичих боломжгүй
+                болно. `inputMode` ч тавихгүй: хэрэглэгч юу бичихээ өөрөө
+                мэднэ, хөтөч бүтэн гар гаргах нь зөв.
+              */}
               <div>
-                <label className="label" htmlFor="phone">
-                  Утас *
+                <label className="label" htmlFor="contact">
+                  Утас эсвэл и-мэйл <span className="text-danger">*</span>
                 </label>
                 <input
-                  id="phone"
-                  name="tel"
-                  type="tel"
-                  inputMode="numeric"
+                  id="contact"
+                  name="contact"
+                  type="text"
                   autoComplete="tel"
-                  maxLength={8}
                   enterKeyHint="next"
                   aria-invalid={Boolean(errors.phone)}
-                  value={customer.phone}
-                  // Зөвхөн цифр — хэрэглэгч зай, зураас бичсэн ч шалгалтад унахгүй.
-                  onChange={(e) => setField('phone', e.target.value.replace(/\D/g, ''))}
+                  aria-describedby={errors.phone ? undefined : 'contact-hint'}
+                  value={contactText}
+                  onChange={(e) => {
+                    const typed = e.target.value;
+                    setContactText(typed);
+                    const { phone, email } = splitContact(typed);
+                    setCustomer((c) => ({ ...c, phone, email }));
+                    setErrors((prev) => ({ ...prev, phone: undefined }));
+                  }}
                   className="field"
-                  placeholder="99001234"
+                  placeholder="99001234 эсвэл name@example.com"
                 />
-                {errors.phone && (
+                {errors.phone ? (
                   <p role="alert" className="mt-1 text-xs text-danger">
                     {errors.phone}
                   </p>
-                )}
-              </div>
-
-              <div>
-                <label className="label" htmlFor="email">
-                  И-мэйл
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  enterKeyHint="next"
-                  aria-invalid={Boolean(errors.email)}
-                  value={customer.email}
-                  onChange={(e) => setField('email', e.target.value)}
-                  className="field"
-                  placeholder="name@example.com"
-                />
-                {errors.email && (
-                  <p role="alert" className="mt-1 text-xs text-danger">
-                    {errors.email}
+                ) : (
+                  <p id="contact-hint" className="mt-1 text-xs text-muted">
+                    Захиалга бэлэн болоход бид эндүүр холбогдоно.
                   </p>
                 )}
               </div>
@@ -569,6 +577,43 @@ export default function Order() {
                   className="field resize-y"
                   placeholder="Хэмжээ, өнгө, хугацаа гэх мэт…"
                 />
+              </div>
+
+              {/*
+                ── Хүлээж авах өдөр ──────────────────────────────────
+
+                Хөтөчийн төрөлх `<input type="date">`-ийг орлосон. Тэр нь
+                найдвартай ч хаалттай өдрийг (Мягмар) унтраах боломжгүй
+                байсан тул хэрэглэгч сонгоод л, дараа нь алдаа хардаг байв.
+                Мөн хэлбэр нь үйлдлийн системийн хэлээр гардаг — монгол
+                хуудсан дээр `mm/dd/yyyy`.
+
+                Заавал БИШ: «хэзээ бэлэн болохыг мэдэхгүй» хэрэглэгч
+                захиалгаа дуусгалгүй гарах эрсдэлээс сэргийлнэ.
+              */}
+              <div>
+                <label className="label" htmlFor="pickupDate">
+                  Хэзээ ирж авах вэ?{' '}
+                  <span className="font-normal text-muted">(сонголтоор)</span>
+                </label>
+                <DatePicker
+                  id="pickupDate"
+                  value={customer.pickupDate}
+                  onChange={(next) => setField('pickupDate', next)}
+                  min={bounds.min}
+                  max={bounds.max}
+                  invalid={Boolean(errors.pickupDate)}
+                  describedBy={errors.pickupDate ? undefined : 'pickup-hint'}
+                />
+                {errors.pickupDate ? (
+                  <p role="alert" className="mt-1 text-xs text-danger">
+                    {errors.pickupDate}
+                  </p>
+                ) : (
+                  <p id="pickup-hint" className="mt-1 text-xs text-muted">
+                    Ажлын цаг: 10:00–18:00. Мягмар гарагт хаалттай.
+                  </p>
+                )}
               </div>
             </div>
 

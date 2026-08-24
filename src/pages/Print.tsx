@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
+import PhotoLimitNote from '../components/PhotoLimitNote';
 import LastOrderBanner from '../components/LastOrderBanner';
 import { SERVICES, byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
 import CategoryGrid, { CATEGORY_HINT } from '../components/CategoryGrid';
@@ -57,14 +58,24 @@ const IN_BRANCH_ONLY: readonly number[] = [405];
  * хүлээж авбал `byCategory` хоосон жагсаалт буцааж, хуудас хоосон харагдана.
  */
 /**
- * «Өөр хэмжээ» мөрийн id — `data/catalog.ts` дахьтай ижил.
+ * Ангилал бүрийн «өөр хэмжээ» мөрийн id — `data/catalog.ts` дахьтай ижил.
  *
- * Энэ мөр нь ердийн хэмжээний тортой хамт харагдах ЁСГҮЙ: түүнд хэмжээ
+ * Эдгээр мөр нь ердийн хэмжээний тортой хамт харагдах ЁСГҮЙ: тэдэнд хэмжээ
  * байхгүй тул `parsePhotoSize` `null` буцааж, картан дээр нэр нь бүтнээрээ
  * гарч, үнэ нь `0₮` гэж худал харагдана. Оронд нь тусдаа карт болгож,
  * дарахад хэмжээ асуух самбар нээнэ.
+ *
+ * ⚠️ Ангилал бүр ӨӨРИЙН мөртэй. Угаалтын 199-ийг засварт дахин ашиглавал
+ * ажилтны ажлын мөрөнд «зураг угаалт» гэж очих бөгөөд тэр нь өөр ажил,
+ * өөр үнэтэй — хэвлэх гэж бэлдээд зураг засах ажил байсныг хожуу мэдэх нь
+ * цаг, цаас хоёуланг алдагдуулна.
  */
-const CUSTOM_SIZE_ID = 199;
+const CUSTOM_SIZE_ID: Partial<Record<ServiceCategory, number>> = {
+  Угаалт: 199,
+  Засвар: 299,
+};
+
+const CUSTOM_IDS: readonly number[] = Object.values(CUSTOM_SIZE_ID);
 
 /** Хэвлэх боломжтой хэмжээний хязгаар, сантиметрээр. */
 const CUSTOM_MIN_CM = 5;
@@ -128,23 +139,22 @@ const WALK_IN: readonly ServiceCategory[] = [
 /**
  * Эхлээд харуулах хэмжээнүүд — бусдыг «Бүх хэмжээ» товчны цаана нууна.
  *
- * ── Яагаад Угаалт энд БАЙХГҮЙ вэ ────────────────────────────────
+ * ── Яагаад ХООСОН вэ ────────────────────────────────────────────
  *
- * Анх Угаалт ч энд байсан (`[103, 104, 102, 107]`): 12 хэмжээг зэрэг
- * харуулбал утсан дээр хоёр дэлгэц дүүрэн жагсаалт болж, хэрэглэгч алийг
- * нь сонгохоо мэдэхгүй зогсоно гэж үзсэн.
+ * Анх Угаалт (12 хэмжээ), дараа нь Засвар (7 хэмжээ) энд байсан: бүгдийг
+ * зэрэг харуулбал утсан дээр урт жагсаалт болж, хэрэглэгч алийг нь
+ * сонгохоо мэдэхгүй зогсоно гэж үзсэн.
  *
- * Практикт эсрэгээр болсон: зураг угаалгах гэж буй хүн ЯГ ямар хэмжээ
- * хэрэгтэйгээ мэдэж ирдэг бөгөөд түүнийгээ жагсаалтаас олохгүй бол
- * «энд байхгүй юм байна» гэж бодоод гардаг. Товчийг дарж нээх нэмэлт
- * алхам нь тэр эргэлзээг арилгахаас илүү удаан.
+ * Практикт ХОЁУЛАНД нь эсрэгээр болсон: зураг угаалгах, засуулах гэж буй
+ * хүн ЯГ ямар хэмжээ хэрэгтэйгээ мэдэж ирдэг бөгөөд түүнийгээ жагсаалтаас
+ * олохгүй бол «энд байхгүй юм байна» гэж бодоод гардаг. Товч дарж нээх
+ * нэмэлт алхам нь тэр эргэлзээг арилгахаас илүү удаан.
  *
- * Засвар нь 7 мөртэй бөгөөд үнэ нь харьцангуй өндөр тул сонголт хийхэд
- * илүү бодох шаардлагатай — тэнд эрэмбэ хэвээр ашигтай.
+ * ⚠️ Тиймээс энэ бүтэц ХООСОН. Ирээдүйд ямар нэг ангилалд 20+ мөр цугларч,
+ * жагсаалт үнэхээр уншигдахгүй болвол л дахин бөглөнө — тэр үед ч эхлээд
+ * хэмжээгээр нь бүлэглэх нь эрэмбэлэхээс дээр байх магадлалтай.
  */
-const POPULAR_IDS: Partial<Record<ServiceCategory, readonly number[]>> = {
-  Засвар: [202, 203, 206], // 10×15, 13×18, 20×30
-};
+const POPULAR_IDS: Partial<Record<ServiceCategory, readonly number[]>> = {};
 
 export default function Print() {
   const navigate = useNavigate();
@@ -206,7 +216,7 @@ export default function Print() {
       tab
         ? byCategory(tab).filter(
             (service) =>
-              service.id !== CUSTOM_SIZE_ID && !IN_BRANCH_ONLY.includes(service.id),
+              !CUSTOM_IDS.includes(service.id) && !IN_BRANCH_ONLY.includes(service.id),
           )
         : [],
     [tab],
@@ -263,7 +273,8 @@ export default function Print() {
       return;
     }
 
-    const base = SERVICES.find((service) => service.id === CUSTOM_SIZE_ID);
+    const customId = tab ? CUSTOM_SIZE_ID[tab] : undefined;
+    const base = SERVICES.find((service) => service.id === customId);
     if (!base) return;
 
     setCustom(null);
@@ -556,14 +567,16 @@ export default function Print() {
             {/*
               * ── Өөрийн хэмжээ ────────────────────────────────────
               *
-              * Зөвхөн зураг угаалтад. Бусад ангилалд (засвар, цээж зураг)
-              * хэмжээ нь стандартаар тогтдог тул утгагүй.
+              * Угаалт БОЛОН засварт. Цээж зурагт хэмжээ нь баримт бичгийн
+              * стандартаар тогтдог тул утгагүй — тэнд харуулбал хэрэглэгч
+              * стандартаас хазайсан хэмжээ сонгоод, баримтад нь тохирохгүй
+              * зураг гартаа авна.
               *
               * Самбарыг картны ДООР нээж байгаа шалтгаан: модал цонх нээвэл
               * хэрэглэгч хоёр давхар цонх (хэмжээ → зураг) дамжина. Энд
               * шууд бөглөөд «Зургаа оруулах» дарахад ганц цонх л нээгдэнэ.
               */}
-            {tab === 'Угаалт' && (
+            {tab !== undefined && CUSTOM_SIZE_ID[tab] !== undefined && (
               <div className="mt-4">
                 {custom === null ? (
                   <button
@@ -635,10 +648,19 @@ export default function Print() {
                     </p>
 
                     <div className="mt-3 flex gap-2">
+                      {/*
+                        ⚠️ `btn-accent` — `btn-brand` БИШ.
+
+                        Энэ бол захиалгат хэмжээний ҮНДСЭН үйлдэл. Хуудасны
+                        бусад бүх үндсэн товч улбар шар (сагсанд нэмэх,
+                        захиалга үргэлжлүүлэх, захиалга илгээх) байхад энэ
+                        ганцаараа цэнхэр байсан тул хэрэглэгч өөр төрлийн
+                        үйлдэл гэж эндүүрч, дараагүй өнгөрөх эрсдэлтэй байв.
+                      */}
                       <button
                         type="button"
                         onClick={openCustomEditor}
-                        className="btn-brand flex-1 !py-2.5 !text-sm"
+                        className="btn-accent flex-1 !py-2.5 !text-sm"
                       >
                         <IconImage className="size-4" /> {t('custom.next')}
                       </button>
@@ -801,6 +823,15 @@ export default function Print() {
               <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
                 {t('print.privacy')}
               </p>
+
+              {/*
+                Хязгаар, хугацааг САГСНЫ доор хэлнэ — хэрэглэгч зургаа
+                нэмж байх үедээ л шийдвэрээ өөрчилж чадна. Захиалгын
+                хуудсан дээр анх удаа мэдвэл эргэж буцах хэрэгтэй болно.
+              */}
+              <PhotoLimitNote
+                photos={basket.items.filter((item) => item.value.file).length}
+              />
             </div>
           </aside>
         </div>
@@ -870,6 +901,12 @@ export default function Print() {
           service={editorFor.service}
           initial={editing?.value}
           editing={Boolean(editorFor.itemKey)}
+          /*
+           * ⚠️ Сагсны тоог ЗААВАЛ дамжуулна. Үүнгүйгээр хязгаар нь зөвхөн
+           * нэг цонхонд үйлчилж, хэрэглэгч цонх бүрт дахин дүүргэж чадна —
+           * бүгдийг бэлдэж дуусаад л сервер татгалзана.
+           */
+          alreadyInBasket={basket.items.filter((item) => item.value.file).length}
           onCancel={() => setEditorFor(null)}
           onSave={saveFromEditor}
         />

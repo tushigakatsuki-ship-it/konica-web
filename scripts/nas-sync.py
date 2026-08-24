@@ -257,6 +257,7 @@ def order_slip(order: dict) -> str:
         f"  Утас      : {customer.get('phone') or '—'}",
         f"  И-мэйл    : {customer.get('email') or '—'}",
         f"  Ирсэн     : {created_text}",
+        f"  Ирж авах  : {customer.get('pickupDate') or '—'}",
         f"  Төлсөн    : {paid_text}  ({payment.get('method') or '—'})",
         "",
         "  ── Захиалгын мөрүүд ──────────────────────",

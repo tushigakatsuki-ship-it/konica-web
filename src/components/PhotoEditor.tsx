@@ -5,6 +5,7 @@ import { formatCurrency, parsePrice } from '../lib/price';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
 import { recommendedPixels, sizeOf } from '../lib/photoSize';
+import { MAX_PHOTOS_PER_ORDER } from '../lib/limits';
 import { useLang } from '../state/lang';
 import CropStudio from './CropStudio';
 import { IconAlert, IconClose, IconImage, IconZoom } from './icons';
@@ -37,16 +38,15 @@ interface Props {
   onSave(values: EditorValue[]): void;
   /** Аль хэдийн сагсанд орсон мөрийг засаж байгаа эсэх. */
   editing?: boolean;
+  /**
+   * Сагсанд АЛЬ ХЭДИЙН орсон зургийн тоо.
+   *
+   * ⚠️ Үүнгүйгээр хязгаар нь зөвхөн НЭГ цонхонд үйлчилнэ: хэрэглэгч
+   * 100 зураг нэмээд, цонхыг хааж, дахин 100 нэмж чадна. Бүгдийг бэлдэж
+   * дуусаад сервер татгалзах бөгөөд хийсэн ажил бүхэлдээ хаягдана.
+   */
+  alreadyInBasket?: number;
 }
-
-/**
- * Нэг удаад сонгох дээд тоо.
- *
- * Сервер нэг захиалгад 60 файл хүлээж авдаг (`api/_files.ts` дахь `MAX_FILES`),
- * зураг тус бүрээс `print` ба `original` хоёр файл гардаг тул 30 зураг нь
- * техникийн дээд хязгаар.
- */
-const MAX_PHOTOS = 30;
 
 /**
  * Зураг сонгох цонх.
@@ -76,8 +76,12 @@ export default function PhotoEditor({
   onCancel,
   onSave,
   editing = false,
+  alreadyInBasket = 0,
 }: Props) {
   const { t, ts } = useLang();
+
+  /** Энэ цонхноос дахин хэдэн зураг нэмж болох вэ. */
+  const remaining = Math.max(0, MAX_PHOTOS_PER_ORDER - alreadyInBasket);
   const size = useMemo(() => sizeOf(service.name), [service.name]);
   const unitPrice = parsePrice(service.price);
 
@@ -175,12 +179,12 @@ export default function PhotoEditor({
     const seq = (pickSeq.current += 1);
 
     /* Засварлаж байгаа үед зөвхөн нэг зураг СОЛИНО, нэмэхгүй. */
-    const room = editing ? 1 : Math.max(0, MAX_PHOTOS - photos.length);
+    const room = editing ? 1 : Math.max(0, remaining - photos.length);
     const accepted = incoming.slice(0, room);
     const overflow = incoming.length - accepted.length;
 
     if (accepted.length === 0) {
-      setError(t('editor.tooMany', { n: MAX_PHOTOS }));
+      setError(t('editor.tooMany', { n: MAX_PHOTOS_PER_ORDER }));
       return;
     }
 
@@ -491,14 +495,14 @@ export default function PhotoEditor({
               <button
                 type="button"
                 onClick={openPicker}
-                disabled={loading || (!editing && photos.length >= MAX_PHOTOS)}
+                disabled={loading || (!editing && photos.length >= remaining)}
                 className="rounded-md border border-hairline px-4 py-2 text-xs font-semibold text-ink-soft hover:bg-brand-50 disabled:opacity-50"
               >
                 {editing ? t('editor.replace') : t('editor.addMore')}
               </button>
-              {!editing && photos.length >= MAX_PHOTOS && (
+              {!editing && photos.length >= remaining && (
                 <p className="mt-1.5 text-xs text-muted">
-                  {t('editor.limitHit', { n: MAX_PHOTOS })}
+                  {t('editor.limitHit', { n: MAX_PHOTOS_PER_ORDER })}
                 </p>
               )}
             </div>
@@ -591,11 +595,19 @@ export default function PhotoEditor({
             </div>
           </div>
 
+          {/*
+            ⚠️ Хоёр төлөвт ИЖИЛ өнгө.
+
+            Урьд нь зураг сонгохоос өмнө цэнхэр, сонгосны дараа улбар шар
+            болдог байв. Гэтэл хоёул ижил байрлалд байгаа, хоёул ҮНДСЭН
+            үйлдэл — өнгө нь солигдох нь «өөр товч гарч ирлээ» гэсэн худал
+            дохио өгнө. Идэвхгүй/идэвхтэйг `disabled` л ялгана.
+          */}
           <button
             type="button"
             onClick={ready ? save : openPicker}
             disabled={loading}
-            className={ready ? 'btn-accent mt-3 w-full' : 'btn-brand mt-3 w-full'}
+            className="btn-accent mt-3 w-full"
           >
             {loading ? (
               busyLabel

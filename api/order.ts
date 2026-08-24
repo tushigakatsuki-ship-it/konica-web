@@ -273,6 +273,7 @@ export default async function handler(request: Request): Promise<Response> {
         email?: string;
         note?: string;
         address?: string;
+        pickupDate?: string;
       };
     }
   ).customer;
@@ -356,6 +357,15 @@ export default async function handler(request: Request): Promise<Response> {
           address: built.address,
           email: (customer.email ?? '').trim(),
           note: (customer.note ?? '').trim(),
+          /*
+           * Хүссэн өдөр нь ЗАХИАЛГА.txt дээр гарна — ажилтан хэвлэх
+           * дарааллаа түүгээр тохируулна.
+           *
+           * ⚠️ `built.pickupDate`-аас авна, `customer`-оос ШУУД биш:
+           * `buildOrder` дотор л хэлбэрийн шалгалт хийгддэг тул түүхий
+           * утгыг тойрч бичвэл шалгагдаагүй мөр manifest руу орно.
+           */
+          pickupDate: built.pickupDate,
         },
         total: built.total,
         lines: built.lines.map((l) => ({ name: l.name, qty: l.qty, total: l.total })),
@@ -394,7 +404,10 @@ export default async function handler(request: Request): Promise<Response> {
         ]
       : [];
 
-  await notify(alertText(built, name, phone) + photoLine, buttons);
+  await notify(
+    alertText(built, name, phone, (customer.email ?? '').trim()) + photoLine,
+    buttons,
+  );
 
   const body = {
     orderNumber: built.orderNumber,

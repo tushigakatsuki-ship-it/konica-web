@@ -10,6 +10,7 @@ import {
   IconPalette,
   IconPrinter,
   IconRuler,
+  IconSparkle,
   type IconProps,
 } from './icons';
 
@@ -83,10 +84,23 @@ const MERGED_INTO_WASH: readonly ServiceCategory[] = ['Засвар', 'Цээж 
  */
 const READY: readonly ServiceCategory[] = ['Угаалт'];
 
-/** Тор дээр харагдах цонхнууд — нэгтгэгдсэн хоёрыг хассан. */
+/**
+ * Тор дээр харагдах БЭЛЭН цонхнууд.
+ *
+ * Нэгтгэгдсэн хоёр (`MERGED_INTO_WASH`) болон бэлэн бус бүхнийг хассан —
+ * сүүлийнх нь доорх `MoreTile` дотор НЭГ хавтан болж нийлнэ.
+ */
 const GRID_TILES = CATEGORY_TILES.filter(
-  (tile) => !MERGED_INTO_WASH.includes(tile.key),
+  (tile) => !MERGED_INTO_WASH.includes(tile.key) && READY.includes(tile.key),
 );
+
+/** Нэг хавтан дотор нийлсэн, хараахан бэлэн бус ангиллууд. */
+const SOON_TILES = CATEGORY_TILES.filter(
+  (tile) => !MERGED_INTO_WASH.includes(tile.key) && !READY.includes(tile.key),
+);
+
+const TILE_CLASS =
+  'glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5';
 
 /**
  * Нэг хавтан.
@@ -97,83 +111,82 @@ const GRID_TILES = CATEGORY_TILES.filter(
  */
 function Tile({
   tile,
-  ready,
   count,
   onPick,
 }: {
   tile: Omit<Tile, 'count'>;
-  ready: boolean;
   count: number;
   onPick(category: ServiceCategory): void;
 }) {
   const { t, tc } = useLang();
 
   /*
-   * Хазайлт нь зөвхөн ДАРАГДАХ хавтан дээр. Бэлэн бус хавтан хөдөлбөл
-   * «энэ ажиллана» гэсэн худал дохио өгнө.
-   *
    * Hook нь дотроо `hover: hover` болон `prefers-reduced-motion`-ыг
    * шалгадаг тул утсан дээр ямар ч сонсогч хавсрахгүй — үнэ төлбөргүй.
    */
   const ref = useTilt<HTMLButtonElement>();
 
-  const inner = (
-    <>
+  return (
+    <button ref={ref} type="button" onClick={() => onPick(tile.key)} className={TILE_CLASS}>
       <span aria-hidden className="glass-tile-sheen" />
 
-      <span
-        className={`relative grid size-10 place-items-center rounded-md ${
-          ready ? 'bg-brand-500/10 text-brand-500' : 'bg-brand-500/5 text-muted'
-        }`}
-      >
+      <span className="relative grid size-10 place-items-center rounded-md bg-brand-500/10 text-brand-500">
         <tile.Icon className="size-5" />
       </span>
 
-      <span
-        className={`relative mt-3 block text-sm font-bold leading-snug sm:text-base ${
-          ready ? 'text-ink' : 'text-ink-soft'
-        }`}
-      >
+      <span className="relative mt-3 block text-sm font-bold leading-snug text-ink sm:text-base">
         {tc(tile.key)}
       </span>
-      <span
-        className={`relative mt-1 block text-[11px] leading-relaxed sm:text-xs ${
-          ready ? 'text-muted' : 'text-muted/80'
-        }`}
-      >
+      <span className="relative mt-1 block text-[11px] leading-relaxed text-muted sm:text-xs">
         {t(tile.hint)}
       </span>
 
-      <span className="relative mt-auto block pt-3 text-[11px] font-bold">
-        {ready ? (
-          <span className="text-brand-500">
-            {count} {t('print.itemCount')}
-          </span>
-        ) : (
-          <span className="rounded-md bg-accent/15 px-2 py-0.5 uppercase tracking-wider text-accent-strong">
-            {t('home.comingSoon')}
-          </span>
-        )}
+      <span className="relative mt-auto block pt-3 text-[11px] font-bold text-brand-500">
+        {count} {t('print.itemCount')}
       </span>
-    </>
-  );
-
-  const shared = 'glass-tile flex size-full flex-col items-start p-4 text-left sm:p-5';
-
-  /*
-   * Бэлэн бол `<button>`, эс бөгөөс `<span>`.
-   *
-   * `disabled` товч биш `<span>` ашиглаж байгаа шалтгаан: идэвхгүй товч нь
-   * гар, дэлгэц уншигчид «энд товч байна, гэхдээ ажиллахгүй» гэж мэдэгддэг
-   * бөгөөд табаар дамжихад саад болно. Мэдээллийн хавтан бол товч биш.
-   */
-  return ready ? (
-    <button ref={ref} type="button" onClick={() => onPick(tile.key)} className={shared}>
-      {inner}
     </button>
-  ) : (
-    <span aria-disabled="true" className={`${shared} cursor-default opacity-70`}>
-      {inner}
+  );
+}
+
+/**
+ * Бэлэн бус БҮХ ангиллыг нэгтгэсэн ганц хавтан.
+ *
+ * ⚠️ Урьд нь ангилал бүр өөрийн «Удахгүй» хавтантай байсан тул тор дээр
+ * 10 хавтангийн 9 нь ажиллахгүй байв. Үр дүн нь эсрэгээрээ: цорын ганц
+ * БЭЛЭН үйлчилгээ (зураг угаалт) тэдгээрийн дунд төөрч, хуудас «одоохондоо
+ * юу ч хийж чадахгүй газар» мэт харагддаг байв.
+ *
+ * Одоо нэг хавтан, нэрс нь дотор нь жагсаалт болж багтана. Мэдээлэл
+ * алдагдахгүй — үйлчлүүлэгч тэр үйлчилгээ энд БАЙХ эсэхийг мэдсэн хэвээр,
+ * гэхдээ бэлэн зүйл нь тодрох болов.
+ *
+ * `<span>` ашиглаж байгаа шалтгаан: идэвхгүй товч нь гар, дэлгэц уншигчид
+ * «энд товч байна, гэхдээ ажиллахгүй» гэж мэдэгддэг бөгөөд табаар дамжихад
+ * саад болно. Мэдээллийн хавтан бол товч биш.
+ */
+function MoreTile() {
+  const { t, tc } = useLang();
+
+  return (
+    <span aria-disabled="true" className={`${TILE_CLASS} cursor-default`}>
+      <span aria-hidden className="glass-tile-sheen" />
+
+      <span className="relative grid size-10 place-items-center rounded-md bg-accent/10 text-accent-strong">
+        <IconSparkle className="size-5" />
+      </span>
+
+      <span className="relative mt-3 block text-sm font-bold leading-snug text-ink-soft sm:text-base">
+        {t('print.moreServices')}
+      </span>
+      <span className="relative mt-1 block text-[11px] leading-relaxed text-muted/80 sm:text-xs">
+        {SOON_TILES.map((tile) => tc(tile.key)).join(' · ')}
+      </span>
+
+      <span className="relative mt-auto block pt-3 text-[11px] font-bold">
+        <span className="rounded-md bg-accent/15 px-2 py-0.5 uppercase tracking-wider text-accent-strong">
+          {t('print.veryComingSoon')}
+        </span>
+      </span>
     </span>
   );
 }
@@ -194,12 +207,17 @@ interface Props {
  *
  * ── Хоёр төлөв ───────────────────────────────────────────────────
  *
- * **Бэлэн** (`READY`) — дарагдана, тод харагдана.
- * **Удахгүй** — дарагдахгүй, бүдэг, «Удахгүй» шошготой.
+ * **Бэлэн** (`READY`) — ангилал бүр өөрийн хавтантай, дарагдана.
+ * **Удахгүй** — БҮГД нэг хавтанд нийлнэ (`MoreTile`), дарагдахгүй.
  *
- * Бэлэн бишийг НУУХГҮЙ байгаа шалтгаан: үйлчлүүлэгч тэр үйлчилгээ энд
- * байх эсэхийг мэдэх нь дэлгүүр рүү залгах эсэхээ шийдэхэд хэрэгтэй.
- * Гэхдээ дарагдвал хоосон урсгалд унах тул `<span>`-аар зурна.
+ * ⚠️ Урьд нь бэлэн бус ангилал бүр өөрийн хавтантай байсан тул тор дээрх
+ * 10 хавтангийн 9 нь ажиллахгүй байв. Цорын ганц БЭЛЭН үйлчилгээ нь
+ * тэдгээрийн дунд төөрч, хуудас «одоохондоо юу ч хийж чадахгүй газар» мэт
+ * харагддаг байсан.
+ *
+ * Бэлэн бишийг бүрмөсөн НУУХГҮЙ байгаа шалтгаан: үйлчлүүлэгч тэр үйлчилгээ
+ * энд байх эсэхийг мэдэх нь дэлгүүр рүү залгах эсэхээ шийдэхэд хэрэгтэй.
+ * Тиймээс нэрс нь нэгтгэсэн хавтан дотор жагсаалт болж үлдэнэ.
  */
 export default function CategoryGrid({ counts, onPick }: Props) {
   const { t } = useLang();
@@ -227,14 +245,18 @@ export default function CategoryGrid({ counts, onPick }: Props) {
               /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 360ms-д. */
               style={{ animationDelay: `${index * 40}ms` }}
             >
-              <Tile
-                tile={tile}
-                ready={READY.includes(tile.key)}
-                count={counts[tile.key] ?? 0}
-                onPick={onPick}
-              />
+              <Tile tile={tile} count={counts[tile.key] ?? 0} onPick={onPick} />
             </li>
           ))}
+
+          {SOON_TILES.length > 0 && (
+            <li
+              className="tile-3d tile-in"
+              style={{ animationDelay: `${GRID_TILES.length * 40}ms` }}
+            >
+              <MoreTile />
+            </li>
+          )}
         </ul>
       </div>
     </section>

@@ -84,7 +84,7 @@ export const CONTACT = {
 
   /** Хоосон мөрийг интерфейс автоматаар алгасана. */
   social: {
-    facebook: '',
+    facebook: 'https://www.facebook.com/NarantuulKonicaSalbar',
     instagram: '',
   },
 } as const;
@@ -114,6 +114,7 @@ export const HERO_IMAGES: readonly HeroImage[] = [
   { src: '/hero/1.jpeg' },
   { src: '/hero/2.jpeg' },
   { src: '/hero/3.jpeg' },
+  { src: '/hero/4.jpeg' },
 ];
 
 /** Толгой болон товчнуудад хэрэглэх үндсэн дугаар. */

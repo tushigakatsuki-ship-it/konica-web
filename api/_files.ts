@@ -10,15 +10,18 @@ import type { PaymentInfo } from './_payment';
 
 // ── Хязгаарууд ─────────────────────────────────────────────────────
 
-/** Нэг захиалгад орох файлын дээд тоо (зураг тус бүр хэвлэх + эх = 2 файл). */
-export const MAX_FILES = 60;
-/** Нэг файлын дээд хэмжээ — утсаар авсан зураг ихэвчлэн 3–8MB. */
-export const MAX_FILE_BYTES = 30 * 1024 * 1024;
+/*
+ * ⚠️ Хязгаарууд `src/lib/limits.ts`-д амьдарна — клиент, сервер ХОЁУЛАА
+ * тэндээс уншина. Энд дахин бичвэл нэгийг нь өөрчлөөд нөгөөг мартах нь цаг
+ * хугацааны асуудал; тэр үед хэрэглэгч зургаа сонгож, бүгдийг бэлдээд,
+ * дараа нь сервер татгалзана — хийсэн ажил бүхэлдээ хаягдана.
+ */
+import { MAX_FILES, MAX_FILE_BYTES, PUT_EXPIRES_SEC } from '../src/lib/limits';
+
+export { MAX_FILES, MAX_FILE_BYTES, PUT_EXPIRES_SEC };
 export const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp'] as const;
 
-/** Presigned PUT-ийн хүчинтэй хугацаа — байршуулах хангалттай, хэтрэхгүй. */
-export const PUT_EXPIRES_SEC = 20 * 60;
 /** Admin татах линкийн хугацаа. */
 export const GET_EXPIRES_SEC = 60 * 60;
 
@@ -139,6 +142,13 @@ export interface WebOrderManifest {
     note: string;
     /** Хүргэлтийн хаяг — NAS дээрх ЗАХИАЛГА.txt дээр гарна. Хүргэлтгүй бол хоосон. */
     address?: string;
+    /**
+     * Хэрэглэгчийн хүссэн хүлээж авах өдөр `YYYY-MM-DD`.
+     *
+     * Хуучин manifest дээр байхгүй байж болзошгүй тул уншихдаа заавал
+     * хоосон утгыг тооцно.
+     */
+    pickupDate?: string;
   };
   total: number;
   lines: { name: string; qty: number; total: number }[];

@@ -50,13 +50,13 @@ export const STRINGS = {
 
   /* ── Нүүр — эхний дэлгэц ── */
   'hero.badge': {
-    mn: 'Konica Minolta · Мэргэжлийн зураг угаалт',
+    mn: 'Konica Minolta · FujiFilm · Мэргэжлийн зураг угаалт',
     en: 'Konica Minolta · Professional photo lab',
   },
   'hero.titleTop': { mn: 'Чанартай хэвлэл,', en: 'Quality printing,' },
   'hero.titleAccent': { mn: 'хурдан үйлчилгээ', en: 'fast service' },
   'hero.subtitle': {
-    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай — үнэ нь тэр дороо харагдана.',
+    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай.',
     en: 'Pick your size and add your photo — the price shows up right away.',
   },
 
@@ -95,6 +95,41 @@ export const STRINGS = {
     en: 'Tap a category to see its price list.',
   },
   'print.itemCount': { mn: 'төрөл', en: 'options' },
+
+  /*
+   * Захиалгын хязгаар, илгээх хугацаа.
+   *
+   * ⚠️ Хязгаар нь урьд нь ЗӨВХӨН серверт байсан тул хэрэглэгч зургаа бүгдийг
+   * бэлдээд «60-аас олон файл байж болохгүй» гэсэн алдаа хардаг байв. Тэр
+   * 60 гэсэн тоо хаанаас гарсныг ойлгох арга байхгүй — зураг бүрээс ХОЁР
+   * файл гардгийг зөвхөн код л мэддэг байлаа.
+   */
+  'limit.title': {
+    mn: 'Нэг захиалгад {max} хүртэл зураг',
+    en: 'Up to {max} photos per order',
+  },
+  'limit.count': {
+    mn: 'Одоо {n}/{max} зураг сонгосон — ойролцоогоор {mb}MB.',
+    en: '{n}/{max} photos selected — about {mb}MB.',
+  },
+  'limit.time': {
+    mn: 'Илгээхэд сайн WiFi-д ~{fast} минут, гар утасны сүлжээгээр ~{slow} минут болно. Цонхоо нээлттэй байлгаарай.',
+    en: 'Sending takes about {fast} min on good WiFi, up to ~{slow} min on mobile data. Keep the tab open.',
+  },
+
+  /*
+   * Бэлэн бус ангиллуудыг НЭГТГЭСЭН хавтан.
+   *
+   * Урьд нь 9 ангилал тус бүр «Удахгүй» шошготой хавтан эзэлдэг байсан тул
+   * тор нь ажиллахгүй зүйлээр дүүрч, БЭЛЭН цорын ганц үйлчилгээ (зураг
+   * угаалт) тэдгээрийн дунд төөрдөг байв.
+   */
+  'print.moreServices': { mn: 'Нэмэлт үйлчилгээ', en: 'More services' },
+  'print.moreServicesHint': {
+    mn: 'Өргөмжлөл, медаль, хувцас хэвлэл, тууз, хулдаас, хувилах, скан.',
+    en: 'Certificates, medals, garment printing, ribbons, banners, copying, scanning.',
+  },
+  'print.veryComingSoon': { mn: 'Тун удахгүй', en: 'Very soon' },
   'print.showAll': { mn: 'Бүх хэмжээ харах', en: 'Show all sizes' },
   'print.continue': { mn: 'Захиалга үргэлжлүүлэх', en: 'Continue to order' },
   'print.back': { mn: 'Буцах', en: 'Back' },

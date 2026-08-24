@@ -1,6 +1,6 @@
 import { CONTACT } from '../data/site';
 import { useLang } from '../state/lang';
-import { IconClock, IconMail, IconMapPin, IconPhone } from './icons';
+import { IconClock, IconFacebook, IconMail, IconMapPin, IconPhone } from './icons';
 
 /**
  * Хөл — жижиг бизнесийн вэбийн хамгийн их уншигддаг хэсгүүдийн нэг.
@@ -49,22 +49,6 @@ export default function Footer() {
           </p>
           <p className="mt-3 text-sm leading-relaxed">{t('common.tagline')}</p>
 
-          {socials.length > 0 && (
-            <ul className="mt-4 flex gap-3 text-sm">
-              {socials.map(([name, url]) => (
-                <li key={name}>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="capitalize hover:text-brand-500"
-                  >
-                    {name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         {/* Холбоо барих */}
@@ -87,6 +71,28 @@ export default function Footer() {
                 >
                   <IconMail className="size-4 shrink-0" />
                   {email}
+                </a>
+              </li>
+            ))}
+
+            {/*
+              Сошиал холбоос нь ХОЛБОО БАРИХ баганад.
+              Урьд нь байгууллагын баганад, зөвхөн нэрээрээ («facebook»)
+              жагсдаг байсан: тэнд утас, и-мэйлээс тусдаа байрладаг тул
+              «энэ бол бас нэг холбогдох арга» гэдэг нь харагддаггүй.
+              Практикт Монголд Facebook Messenger нь утаснаас илүү олон
+              захиалга авчирдаг тул хамгийн ил байх ёстой.
+            */}
+            {socials.map(([name, url]) => (
+              <li key={name}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 capitalize hover:text-brand-500"
+                >
+                  <IconFacebook className="size-4 shrink-0" />
+                  {name}
                 </a>
               </li>
             ))}
