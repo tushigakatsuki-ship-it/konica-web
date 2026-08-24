@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """nas-sync.py-г хуурамч сервер дээр бүтнээр нь ажиллуулж шалгана."""
-import json, os, shutil, subprocess, sys, tempfile, threading
+import json, os, pathlib, shutil, subprocess, sys, tempfile, threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 TOKEN = "test-token-0123456789"
@@ -156,6 +156,31 @@ cyr = subprocess.run([sys.executable, SCRIPT], capture_output=True, text=True,
 ok(cyr.returncode == 2, f"кирилл токен → код 2 ({cyr.returncode})")
 ok("Traceback" not in cyr.stderr, "traceback биш, ойлгомжтой мессеж")
 ok("кирилл" in cyr.stderr, "юу болсныг нэрлэж хэлнэ")
+
+# ── 8. Windows Notepad-ын BOM ────────────────────────────────────────────
+#
+# Notepad файлыг ихэвчлэн BOM-той хадгалдаг. Энгийн `utf-8`-аар уншвал эхний
+# түлхүүр нь `\ufeffKONICA_API_BASE` болж, скрипт «тохиргоо дутуу» гэж
+# гомдоно — атал файл нүдээр харахад төгс зөв харагдана.
+import importlib.util as _ilu
+
+_spec = _ilu.spec_from_file_location("nas_sync_mod", SCRIPT)
+_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+
+_bom_dir = tempfile.mkdtemp()
+_bom = os.path.join(_bom_dir, "nas-sync.env")
+with open(_bom, "wb") as handle:
+    handle.write("\ufeffKONICA_API_BASE=https://jishee.mn\n".encode("utf-8"))
+    handle.write("KONICA_ADMIN_TOKEN=abc123\n".encode("utf-8"))
+    handle.write("KONICA_DEST=\\\\SERVER\\photo\n".encode("utf-8"))
+
+_config = _mod.load_config(pathlib.Path(_bom))
+ok(_config.get("KONICA_API_BASE") == "https://jishee.mn",
+   f"BOM-той тохиргоог зөв уншина ({list(_config)[:1]})")
+ok(_config.get("KONICA_DEST") == "\\\\SERVER\\photo",
+   "UNC зам (\\\\SERVER\\photo) гэмтэлгүй уншигдана")
+shutil.rmtree(_bom_dir, ignore_errors=True)
 
 shutil.rmtree(dest, ignore_errors=True)
 print("\n=== ДҮН ===")

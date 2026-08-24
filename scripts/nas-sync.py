@@ -211,7 +211,13 @@ def load_config(path: Path | None) -> dict[str, str]:
     """
     config: dict[str, str] = {}
     if path is not None and path.exists():
-        for raw in path.read_text(encoding="utf-8").splitlines():
+        # ⚠️ `utf-8-sig` — `utf-8` БИШ.
+        #
+        # Windows-ийн Notepad файлыг ихэвчлэн BOM-той хадгалдаг. Энгийн
+        # `utf-8`-аар уншвал эхний түлхүүр нь `﻿KONICA_API_BASE` болж,
+        # скрипт «тохиргоо дутуу» гэж гомдоно — атал файл нүдээр харахад
+        # төгс зөв харагдана. Ийм алдааг олоход хагас өдөр зарцуулна.
+        for raw in path.read_text(encoding="utf-8-sig").splitlines():
             line = raw.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
