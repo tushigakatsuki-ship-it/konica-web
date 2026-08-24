@@ -592,14 +592,20 @@ export default function Order() {
 
             {progress && (
               <div className="mt-4">
+                {/*
+                  ⚠️ НЭГ мөр, НЭГ тоолуур.
+                  Урьд нь «бэлдэж байна» / «илгээж байна» гэсэн хоёр үе шат
+                  тусад нь харагддаг байсан тул мөр 3/3 болоод 0/3 руу буцдаг
+                  байв. Одоо зураг бүр бэлдэгдээд тэр даруй илгээгддэг тул
+                  үнэхээр нэг үе шат болов.
+
+                  Тоо нь ЗУРГААР явна (файлаар биш) — зураг бүрээс хоёр файл
+                  гардаг тул «24/60» гэж харуулбал хэрэглэгч ойлгохгүй.
+                */}
                 <div className="flex justify-between text-xs text-muted">
-                  <span>
-                    {progress.phase === 'prepare'
-                      ? 'Зургийг хэвлэлд бэлдэж байна…'
-                      : 'Зураг илгээж байна…'}
-                  </span>
-                  <span>
-                    {progress.done}/{progress.total}
+                  <span>Зураг илгээж байна…</span>
+                  <span className="tabular-nums">
+                    {progress.done}/{progress.total} зураг
                   </span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-brand-50">

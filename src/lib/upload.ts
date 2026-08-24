@@ -14,6 +14,7 @@ import { ServiceUnavailableError } from './api';
 import { DEFAULT_CROP } from './crop';
 import { renderPrintBlob } from './photoRender';
 import { sizeOf } from './photoSize';
+import { createProgress, slotIndex, type UploadProgress } from './uploadProgress';
 
 export interface UploadedFile {
   key: string;
@@ -31,14 +32,7 @@ export interface UploadResult {
   files: UploadedFile[];
 }
 
-export interface UploadProgress {
-  /** `prepare` — хэвлэлийн файл бэлдэж байна; `upload` — сүлжээгээр илгээж байна. */
-  phase: 'prepare' | 'upload';
-  /** 0–1 */
-  ratio: number;
-  done: number;
-  total: number;
-}
+export type { UploadProgress } from './uploadProgress';
 
 const extOf = (type: string): string =>
   type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
@@ -141,99 +135,127 @@ const putWithProgress = async (
 interface Planned {
   blob: Blob;
   meta: Omit<UploadedFile, 'key'>;
+  /**
+   * Аль зурагт харьяалагдах вэ (0-оос эхэлсэн дугаар).
+   *
+   * `Math.floor(index / 2)` гэж тооцож БОЛОХГҮЙ: `renderPrintBlob` унавал
+   * тухайн зураг зөвхөн нэг файл (`original`) үлдээдэг тул хосын дараалал
+   * тэр цэгээс эхлэн бүхэлдээ гажина.
+   */
+  photo: number;
+}
+
+
+/**
+ * Нэг зургаас байршуулах файлуудыг бэлдэнэ.
+ *
+ * Зураг бүрээс ХОЁР файл гарна:
+ *   `print`    — сонгосон хэмжээний харьцаагаар тайрсан, 300dpi, шууд
+ *                хэвлэхэд бэлэн JPEG.
+ *   `original` — хэрэглэгчийн эх файл. Автомат тайралт чухал хэсгийг таслачихвал
+ *                эсвэл өнгө/гэрэл засах шаардлага гарвал ажилтанд энэ хэрэгтэй.
+ *
+ * `renderPrintBlob` унавал зөвхөн `original` буцна — эх файл нь ажилтанд
+ * хамгийн чухал нь учир зургийг бүхэлд нь хаяхгүй.
+ */
+async function preparePhoto(
+  item: BasketItem,
+  labelIndex: number,
+  photo: number,
+): Promise<Planned[]> {
+  const original = item.value.file;
+  if (!original) return [];
+
+  const size = sizeOf(item.service.name);
+  const label = `${String(labelIndex + 1).padStart(2, '0')}_${asciiSize(size.label)}_${item.value.qty}sh`;
+  const common = {
+    serviceId: item.service.id,
+    sizeLabel: size.label,
+    qty: item.value.qty,
+  };
+
+  /*
+   * Хэрэглэгчийн тайралтыг ЗААВАЛ дамжуулна. Үүнийг мартвал дэлгэц дээр
+   * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
+   * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
+   */
+  const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
+  const files: Planned[] = [];
+
+  if (print) {
+    files.push({
+      blob: print,
+      photo,
+      meta: { kind: 'print', name: `${label}_print.jpg`, size: print.size, ...common },
+    });
+  }
+
+  files.push({
+    blob: original,
+    photo,
+    meta: {
+      kind: 'original',
+      name: `${label}_original.${extOf(original.type)}`,
+      size: original.size,
+      ...common,
+    },
+  });
+
+  return files;
 }
 
 /**
- * Сагснаас байршуулах файлуудыг бэлдэнэ.
+ * Захиалгын бүх зургийг R2 руу байршуулна.
  *
- * Зураг бүрээс ХОЁР файл гарна:
- *   `print`    — сонгосон хэмжээний харьцаагаар төвөөр нь тайрсан, 300dpi,
- *                шууд хэвлэхэд бэлэн JPEG.
- *   `original` — хэрэглэгчийн эх файл. Автомат тайралт чухал хэсгийг таслачихвал
- *                эсвэл өнгө/гэрэл засах шаардлага гарвал ажилтанд энэ хэрэгтэй.
+ * ── Яагаад бэлтгэл, илгээлт хоёрыг СОЛЬЖ явуулдаг вэ ────────────────
+ *
+ * Урьд нь эхлээд БҮХ зургийг бэлдэж (30 зурагт 10–25 секунд), дараа нь
+ * илгээж эхэлдэг байв. Гурван бодит гэм:
+ *
+ *   1. Явцын мөр хоёр удаа дүүрдэг — бэлтгэл 30/30 болоод илгээлт 0/30-аас
+ *      дахин эхэлнэ. Хэрэглэгч «эхнээс нь эхэллээ юү?» гэж эргэлзэнэ.
+ *   2. Эхний 20 секундэд сүлжээ ХООСОН зогсоно. Тэр хугацаанд эхний хэдэн
+ *      зураг аль хэдийн орчихож болох байсан.
+ *   3. Бэлдсэн 30 хэвлэлийн файл (~30–45MB) бүгд санах ойд зэрэг хуримтлагдана.
+ *
+ * Одоо зураг бүр бэлдэгдээд ТЭР ДАРУЙ илгээгдэнэ. Дараагийн зургийн бэлтгэл
+ * нь одоогийн зургийн илгээлттэй ЗЭРЭГ явна (процессор ба сүлжээ хоёр өөр
+ * нөөц — зэрэг ажиллуулбал нийт хугацаа богиносно).
+ *
+ * ⚠️ Хаягуудыг бэлтгэлээс ӨМНӨ, зураг бүрт хоёр байр урьдчилан захиална.
+ * Хэвлэлийн файлын ЯГ хэмжээг тэр үед мэдэхгүй тул эх файлын хэмжээг мэдүүлнэ —
+ * presigned гарын үсэгт хэмжээ ОРДОГГҮЙ тул энэ нь зөвхөн серверийн 30MB
+ * шалгалтад л нөлөөлнө (хэвлэлийн файл нь эх файлаас томрох боломжгүй,
+ * учир нь хиймэл томруулалт хийдэггүй). Manifest руу ҮРГЭЛЖ жинхэнэ хэмжээ
+ * бичигдэнэ.
  */
-export async function planFiles(
-  items: readonly BasketItem[],
-  onProgress?: (done: number, total: number) => void,
-): Promise<Planned[]> {
-  const planned: Planned[] = [];
-  const withPhoto = items.filter((item) => item.value.file).length;
-  let prepared = 0;
-
-  for (const [index, item] of items.entries()) {
-    const original = item.value.file;
-    if (!original) continue;
-
-    const size = sizeOf(item.service.name);
-    const label = `${String(index + 1).padStart(2, '0')}_${asciiSize(size.label)}_${item.value.qty}sh`;
-
-    /*
-     * Задалсан зургийг хадгалахгүй — `renderPrintBlob` дотроо задалж, дуусмагц
-     * `close()` дуудна. 20 зурагтай захиалгад бүгдийг зэрэг задалбал хямд утас
-     * санах ойгүй болно.
-     */
-    /*
-     * Хэрэглэгчийн тайралтыг ЗААВАЛ дамжуулна. Үүнийг мартвал дэлгэц дээр
-     * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
-     * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
-     */
-    const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
-    if (print) {
-      planned.push({
-        blob: print,
-        meta: {
-          kind: 'print',
-          name: `${label}_print.jpg`,
-          size: print.size,
-          serviceId: item.service.id,
-          sizeLabel: size.label,
-          qty: item.value.qty,
-        },
-      });
-    }
-
-    planned.push({
-      blob: original,
-      meta: {
-        kind: 'original',
-        name: `${label}_original.${extOf(original.type)}`,
-        size: original.size,
-        serviceId: item.service.id,
-        sizeLabel: size.label,
-        qty: item.value.qty,
-      },
-    });
-
-    prepared += 1;
-    onProgress?.(prepared, withPhoto);
-    // Зураг бүрийн дараа хөтөчид зурах завсар өгнө — эс тэгвээс 20 зурагтай
-    // захиалгад интерфейс хэдэн секунд царцсан мэт харагдана.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-
-  return planned;
-}
-
 export async function uploadBasketPhotos(
   items: readonly BasketItem[],
   onProgress: (progress: UploadProgress) => void,
 ): Promise<UploadResult | null> {
-  const planned = await planFiles(items, (done, total) =>
-    onProgress({ phase: 'prepare', ratio: total === 0 ? 1 : done / total, done, total }),
-  );
-  if (planned.length === 0) return null;
+  const photos = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.value.file);
+  if (photos.length === 0) return null;
+
+  // ── 1. Хаягуудыг урьдчилан захиалах ──────────────────────────────
+  const reserved = photos.flatMap(({ item }) => {
+    const original = item.value.file as File;
+    return [
+      { kind: 'print', ext: 'jpg', size: original.size, contentType: 'image/jpeg' },
+      {
+        kind: 'original',
+        ext: extOf(original.type),
+        size: original.size,
+        contentType: original.type || 'image/jpeg',
+      },
+    ];
+  });
 
   const response = await fetch('/api/upload', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      files: planned.map((p) => ({
-        kind: p.meta.kind,
-        ext: extOf(p.blob.type),
-        size: p.blob.size,
-        contentType: p.blob.type || 'image/jpeg',
-      })),
-    }),
+    body: JSON.stringify({ files: reserved }),
   });
 
   /*
@@ -258,83 +280,116 @@ export async function uploadBasketPhotos(
 
   const { uploadId, date, urls } = body as Required<typeof body>;
 
-  // Явцыг файлын хэмжээгээр жигнэнэ — жижиг файл дүүрсэн ч мөр үсрэхгүй.
-  const totalBytes = planned.reduce((sum, p) => sum + p.blob.size, 0);
-  const sent = new Array<number>(planned.length).fill(0);
-  const report = (done: number) =>
-    onProgress({
-      phase: 'upload',
-      ratio: totalBytes === 0 ? 1 : sent.reduce((a, b) => a + b, 0) / totalBytes,
-      done,
-      total: planned.length,
-    });
-
-  report(0);
-
-  /**
-   * Дараалан илгээнэ.
-   *
-   * Зэрэг илгээвэл хурдан ч, гар утасны сүлжээнд олон том PUT зэрэг явуулбал
-   * timeout-д орох магадлал огцом нэмэгддэг. Явц ч ойлгомжтой байна.
+  // ── 2. Явцын тооцоо ──────────────────────────────────────────────
+  /*
+   * Зураг бүр ижил жинтэй. Байтаар жигнэх боломжгүй — бэлдэж дуустал
+   * хэвлэлийн файлын хэмжээг мэдэхгүй, харин мөр эхний секундээс л хөдлөх
+   * ёстой.
    */
-  const sendOne = async (index: number): Promise<boolean> => {
-    const plan = planned[index];
-    try {
-      await putWithProgress(urls[index].url, plan.blob, (fraction) => {
-        sent[index] = plan.blob.size * fraction;
-        report(index);
-      });
-      sent[index] = plan.blob.size;
-      report(index + 1);
-      return true;
-    } catch {
-      sent[index] = 0;
-      return false;
+  const total = photos.length;
+  const progress = createProgress(total);
+  const report = (state: UploadProgress) => onProgress(state);
+
+  report(progress.snapshot());
+
+  // ── 3. Бэлтгэл + илгээлтийг сольж явуулах ────────────────────────
+  /** Хоёр дахь давталтад зориулж УНАСАН зургийн файлыг л хадгална. */
+  const retry: Planned[] = [];
+  const uploaded: UploadedFile[] = [];
+
+  const sendPhoto = async (files: Planned[], photo: number): Promise<boolean> => {
+    const bytes = files.reduce((sum, file) => sum + file.blob.size, 0);
+    const sent = new Array<number>(files.length).fill(0);
+
+    const tick = () =>
+      report(
+        progress.sending(
+          photo,
+          bytes === 0 ? 1 : sent.reduce((a, b) => a + b, 0) / bytes,
+        ),
+      );
+
+    for (const [index, file] of files.entries()) {
+      const slot = urls[slotIndex(photo, file.meta.kind)];
+      try {
+        await putWithProgress(slot.url, file.blob, (fraction) => {
+          sent[index] = file.blob.size * fraction;
+          tick();
+        });
+        sent[index] = file.blob.size;
+        tick();
+      } catch {
+        /*
+         * Хагас явсныг тэглэнэ — эс тэгвээс дахин илгээхэд ижил байт давхарлаж
+         * тооцоо 100%-иас давна.
+         */
+        sent[index] = 0;
+        return false;
+      }
     }
+
+    for (const file of files) {
+      uploaded.push({ key: urls[slotIndex(photo, file.meta.kind)].key, ...file.meta });
+    }
+    report(progress.finished(photo));
+    return true;
   };
 
   /*
-   * ── Нэг файл унахад БҮХНИЙГ хаядаггүй ────────────────────────────
+   * Нэг зураг ТУРУУЛЖ бэлдэнэ. Дараа нь давталт бүрт: одоогийн зургийг
+   * илгээхийн ЗЭРЭГЦЭЭ дараагийнхыг бэлдэнэ. Процессор, сүлжээ хоёр зэрэг
+   * ажиллана — 30 зурагт бэлтгэлийн 10–25 секунд бүхэлдээ хэмнэгдэнэ.
+   */
+  let ahead = preparePhoto(photos[0].item, photos[0].index, 0);
+
+  for (let photo = 0; photo < total; photo += 1) {
+    const files = await ahead;
+    report(progress.prepared(photo));
+
+    const next = photos[photo + 1];
+    ahead = next
+      ? preparePhoto(next.item, next.index, photo + 1)
+      : Promise.resolve([]);
+
+    if (!(await sendPhoto(files, photo))) retry.push(...files);
+  }
+
+  // ── 4. Унасан файлуудыг дахин үзэх ───────────────────────────────
+  /*
+   * ⚠️ Нэг файл унахад БҮХНИЙГ хаядаггүй.
    *
-   * ⚠️ Урьд нь энэ давталт `await putWithProgress(...)`-ыг шууд дууддаг
-   * байсан тул 20 зурагтай захиалгын 19 дэх нь уначихвал алдаа дээшээ шидэгдэж,
-   * АЛЬ ХЭДИЙН амжилттай орсон 18 зураг ч хамт хаягддаг байв. Хэрэглэгч 45 MB
-   * илгээчихээд эхнээс нь дахин эхлэх шаардлагатай болно — гар утасны сүлжээн
-   * дээр энэ нь хамгийн түгээмэл бүтэлгүйтэл.
+   * Урьд нь алдаа дээшээ шидэгддэг байсан тул 20 зурагтай захиалгын 19 дэх нь
+   * уначихвал АЛЬ ХЭДИЙН орсон 18 зураг ч хамт хаягддаг байв — хэрэглэгч 45MB
+   * илгээчихээд эхнээс нь эхэлнэ.
    *
-   * Одоо: эхний давталт бүх файлыг оролдож, унасныг нь ТЭМДЭГЛЭЖ авна.
-   * Дараа нь хэдэн секунд амраад зөвхөн УНАСАН файлуудыг дахин илгээнэ.
    * Presigned URL 20 минут хүчинтэй тул ижил хаяг руу үргэлжлүүлж болно —
    * шинэ хаяг гуйх, сервер рүү дахин хандах шаардлагагүй.
    */
-  const failed: number[] = [];
-  for (let index = 0; index < planned.length; index += 1) {
-    if (!(await sendOne(index))) failed.push(index);
-  }
-
-  if (failed.length > 0) {
+  if (retry.length > 0) {
     await sleep(SECOND_PASS_DELAY_MS);
 
-    const stillFailed: number[] = [];
-    for (const index of failed) {
-      if (!(await sendOne(index))) stillFailed.push(index);
+    const stillFailed: Planned[] = [];
+    const byPhoto = new Map<number, Planned[]>();
+    for (const file of retry) {
+      byPhoto.set(file.photo, [...(byPhoto.get(file.photo) ?? []), file]);
+    }
+
+    for (const [photo, files] of byPhoto) {
+      if (!(await sendPhoto(files, photo))) stillFailed.push(...files);
     }
 
     /*
-     * Хоёр дахь давталт ч бүтэхгүй бол л бууж өгнө. Хэдэн файл дутсаныг
+     * Хоёр дахь давталт ч бүтэхгүй бол л бууж өгнө. Хэдэн зураг дутсаныг
      * хэлэх нь чухал: «алдаа гарлаа» гэхээс илүү «19 зургаас 2 нь орсонгүй»
      * гэвэл хэрэглэгч сүлжээгээ соливол болно гэдгээ ойлгоно.
      */
-    if (stillFailed.length > 0)
+    if (stillFailed.length > 0) {
+      const lost = new Set(stillFailed.map((file) => file.photo)).size;
       throw new Error(
-        `${planned.length} файлаас ${stillFailed.length} нь илгээгдсэнгүй. ` +
-          'Сүлжээгээ шалгаад дахин оролдоно уу.',
+        `${total} зургаас ${lost} нь илгээгдсэнгүй. Сүлжээгээ шалгаад дахин оролдоно уу.`,
       );
+    }
   }
 
-  return {
-    uploadId,
-    date,
-    files: planned.map((plan, index) => ({ key: urls[index].key, ...plan.meta })),
-  };
+  return { uploadId, date, files: uploaded };
 }
