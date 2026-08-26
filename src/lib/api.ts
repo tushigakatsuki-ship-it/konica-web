@@ -28,6 +28,8 @@ export interface BankOption {
   bank: string;
   account: string;
   holder: string;
+  /** Хоосон байж болно — тэр үед интерфейст мөр нь гарахгүй. */
+  iban: string;
   reference: string;
   amount: number;
 }

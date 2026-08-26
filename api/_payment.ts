@@ -38,6 +38,15 @@ export interface BankInstructions {
   bank: string;
   account: string;
   holder: string;
+  /**
+   * IBAN — ЗААВАЛ БИШ.
+   *
+   * Дотоодын шилжүүлэгт ердийн дансны дугаар хангалттай тул ихэнх
+   * үйлчлүүлэгчид энэ хэрэггүй. Байгууллагын нягтлан, банк хооронд
+   * шилжүүлэг хийдэг хүнд л хэрэгтэй болдог. `BANK_IBAN` хоосон бол
+   * интерфейст энэ мөр огт гарахгүй.
+   */
+  iban: string;
   /** Гүйлгээний утга — ЗААВАЛ захиалгын дугаар байх ёстой. */
   reference: string;
   amount: number;
@@ -51,6 +60,12 @@ export const readBankInstructions = (
   const bank = env.BANK_NAME ?? '';
   const account = env.BANK_ACCOUNT ?? '';
   const holder = env.BANK_HOLDER ?? '';
+  /*
+   * Зайг зайлуулна: IBAN-ыг банкны аппаас хуулахад `MN95 0005 0050 3529 8851`
+   * гэсэн бүлэглэсэн хэлбэрээр ирдэг. Хэрэглэгч түүнийг хуулж аппдаа буулгахад
+   * зарим банк зайтай утгыг хүлээж авдаггүй — тиймээс нягт хэлбэрээр хадгална.
+   */
+  const iban = (env.BANK_IBAN ?? '').replace(/\s+/g, '').toUpperCase();
   if (!bank || !account) return null;
-  return { bank, account, holder, reference: orderNumber, amount };
+  return { bank, account, holder, iban, reference: orderNumber, amount };
 };

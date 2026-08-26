@@ -195,6 +195,28 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
                   <dd className="font-semibold">{payment.bank.holder}</dd>
                 </div>
               )}
+              {/*
+                IBAN нь дансны дугаарын ДООР байрлана — дээр нь биш.
+
+                Ихэнх үйлчлүүлэгч дотоодын шилжүүлэг хийдэг бөгөөд тэдэнд
+                ердийн дансны дугаар л хэрэгтэй. IBAN-ыг эхэнд тавивал урт
+                тоог хараад «алийг нь хуулах вэ» гэж эргэлзэнэ.
+              */}
+              {payment.bank.iban && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">IBAN</dt>
+                  <dd className="flex items-center gap-2 font-semibold">
+                    <span className="break-all text-right">{payment.bank.iban}</span>
+                    <button
+                      type="button"
+                      onClick={() => void copy(payment.bank!.iban, 'iban')}
+                      className="shrink-0 rounded-sm border border-hairline px-2 py-0.5 text-[11px] font-semibold text-brand-500"
+                    >
+                      {copied === 'iban' ? 'Хууллаа' : 'Хуулах'}
+                    </button>
+                  </dd>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-muted">Гүйлгээний утга</dt>
                 <dd className="flex items-center gap-2 font-semibold">
