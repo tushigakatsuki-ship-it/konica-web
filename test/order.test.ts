@@ -9,6 +9,7 @@ import {
   numberWorkLogs,
   type IncomingOrder,
 } from '../api/_shared';
+import { isOrderNumber } from '../api/_files';
 
 /**
  * 2026-08-06 14:05 Улаанбаатар.
@@ -128,14 +129,14 @@ test('ашиглагдсан дугаарыг ТОЙРНО', () => {
    * мөнгө шилжүүлбэл аль нь төлснийг ялгах арга байхгүй — ажилтан буруу
    * захиалгын зургийг нээж, зөв нь хүлээсээр үлдэнэ.
    */
-  const taken = new Set(['PMN-260806-1000', 'PMN-260806-2000']);
+  const taken = new Set(['PMN-260806-10000', 'PMN-260806-20000']);
 
   // Эхний хоёр сугалалт «авагдсан», гурав дахь нь чөлөөтэй.
   const draws = [0, 1 / 9, 0.5];
   let i = 0;
   const number = makeOrderNumber(NOW, () => draws[i++] ?? 0.5, taken);
 
-  assert.equal(number, 'PMN-260806-5500');
+  assert.equal(number, 'PMN-260806-55000');
   assert.equal(i, 3, 'чөлөөт дугаар олтол оролдоогүй');
   assert.ok(!taken.has(number));
 });
@@ -148,12 +149,12 @@ test('давхцалгүй бол ПЕРВЫЙ сугалалтыг л авна'
 
 test('бүх оролдлого дүүрсэн ч захиалгыг УНАГААХГҮЙ', () => {
   /*
-   * Өдөрт 9000 дугаар дүүрэх нь бодит биш. Гэхдээ хэрэв тийм болбол
+   * Өдөрт 90,000 дугаар дүүрэх нь бодит биш. Гэхдээ хэрэв тийм болбол
    * захиалгыг татгалзах нь давхцлаас хамаагүй дор — хэрэглэгч мөнгөө
    * төлж чадахгүй болно.
    */
-  const number = makeOrderNumber(NOW, () => 0.5, new Set(['PMN-260806-5500']));
-  assert.equal(number, 'PMN-260806-5500', 'алдаа шидсэн эсвэл хоосон буцаасан');
+  const number = makeOrderNumber(NOW, () => 0.5, new Set(['PMN-260806-55000']));
+  assert.equal(number, 'PMN-260806-55000', 'алдаа шидсэн эсвэл хоосон буцаасан');
 });
 
 test('buildOrder нь taken-ыг дамжуулна', () => {
@@ -163,9 +164,9 @@ test('buildOrder нь taken-ыг дамжуулна', () => {
     order(),
     NOW,
     () => draws[i++] ?? 0.9,
-    new Set(['PMN-260806-5500']),
+    new Set(['PMN-260806-55000']),
   );
-  assert.equal(built.orderNumber, 'PMN-260806-9100');
+  assert.equal(built.orderNumber, 'PMN-260806-91000');
 });
 
 test('дугаарын хэлбэр хэвээр — апп, NAS, товч бүгд түүнээс хамаарна', () => {
@@ -174,8 +175,20 @@ test('дугаарын хэлбэр хэвээр — апп, NAS, товч бү�
    * хавтасны нэр — бүгд энэ хэлбэрийг барьдаг. Өөрчилвөл дөрвүүлэн эвдэрнэ.
    */
   for (const draw of [0, 0.25, 0.5, 0.999]) {
-    assert.match(makeOrderNumber(NOW, draw), /^PMN-\d{6}-\d{4}$/);
+    assert.match(makeOrderNumber(NOW, draw), /^PMN-\d{6}-\d{5}$/);
   }
+});
+
+test('ХУУЧИН дөрвөн оронтой дугаар хүчинтэй хэвээр', () => {
+  /*
+   * R2 дээр аль хэдийн дөрвөн оронтой захиалгууд хадгалагдсан. Зөвхөн таван
+   * оронг зөвшөөрвөл тэдгээрийн төлөв харах хуудас, NAS-ийн таталт, түлхүүр
+   * задлагч гурвуулаа тэр дороо ажиллахаа болино.
+   */
+  assert.ok(isOrderNumber('PMN-260806-4821'), 'хуучин дугаар хүчингүй болжээ');
+  assert.ok(isOrderNumber('PMN-260806-48213'), 'шинэ дугаар хүчингүй байна');
+  assert.ok(!isOrderNumber('PMN-260806-482'), 'гурван орон өнгөрч байна');
+  assert.ok(!isOrderNumber('PMN-260806-482134'), 'зургаан орон өнгөрч байна');
 });
 
 test('клиентийн явуулсан үнийг тогтмол үнэтэй мөрөнд ҮЛ ТООМСОРЛОНО', () => {
@@ -260,7 +273,7 @@ test('хүргэлт зөвхөн эхний worklog дээр тэмдэглэг
 
 test('захиалгын дугаар PMN-YYMMDD-NNNN хэлбэртэй', () => {
   const built = buildOrder(order(), NOW, 0.5);
-  assert.match(built.orderNumber, /^PMN-260806-\d{4}$/);
+  assert.match(built.orderNumber, /^PMN-260806-\d{5}$/);
   // Дугаар бүх бичлэг дээр давтагдаж, шүүхэд ашиглагдана.
   for (const record of [
     ...Object.values(built.orders),

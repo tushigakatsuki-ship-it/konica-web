@@ -95,6 +95,25 @@ export interface NotifyButton {
 /** `callback_data`-гийн Telegram-ийн хатуу хязгаар. */
 export const CALLBACK_DATA_MAX = 64;
 
+/**
+ * Дахин оролдох хугацааны НИЙТ төсөв, миллисекундээр.
+ *
+ * ⚠️ Энэ тоо яагаад ийм БАГА вэ:
+ *
+ * `notify` нь захиалга илгээх хариуг ХҮЛЭЭЛГЭЖ байгаад дуудагддаг. Өөрөөр
+ * хэлбэл энд хүлээсэн секунд бүр нь хэрэглэгчийн дэлгэц дээрх «илгээж
+ * байна…» дүрсийг уртасгана. Telegram-ийг найдвартай болгох гэж
+ * үйлчлүүлэгчийг 40 секунд хүлээлгэх нь буруу солилцоо — тэр хүн табаа
+ * хаачихвал захиалга нь ч алдагдана.
+ *
+ * Тиймээс зөвхөн ТҮР зуурын саатлыг (сүлжээний алдаа, богино 429) нөхнө.
+ */
+const RETRY_BUDGET_MS = 4_000;
+const RETRY_ATTEMPTS = 3;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 export async function notify(
   text: string,
   buttons: readonly NotifyButton[] = [],
@@ -114,38 +133,76 @@ export async function notify(
     (button) => new TextEncoder().encode(button.data).length <= CALLBACK_DATA_MAX,
   );
 
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
-        // Линк урьдчилан харах хэсэг чатыг дүүргэдэг тул хаана.
-        disable_web_page_preview: true,
-        ...(safe.length > 0
-          ? {
-              reply_markup: {
-                inline_keyboard: safe.map((button) => [
-                  { text: button.text, callback_data: button.data },
-                ]),
-              },
-            }
-          : {}),
-      }),
-      signal: AbortSignal.timeout(5_000),
-    });
+  const payload = JSON.stringify({
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    // Линк урьдчилан харах хэсэг чатыг дүүргэдэг тул хаана.
+    disable_web_page_preview: true,
+    ...(safe.length > 0
+      ? {
+          reply_markup: {
+            inline_keyboard: safe.map((button) => [
+              { text: button.text, callback_data: button.data },
+            ]),
+          },
+        }
+      : {}),
+  });
 
-    if (response.ok) return { ok: true };
+  const deadline = Date.now() + RETRY_BUDGET_MS;
+  let last: NotifyResult = { ok: false, error: 'Telegram руу огт хандсангүй.' };
 
-    const body = (await response.json().catch(() => null)) as {
-      description?: string;
-    } | null;
-    return { ok: false, error: explain(response.status, body?.description ?? '') };
-  } catch (error) {
-    return { ok: false, error: `Telegram руу холбогдож чадсангүй: ${String(error)}` };
+  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: payload,
+        signal: AbortSignal.timeout(5_000),
+      });
+
+      if (response.ok) return { ok: true };
+
+      const body = (await response.json().catch(() => null)) as {
+        description?: string;
+        parameters?: { retry_after?: number };
+      } | null;
+
+      last = { ok: false, error: explain(response.status, body?.description ?? '') };
+
+      /*
+       * 4xx нь 429-ээс бусад тохиолдолд БАЙНГЫН алдаа: мессеж буруу, токен
+       * буруу, бот группээс хөөгдсөн. Давтаад ижил хариу ирнэ.
+       */
+      if (response.status !== 429 && response.status < 500) return last;
+
+      /*
+       * Telegram 429 дээр `retry_after` секундээр хэлдэг. Түүнийг ХҮНДЭТГЭНЭ —
+       * өөрийн таамгаар эрт давтвал хязгаар нь улам уртасдаг.
+       *
+       * ⚠️ Гэхдээ багц ачаалалд `retry_after` нь 30–60 секунд байж болно.
+       * Тэр нь бидний төсөвт багтахгүй — тэр үед дахин оролдохгүй ЗОРИУДААР
+       * шууд буцна. Группд минутанд 20 мессежийн хязгаар байдаг тул 100
+       * захиалга нэг дор ирвэл хүлээгээд ч нэмэргүй: шийдэл нь хүлээх биш,
+       * Telegram-ээс өөр нөөц зам байх явдал.
+       */
+      const waitMs =
+        response.status === 429 && typeof body?.parameters?.retry_after === 'number'
+          ? body.parameters.retry_after * 1000
+          : 500 * 2 ** attempt;
+
+      if (Date.now() + waitMs > deadline) return last;
+      await sleep(waitMs);
+    } catch (error) {
+      last = { ok: false, error: `Telegram руу холбогдож чадсангүй: ${String(error)}` };
+      const waitMs = 500 * 2 ** attempt;
+      if (Date.now() + waitMs > deadline) return last;
+      await sleep(waitMs);
+    }
   }
+
+  return last;
 }
 
 /** `1000` → `1,000₮` */

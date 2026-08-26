@@ -21,8 +21,16 @@ import { ValidationError, mongolianToday } from './_shared';
 
 export const config = { runtime: 'edge' };
 
+/*
+ * ⚠️ Хязгаар нь `order.ts`-ийнхаас ӨНДӨР байх ёстой: хэрэглэгч зургаа
+ * сонгоод байршуулах хаяг авах бүрд энд ирдэг ч, захиалга нэг л удаа
+ * илгээгддэг. Тэнцүү тавьвал байршуулалт нь захиалгаас өмнө хаагдана.
+ *
+ * 30 гэсэн тоо нь CGNAT-ыг тооцсон: Монголын операторууд олон хэрэглэгчийг
+ * нэг нийтийн IP-ийн ард байрлуулдаг тул «нэг IP» ≠ «нэг хүн».
+ */
 const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 10;
+const MAX_PER_WINDOW = 30;
 const hits = new Map<string, number[]>();
 
 function rateLimited(ip: string): boolean {

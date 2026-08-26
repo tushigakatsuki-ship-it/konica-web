@@ -93,7 +93,7 @@ test('амжилттай захиалга 201 буцааж, дугаар өгн�
   const body = (await response.json()) as { orderNumber: string; total: number };
 
   assert.equal(response.status, 201);
-  assert.match(body.orderNumber, /^PMN-\d{6}-\d{4}$/);
+  assert.match(body.orderNumber, /^PMN-\d{6}-\d{5}$/);
   assert.equal(body.total, 1000); // 500₮ × 2
 });
 
@@ -206,7 +206,8 @@ test('нэг IP-ээс хэт олон хүсэлт ирвэл 429', async () =>
   });
 
   const statuses: number[] = [];
-  for (let i = 0; i < 8; i++) statuses.push((await handler(flood.clone())).status);
+  // Хязгаар 15/минут (CGNAT-ыг тооцсон) тул түүнээс хол давсан тоо хэрэгтэй.
+  for (let i = 0; i < 25; i++) statuses.push((await handler(flood.clone())).status);
 
   assert.ok(statuses.includes(429), `429 гарсангүй: ${statuses.join(',')}`);
 });
