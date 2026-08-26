@@ -28,11 +28,11 @@ export interface ServiceItem {
 }
 
 export const SERVICES: readonly ServiceItem[] = [
-  { id: 101, name: 'Зураг угаалт 6*9 - 2%', price: '1,000₮', category: 'Угаалт' },
-  { id: 102, name: 'Зураг угаалт 9*12', price: '500₮', category: 'Угаалт' },
-  { id: 103, name: 'Зураг угаалт 10*15', price: '500₮', category: 'Угаалт' },
-  { id: 104, name: 'Зураг угаалт 13*18', price: '1,000₮', category: 'Угаалт' },
-  { id: 105, name: 'Зураг угаалт 16*22', price: '1,500₮', category: 'Угаалт' },
+  { id: 101, name: 'Зураг угаалт 6*9 - 2%', price: '700₮', category: 'Угаалт' },
+  { id: 102, name: 'Зураг угаалт 9*12', price: '700₮', category: 'Угаалт' },
+  { id: 103, name: 'Зураг угаалт 10*15', price: '700₮', category: 'Угаалт' },
+  { id: 104, name: 'Зураг угаалт 13*18', price: '1,500₮', category: 'Угаалт' },
+  { id: 105, name: 'Зураг угаалт 16*22', price: '2,500₮', category: 'Угаалт' },
   { id: 106, name: 'Зураг угаалт 20*25', price: '4,000₮', category: 'Угаалт' },
   { id: 107, name: 'Зураг угаалт 20*30', price: '5,000₮', category: 'Угаалт' },
   { id: 108, name: 'Зураг угаалт 30*40', price: '18,000₮', category: 'Угаалт' },
