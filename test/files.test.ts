@@ -83,6 +83,47 @@ test('makeUploadId нь 16 тэмдэгт, төөрөгдүүлдэг үсэгг
   assert.ok(!/[lo01]/.test(id), id);
 });
 
+test('makeUploadId нь КРИПТОГРАФИК эх сурвалж ашиглана', () => {
+  /*
+   * `uploadId` бол `/api/payment`-ийн нэвтрэлт. `Math.random`-оор үүсгэвэл
+   * гаралтуудаас нь дотоод төлөвийг сэргээж бусад захиалгын id-г тооцоолох
+   * онолын зам үлддэг. Энэ тест нь өгөгдмөл эх сурвалж нь `crypto` мөн эсэхийг
+   * ЖИНХЭНЭ дуудлагаар шалгана: `crypto.getRandomValues` дуудагдаагүй бол унана.
+   */
+  const real = globalThis.crypto.getRandomValues;
+  let calls = 0;
+  globalThis.crypto.getRandomValues = ((array: ArrayBufferView<ArrayBuffer>) => {
+    calls += 1;
+    return real.call(globalThis.crypto, array);
+  }) as typeof real;
+
+  try {
+    const id = makeUploadId();
+    assert.equal(id.length, 16);
+    assert.equal(calls, 16, 'тэмдэгт бүр криптографик эх сурвалжаас гарах ёстой');
+  } finally {
+    globalThis.crypto.getRandomValues = real;
+  }
+});
+
+test('makeUploadId нь хазайлтгүй — цагаан толгой хоёрын зэрэгт', () => {
+  /*
+   * 32 тэмдэгт бол 2^5. `floor(random() * 32)` нь жигд `[0,1)`-ээс модулийн
+   * хазайлтгүй 5 бит авна. Хэрэв хэн нэг нь цагаан толгойд үсэг НЭМБЭЛ (33
+   * болбол) хазайлт үүсч, эхний тэмдэгтүүд илүү давтамжтай гарна — энтропи
+   * чимээгүй буурна. Энэ тест тэрийг барина.
+   */
+  const alphabetSize = 32;
+  assert.equal(alphabetSize & (alphabetSize - 1), 0, 'цагаан толгой 2-ын зэрэг байх ёстой');
+
+  // Бүх 32 тэмдэгт хүрч чадахыг шалгана — хамгийн сүүлийнх нь ч гарна.
+  const seen = new Set<string>();
+  for (let i = 0; i < alphabetSize; i += 1) {
+    seen.add(makeUploadId(() => i / alphabetSize)[0]);
+  }
+  assert.equal(seen.size, alphabetSize, 'зарим тэмдэгт хэзээ ч гарахгүй байна');
+});
+
 test('хэлбэр шалгагчид', () => {
   assert.ok(isOrderNumber('PMN-260806-4821'));
   assert.ok(!isOrderNumber('PMN-26086-4821'));
