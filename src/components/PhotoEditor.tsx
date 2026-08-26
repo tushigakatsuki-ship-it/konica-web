@@ -4,7 +4,7 @@ import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
-import { recommendedPixels, sizeOf } from '../lib/photoSize';
+import { orientSize, recommendedPixels, sizeOf } from '../lib/photoSize';
 import { MAX_PHOTOS_PER_ORDER } from '../lib/limits';
 import { useLang } from '../state/lang';
 import CropStudio from './CropStudio';
@@ -84,6 +84,21 @@ export default function PhotoEditor({
   const remaining = Math.max(0, MAX_PHOTOS_PER_ORDER - alreadyInBasket);
   const size = useMemo(() => sizeOf(service.name), [service.name]);
   const unitPrice = parsePrice(service.price);
+
+  /**
+   * Урьдчилсан харагдацын хайрцгийн харьцаа, ТУХАЙН зургийн чиглэлээр.
+   *
+   * Зураг хараахан уншигдаагүй үед (`natural === null`) каталогийн чиглэлээр
+   * харуулна — хайрцаг хоосон байх тэр хэдэн зуун миллисекундэд ямар харьцаа
+   * байх нь хамаагүй, харин хэмжээ нь нэг л удаа үсрэх нь дээр.
+   */
+  const frameOf = (natural: { w: number; h: number } | null | undefined): string => {
+    const oriented = orientSize(
+      size,
+      natural ? { width: natural.w, height: natural.h } : null,
+    );
+    return `${oriented.w} / ${oriented.h}`;
+  };
 
   const fileInput = useRef<HTMLInputElement>(null);
   /** Хуучирсан үр дүнг хаяхад — хурдан дараалж зураг сонговол. */
@@ -307,8 +322,15 @@ export default function PhotoEditor({
           {/* ── Зураггүй эсвэл ганц зураг — том харагдац ── */}
           {photos.length <= 1 && (
             <div className="mx-auto w-full max-w-[260px]">
+              {/*
+                Хүрээг ТУХАЙН зургийн чиглэлээр — `size`-аар шууд биш.
+
+                `renderPreview`, `renderPrintBlob` хоёр ижил дүрмээр эргүүлдэг
+                тул энд эргүүлэхгүй бол хайрцаг босоо, доторх зураг хэвтээ
+                болж, хэрэглэгч буруу тайралт харна.
+              */}
               <div
-                style={{ aspectRatio: `${size.w} / ${size.h}` }}
+                style={{ aspectRatio: frameOf(single?.natural) }}
                 className="relative w-full overflow-hidden rounded-md bg-brand-50"
               >
                 {single?.preview ? (
@@ -402,7 +424,7 @@ export default function PhotoEditor({
                       onClick={() => void openCrop(index)}
                       disabled={cropLoading !== null || loading}
                       aria-label={t('crop.openNth', { n: index + 1 })}
-                      style={{ aspectRatio: `${size.w} / ${size.h}` }}
+                      style={{ aspectRatio: frameOf(photo.natural) }}
                       className="relative block w-full overflow-hidden rounded-md bg-brand-50"
                     >
                       {photo.preview && (

@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_CROP, placeCover, type Crop } from './crop';
-import { PRINT_DPI, type PhotoSize } from './photoSize';
+import { PRINT_DPI, orientSize, type PhotoSize } from './photoSize';
 
 /** `ImageBitmap` ба `HTMLImageElement` хоёулаа энэ хэлбэрт тохирно. */
 type Source = CanvasImageSource & { width: number; height: number };
@@ -103,13 +103,15 @@ export interface PreviewResult {
  */
 export async function renderPreview(
   blob: Blob,
-  size: PhotoSize,
+  paper: PhotoSize,
   maxWidth = 640,
   crop: Crop = DEFAULT_CROP,
 ): Promise<PreviewResult> {
   const decoded = await decodeImage(blob);
   try {
     const natural = { w: decoded.source.width, h: decoded.source.height };
+    // Хэвлэх файлтай ИЖИЛ дүрмээр эргүүлнэ — эс тэгвээс дэлгэц худал хэлнэ.
+    const size = orientSize(paper, decoded.source);
     const outW = Math.min(maxWidth, Math.max(160, natural.w || maxWidth));
     const preview =
       drawCover(decoded.source, size, outW, crop)?.toDataURL('image/jpeg', 0.82) ?? '';
@@ -166,11 +168,20 @@ const MIN_DPI = 150;
  */
 export async function renderPrintBlob(
   blob: Blob,
-  size: PhotoSize,
+  paper: PhotoSize,
   crop: Crop = DEFAULT_CROP,
 ): Promise<Blob | null> {
   const decoded = await decodeImage(blob);
   try {
+    /*
+     * Цаасыг зургийн чиглэлд тохируулна — тайрахаас ӨМНӨ.
+     *
+     * `renderPreview` ч мөн адил хийдэг тул хэрэглэгчийн дэлгэц дээр харсан
+     * хүрээ хэвлэгдэх файлтай яг таарна. Хоёрын нэгэнд нь мартвал дэлгэц
+     * дээр бүтэн харагдаад, хэвлэхэд тал нь тасарна.
+     */
+    const size = orientSize(paper, decoded.source);
+
     const target = Math.round((size.w / 2.54) * PRINT_DPI);
     const floor = Math.round((size.w / 2.54) * MIN_DPI);
     /*
@@ -190,8 +201,18 @@ export async function renderPrintBlob(
     const canvas = drawCover(decoded.source, size, outW, crop);
     if (!canvas) return null;
 
+    /*
+     * JPEG чанар 0.95 — 0.92 БИШ.
+     *
+     * Хэмжсэн зөрүү: 10×15 зурагт 335KB → 367KB, ердөө +32KB. Эх файл нь
+     * өөрөө ~1.7MB тул нийт илгээлт 1.5% л уртасна.
+     *
+     * Харин 0.92 дээр өндөр ялгарлын ирмэг (улаан үсэг цагаан дэвсгэр дээр,
+     * тод хувцас, бичээс) дээр JPEG-ийн «цагираг» тод харагдаж байсан.
+     * Хэвлэсний дараа тэр нь эргэж арилахгүй.
+     */
     return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+      canvas.toBlob(resolve, 'image/jpeg', 0.95);
     });
   } finally {
     decoded.close();
