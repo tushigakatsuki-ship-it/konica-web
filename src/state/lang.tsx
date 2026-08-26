@@ -39,12 +39,28 @@ export const LANG_KEY = 'printmn-lang';
 const isLang = (value: unknown): value is Lang =>
   typeof value === 'string' && (LANGS as readonly string[]).includes(value);
 
+/**
+ * Эхлэх хэл.
+ *
+ * ── Яагаад хөтчийн хэлээр ТААМАГЛАХГҮЙ вэ ────────────────────────
+ *
+ * Урьд нь `navigator.language` нь `en`-ээр эхэлбэл англи хэл рүү шилждэг
+ * байв. Улаанбаатарт энэ нь БУРУУ таамаг: маш олон монгол хүн утсаа англи
+ * хэл дээр тохируулж хэрэглэдэг (Android-ын анхны тохиргоо, iPhone-ыг
+ * гадаадаас авсан, эсвэл зүгээр л дассан). Тэдэнд монгол дэлгүүрийн сайт
+ * англиар нээгдэх нь ямар ч ашиггүй — харин зарим нь «буруу сайт орлоо»
+ * гэж бодоод гарч ч болно.
+ *
+ * Толгойд `MN / EN` товч байнга харагдаж байгаа тул англиар үзэх хүн нэг
+ * дарахад л болно, тэр сонголт нь хадгалагдана. Таамаглал нь ашгаас илүү
+ * эрсдэл авчирдаг тул хаяв.
+ *
+ * Дэлгүүр Улаанбаатарт, үйлчлүүлэгч нь монгол — өгөгдмөл нь монгол.
+ */
 export function readStoredLang(): Lang {
   try {
     const stored = localStorage.getItem(LANG_KEY);
     if (isLang(stored)) return stored;
-    // Хадгалсан утга байхгүй бол хөтчийн хэлээс таамаглана.
-    if (typeof navigator !== 'undefined' && /^en\b/i.test(navigator.language ?? '')) return 'en';
   } catch {
     /*
      * `localStorage` нь нууц горимд, эсвэл cookie хаасан тохиргоонд

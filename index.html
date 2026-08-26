@@ -4,22 +4,42 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f7f8fb" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f7f8fb" />
 
     <!--
-      Хадгалсан горимыг React ачаалагдахААС ӨМНӨ буулгана.
+      Горимыг React ачаалагдахААС ӨМНӨ буулгана.
 
       ⚠️ Энэ нь блоклодог скрипт байх ЁСТОЙ. `defer`, эсвэл React дотор
-      хийвэл харанхуй горимын хэрэглэгч эхлээд цагаан дэлгэц харна —
-      шөнө нүд гялбуулна. Хэдэн байт кодыг блоклох нь зөв солилцоо.
+      хийвэл хэрэглэгч эхлээд буруу өнгө хараад дараа нь солигдоно.
+
+      ── ЯАГААД ӨГӨГДМӨЛ НЬ ГЭРЭЛ ВЭ ──────────────────────────────
+
+      Энэ бол зүгээр нэг зan сонголт биш, ЗУРГИЙН БИЗНЕСИЙН шаардлага.
+
+      Хэрэглэгч оруулсан зургаа дэлгэц дээр хараад «ийм өнгөтэй хэвлэгдэнэ»
+      гэж шийддэг. Харанхуй дэвсгэр дээр зураг илүү тод, илүү өнгөлөг
+      харагддаг (нүдний харьцангуй мэдрэмж) — тэгээд цаасан дээр буухдаа
+      бүдэг санагдана. Фото засварын програм, хэвлэлийн лаборатори бүр
+      саарал эсвэл цагаан дэвсгэр хэрэглэдэг нь яг үүнээс.
+
+      Тиймээс хадгалсан утга байхгүй бол ГЭРЭЛ горимыг албадана —
+      үйлдлийн системийн харанхуй тохиргоог үл харгалзан.
+
+      Харанхуй горимын бүх өнгө `index.css` дотор ХЭВЭЭР байгаа. Хожим
+      сонголт болгож нээх бол `ThemeToggle`-ыг толгойд байрлуулахад л
+      бүрэн ажиллана.
     -->
     <script>
       try {
         var t = localStorage.getItem('printmn-theme');
-        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-      } catch (e) {}
+        document.documentElement.setAttribute(
+          'data-theme',
+          t === 'dark' || t === 'light' ? t : 'light',
+        );
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
     </script>
 
     <!--

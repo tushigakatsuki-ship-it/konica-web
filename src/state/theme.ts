@@ -23,16 +23,33 @@ export const THEME_KEY = 'printmn-theme';
 const isChoice = (value: unknown): value is ThemeChoice =>
   value === 'light' || value === 'dark' || value === 'system';
 
+/**
+ * Хадгалсан утга байхгүй үеийн горим.
+ *
+ * ⚠️ `'system'` БИШ, `'light'`. Энэ бол ЗУРГИЙН БИЗНЕСИЙН шаардлага:
+ *
+ * Хэрэглэгч оруулсан зургаа дэлгэц дээр хараад «ийм өнгөтэй хэвлэгдэнэ» гэж
+ * шийддэг. Харанхуй дэвсгэр дээр зураг илүү тод, өнгөлөг харагддаг (нүдний
+ * харьцангуй мэдрэмж) — тэгээд цаасан дээр буухдаа бүдэг санагдана. Фото
+ * засварын програм, хэвлэлийн лаборатори бүр саарал/цагаан дэвсгэр
+ * хэрэглэдэг нь яг үүнээс.
+ *
+ * `index.html` доторх блоклодог скрипт ч ЯГ ижил өгөгдмөлтэй байх ёстой —
+ * зөрвөл хуудас эхлээд харанхуй гараад React ачаалагдмагц цагаан болж
+ * анивчина. Хоёрын аль нэгийг сольвол нөгөөг нь ЗААВАЛ хамт сольно.
+ */
+const DEFAULT_CHOICE: ThemeChoice = 'light';
+
 export function readStoredTheme(): ThemeChoice {
   try {
     const stored = localStorage.getItem(THEME_KEY);
-    return isChoice(stored) ? stored : 'system';
+    return isChoice(stored) ? stored : DEFAULT_CHOICE;
   } catch {
     /*
      * `localStorage` нь нууц горимд, эсвэл cookie хаасан тохиргоонд
      * шидэж болно. Тэр нь вэбийг зогсоох шалтгаан биш.
      */
-    return 'system';
+    return DEFAULT_CHOICE;
   }
 }
 
