@@ -25,9 +25,28 @@ export interface UploadProgress {
   total: number;
 }
 
-/** Зураг бүрт хоёр байр урьдчилан захиалагддаг: эхнийх нь `print`. */
-export const slotIndex = (photo: number, kind: 'print' | 'original'): number =>
-  photo * 2 + (kind === 'print' ? 0 : 1);
+/**
+ * Зураг бүрээс гарах файлууд — ЭНЭ ДАРААЛЛААР хаяг захиалагдана.
+ *
+ * ⚠️ ЭНЭ БОЛ ГАНЦ ЭХ СУРВАЛЖ. `upload.ts` хаягуудыг захиалахдаа энэ жагсаалтыг
+ * ашиглах ба `slotIndex` мөн эндээс тоолно.
+ *
+ * Яагаад ийм болгосон бэ: урьд нь дараалал ХОЁР газар бичигдсэн байв —
+ * `upload.ts` дотор `[print, original]` гэсэн жагсаалт, энд `kind === 'print'
+ * ? 0 : 1` гэсэн тооцоо. Хэн нэг нь `upload.ts`-ийн дарааллыг сольвол
+ * `slotIndex` чимээгүй буруу тоо буцааж, ХЭВЛЭХ файл нь ЭХ ФАЙЛЫН хаяг руу
+ * илгээгдэнэ. R2 алдаа өгөхгүй — тэр хоёулаа хүчинтэй хаяг. Ажилтан хэвлэх
+ * файл нээхэд эх файл гарч ирнэ.
+ *
+ * Telegram-ийн товч яг ийм давхардлаас болж эвдэрсэн. Тэр сургамжаар нэгтгэв.
+ */
+export const FILE_KINDS = ['print', 'original'] as const;
+
+export type FileKind = (typeof FILE_KINDS)[number];
+
+/** Тухайн зургийн тухайн төрлийн файл хаягийн жагсаалтын хэддүгээрт байх вэ. */
+export const slotIndex = (photo: number, kind: FileKind): number =>
+  photo * FILE_KINDS.length + FILE_KINDS.indexOf(kind);
 
 /**
  * Явцын төлөв.

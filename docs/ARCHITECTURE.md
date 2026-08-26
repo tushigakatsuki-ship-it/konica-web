@@ -306,7 +306,7 @@ erDiagram
         string paymentType "Данс Бэлэн Карт Бусад"
         string desc "Ажлын нэр (тоо ширхэгтэй)"
         number price "Нийт дүн"
-        string time "HH_mm"
+        string time "HH:mm"
         string source "web — зөвхөн вэбээс ирсэнд"
         number createdAt "epoch ms, зөвхөн вэб"
         string orderNumber "PMN-YYMMDD-NNNN, зөвхөн вэб"
@@ -398,7 +398,7 @@ erDiagram
     }
 
     TIMESETTINGS {
-        string startTime "HH_mm — ганц бичлэг"
+        string startTime "HH:mm — ганц бичлэг"
         number penaltyPerMin
         number onTimeScore
         number onLeaveScore

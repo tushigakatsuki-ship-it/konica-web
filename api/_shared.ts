@@ -6,8 +6,9 @@
  */
 
 import { SERVICES } from '../src/data/catalog';
-import { VAT_RATE, isValidPhone } from '../src/lib/price';
+import { VAT_RATE, isValidEmail, isValidPhone } from '../src/lib/price';
 import { CUSTOM_PRICE_CATEGORIES, DELIVERY_FEE } from '../src/lib/order';
+import { isDateStamp } from './_files';
 
 // ── Оролт ──────────────────────────────────────────────────────────
 
@@ -162,11 +163,40 @@ const clean = (value: unknown, max: number): string =>
 /**
  * `utils/id.ts` — `Date.now()` дангаараа давхцаж болно. id нь Firebase-ийн
  * хүүхэд зам учраас давхцвал нэг бичлэг нөгөөгөө дарж устгана.
+ *
+ * ── Хоёр өөр давхцал, хоёр өөр шийдэл ────────────────────────────
+ *
+ * **Нэг захиалгын дотор.** `last + 1` нь захиалга, ажлын бүртгэл, олон мөр
+ * бүгд өөр id авахыг баталгаажуулна. Энэ нь анхнаасаа ажиллаж байсан.
+ *
+ * **Захиалга ХООРОНД.** Энэ генератор `buildOrder` бүрд ШИНЭЭР үүсдэг тул
+ * түүний `last` нь зөвхөн тухайн захиалгыг мэднэ. Хоёр өөр үйлчлүүлэгчийн
+ * хүсэлт яг нэг миллисекундэд боловсрогдвол хоёулаа ижил `Date.now()` аваад
+ * ижил `orders/<id>` зам руу бичнэ — multi-path PATCH нь атомик боловч
+ * сүүлчийнх нь өмнөхийг ДАРНА. Нэг үйлчлүүлэгчийн захиалга ажилтны апп дээр
+ * огт харагдахгүй болно.
+ *
+ * ⚠️ Яагаад `orderNumber`-тэй адил «ашиглагдсаныг уншаад тойрох» арга
+ * хэрэглэхгүй вэ: тэр нь Firebase-ээс уншилт нэмнэ, мөн id нь тухайн өдрөөр
+ * бус БҮХ түүхээр давхцаж болох тул уншилт нь хямд биш.
+ *
+ * Оронд нь миллисекундийн доторх санамсаргүй шилжилт нэмнэ. id нь
+ * цаг хугацааны дараалалтай тоо хэвээр (апп үүгээр эрэмбэлдэг тул чухал),
+ * зөвхөн нэг секундын дотор тархана. Давхцахын тулд хоёр захиалга ижил
+ * миллисекундэд БӨГӨӨД ижил шилжилт авах ёстой — магадлал 1000 дахин буурна.
+ *
+ * Бүрэн шийдэл биш гэдгийг ил хэлье: `orderNumber` шиг баталгаа биш, магадлал
+ * бууруулсан хамгаалалт. Бүрэн шийдэхийн тулд Firebase-ийн `push()` түлхүүр
+ * эсвэл атомик тоолуур руу шилжих ёстой ба тэр нь ажилтны аппын id хүлээлттэй
+ * зөрөх тул тэр аппыг харалгүйгээр хийж болохгүй.
  */
-const makeIdGenerator = () => {
+const ID_SPREAD_MS = 1_000;
+
+const makeIdGenerator = (random: () => number = Math.random) => {
+  const offset = Math.floor(random() * ID_SPREAD_MS);
   let last = 0;
   return (): number => {
-    const now = Date.now();
+    const now = Date.now() + offset;
     last = now > last ? now : last + 1;
     return last;
   };
@@ -280,7 +310,7 @@ export function buildOrder(
    */
   if (phone && !isValidPhone(phone))
     throw new ValidationError('Утасны дугаар буруу байна.');
-  if (email && !/^\S+@\S+\.\S+$/.test(email))
+  if (email && !isValidEmail(email))
     throw new ValidationError('И-мэйл хаяг буруу байна.');
   if (!phone && !email)
     throw new ValidationError('Утас эсвэл и-мэйлийн аль нэгийг оруулна уу.');
@@ -293,7 +323,7 @@ export function buildOrder(
    * захиалгыг татгалзуулах эрсдэлтэй. Энэ талбар нь ХҮСЭЛТ болохоос үнэд ч,
    * үйл ажиллагаанд ч заавал биш — ажилтан хэрэгтэй бол ярина.
    */
-  if (pickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate))
+  if (pickupDate && !isDateStamp(pickupDate))
     throw new ValidationError('Хүлээж авах огноо буруу байна.');
 
   /*
@@ -346,7 +376,8 @@ export function buildOrder(
   const orderNumber = makeOrderNumber(now, random, taken);
   const time = nowTimeString(now);
   const date = toDateString(now);
-  const nextId = makeIdGenerator();
+  // Тест тогтмол тоо өгдөг тул функц болгож жигдрүүлнэ (`makeOrderNumber` ч ижил).
+  const nextId = makeIdGenerator(typeof random === 'function' ? random : () => random);
   const contactNote = [
     note,
     `[web ${orderNumber}]`,
@@ -407,7 +438,19 @@ export function buildOrder(
       price: String(line.total),
       unitPrice: String(line.unitPrice),
       quantity: line.qty,
-      payType: 'Бусад',
+      /*
+       * `''` — «Бусад» БИШ.
+       *
+       * Ажилтны аппын өөрийнх нь хоосон ажлын бүртгэл `payType: ''` гэж
+       * эхэлдэг (`workLogLogic.ts`, `blankWorkLog`). `''` нь «хараахан
+       * тодорхойгүй» гэсэн утгатай — вэб захиалга үүсэх мөчид төлбөр үнэхээр
+       * хийгдээгүй байдаг тул яг тэр утга зөв.
+       *
+       * `'Бусад'` нь хүчинтэй утга ч гэсэн «өөр аргаар ТӨЛСӨН» гэж
+       * баталгаажуулна — худал мэдээлэл. Төлбөрийн тайланд вэб захиалга бүр
+       * «бусад» гэсэн ангилалд орж, дансаар орсон мөнгө буруу тоологдоно.
+       */
+      payType: '',
       // Хүргэлт, НӨАТ бол захиалгын түвшний зүйл — эхний мөрөнд л тэмдэглэнэ,
       // эс тэгвээс тайланд олон дахин тоологдоно.
       isDelivery: delivery && index === 0,

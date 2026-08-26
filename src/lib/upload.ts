@@ -14,7 +14,7 @@ import { ServiceUnavailableError } from './api';
 import { DEFAULT_CROP } from './crop';
 import { renderPrintBlob } from './photoRender';
 import { sizeOf } from './photoSize';
-import { createProgress, slotIndex, type UploadProgress } from './uploadProgress';
+import { FILE_KINDS, createProgress, slotIndex, type UploadProgress } from './uploadProgress';
 
 export interface UploadedFile {
   key: string;
@@ -239,17 +239,25 @@ export async function uploadBasketPhotos(
   if (photos.length === 0) return null;
 
   // ── 1. Хаягуудыг урьдчилан захиалах ──────────────────────────────
+  /*
+   * ⚠️ Дарааллыг ГАРААР бүү бич — `FILE_KINDS`-ээс гарга.
+   *
+   * `slotIndex` нь энэ жагсаалтын дарааллаас тоолдог. Хоёрыг тусад нь бичвэл
+   * нэгийг нь сольсон хүн нөгөөг мартаж, хэвлэх файл эх файлын хаяг руу
+   * илгээгдэнэ — R2 алдаа өгөхгүй тул хэн ч анзаарахгүй.
+   */
   const reserved = photos.flatMap(({ item }) => {
     const original = item.value.file as File;
-    return [
-      { kind: 'print', ext: 'jpg', size: original.size, contentType: 'image/jpeg' },
-      {
-        kind: 'original',
-        ext: extOf(original.type),
-        size: original.size,
-        contentType: original.type || 'image/jpeg',
-      },
-    ];
+    return FILE_KINDS.map((kind) =>
+      kind === 'print'
+        ? { kind, ext: 'jpg', size: original.size, contentType: 'image/jpeg' }
+        : {
+            kind,
+            ext: extOf(original.type),
+            size: original.size,
+            contentType: original.type || 'image/jpeg',
+          },
+    );
   });
 
   const response = await fetch('/api/upload', {

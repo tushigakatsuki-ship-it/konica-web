@@ -499,3 +499,50 @@ test('утасгүй захиалгын мэдэгдэлд хоосон 📞 м�
   assert.ok(!text.includes('📞'), 'хоосон утасны мөр үлдлээ');
   assert.match(text, /✉ test@example\.com/, 'и-мэйл харагдахгүй байна');
 });
+
+/* ── Ажилтны аппын гэрээ — АППЫН ЭХ КОДООС БАТАЛСАН ────────────── */
+
+test('payType нь аппын «тодорхойгүй» утгатай таарна', () => {
+  /*
+   * ⚠️ Энэ утгыг ТААМАГЛААГҮЙ — `konica-app`-ын эх кодоос уншиж баталсан:
+   * `src/features/worklogs/workLogLogic.ts` доторх хоосон ажлын бүртгэл
+   * `payType: ''` гэж эхэлдэг, `PayType` төрөл нь
+   * `'Данс' | 'Бэлэн' | 'Карт' | 'Холимог' | 'Бусад' | ''`.
+   *
+   * Урьд нь вэб `'Бусад'` гэж бичдэг байв. Тэр нь хүчинтэй утга ч гэсэн
+   * «өөр аргаар ТӨЛСӨН» гэж баталгаажуулдаг — захиалга үүсэх мөчид төлбөр
+   * хийгдээгүй байдаг тул худал. Төлбөрийн тайланд вэб захиалга бүр «бусад»
+   * ангилалд орж, дансаар орсон мөнгө буруу тоологдоно.
+   */
+  const built = buildOrder(order(), NOW, 0.5);
+  const log = Object.values(built.worklogs)[0];
+  assert.equal(log?.payType, '', 'аппын «тодорхойгүй» утга нь хоосон мөр');
+});
+
+test('аппын хоосон бүртгэлийн өгөгдмөл утгуудтай таарна', () => {
+  /*
+   * `konica-app` → `blankWorkLog`-оос уншсан утгууд. Эдгээрийг зөрүүлбэл
+   * ажилтны самбар дээр вэб захиалга өөр өнгө, өөр ангилалтай харагдана.
+   */
+  const built = buildOrder(order(), NOW, 0.5);
+  const log = Object.values(built.worklogs)[0];
+
+  assert.equal(log?.status, '', 'хоосон статус = «хүлээгдэж буй» өнгө');
+  assert.equal(log?.color, '#ffffff');
+  assert.equal(log?.paymentStatus, 'Төлөгдөөгүй');
+  assert.equal(log?.customerType, '');
+  assert.equal(log?.agreedPrice, '');
+});
+
+test('цагийн хэлбэр нь аппын HH:mm-тэй таарна', () => {
+  /*
+   * Аппын `src/utils/date.ts` болон `workLogLogic.ts` хоёулаа `HH:mm`
+   * (цэгтэй) ашигладаг. `docs/ARCHITECTURE.md` дээр `HH_mm` гэж бичигдсэн
+   * байсан нь ХУУЧИРСАН баримт байсныг аппын эх кодоос шалгаж тогтоов —
+   * код зөв, баримт буруу байсан тул баримтыг зассан.
+   */
+  const built = buildOrder(order(), NOW, 0.5);
+  const log = Object.values(built.worklogs)[0];
+  assert.match(log?.receivedTime ?? '', /^\d{2}:\d{2}$/, 'доогуур зураас биш, цэг');
+  assert.ok(!(log?.receivedTime ?? '').includes('_'));
+});

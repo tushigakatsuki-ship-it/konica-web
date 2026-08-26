@@ -11,7 +11,7 @@ import {
   type FieldErrors,
   type OrderLine,
 } from '../lib/order';
-import { formatCurrency, isValidPhone, vatPortion } from '../lib/price';
+import { formatCurrency, isValidEmail, isValidPhone, vatPortion } from '../lib/price';
 import { pickupBounds, validatePickup } from '../lib/pickup';
 import { joinContact, splitContact } from '../lib/contact';
 import DatePicker from '../components/DatePicker';
@@ -65,7 +65,7 @@ const validate = (customer: CustomerInfo, lines: readonly OrderLine[]): FieldErr
   if (!phone && !email) errors.phone = 'Утас эсвэл и-мэйлээ оруулна уу.';
   else if (phone && !isValidPhone(phone))
     errors.phone = '8 оронтой дугаар оруулна уу (жишээ: 99001234).';
-  else if (email && !/^\S+@\S+\.\S+$/.test(email))
+  else if (email && !isValidEmail(email))
     errors.phone = 'И-мэйл хаяг буруу байна.';
 
   const pickup = validatePickup(customer.pickupDate);
