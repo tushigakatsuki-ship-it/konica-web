@@ -3,6 +3,8 @@ import test, { after, before } from 'node:test';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { payCallback, printCallback, refFromCallback } from '../api/_callback';
+import { makeOrderNumber } from '../api/_shared';
+import { makeUploadId } from '../api/_files';
 
 /**
  * `/api/telegram` — мэдэгдэл дээрх «✅ Төлбөр орсон» товч.
@@ -332,4 +334,73 @@ test('хэвлэх товчны өгөгдөл ч 64 байтад багтана
     printCallback('2026-12-31', 'PMN-261231-9999', 'zyxwvutsrqponmlk'),
   ).length;
   assert.ok(bytes <= 64, `${bytes} байт`);
+});
+
+/* ── Товчны өгөгдөл: ҮҮСГЭГЧ ба ЗАДЛАГЧ хоёр заавал таарна ─────── */
+
+/*
+ * ⚠️ ЭНЭ ХЭСЭГ БОДИТ АЛДААНААС ТӨРСӨН.
+ *
+ * Захиалгын дугаарыг 4 → 5 орон болгоход `_files.ts` дэх шалгагчийг зассан
+ * ч `_callback.ts` дотор ТУСДАА хуулбар байсныг олж хараагүй. Үр дүнд нь
+ * шинэ дугаартай захиалгын «✅ Төлсөн» товч «Товчны өгөгдөл танигдсангүй»
+ * гэж хариулж, ажилтан төлбөрөө тэмдэглэж чадахгүй болсон — зураг нь
+ * хэзээ ч татагдахгүй гэсэн үг.
+ *
+ * Хуучин тестүүд зөвхөн `makeOrderNumber`-ийн ГАРАЛТЫГ шалгадаг байсан тул
+ * задлагч талын хуулбар өөрчлөгдөөгүйг хэн ч мэдээгүй. Доорх тестүүд
+ * үүсгэгч → задлагч гинжийг БҮТНЭЭР нь холбоно.
+ */
+
+test('үүсгэсэн товчны өгөгдөл БУЦААЖ задарна — 5 оронтой дугаар', () => {
+  const date = '2026-08-26';
+  const orderNumber = 'PMN-260826-48213';
+  const uploadId = 'abcdefghijkmnpqr';
+
+  const parsed = refFromCallback(payCallback(date, orderNumber, uploadId));
+  assert.ok(parsed, '5 оронтой дугаартай товч танигдсангүй');
+  assert.equal(parsed.action, 'pay');
+  assert.equal(parsed.ref, `manifests/${date}/${orderNumber}-${uploadId}.json`);
+});
+
+test('ХУУЧИН 4 оронтой дугаартай товч ажилласаар байна', () => {
+  /*
+   * Telegram дэх хуучин мессежүүд дээрх товч устдаггүй. Зөвхөн 5 оронг
+   * зөвшөөрвөл өнгөрсөн долоо хоногийн бүх мэдэгдэл ажиллахаа болино.
+   */
+  const parsed = refFromCallback(payCallback('2026-08-20', 'PMN-260820-0001', 'abcdefghijkmnpqr'));
+  assert.ok(parsed, 'хуучин дугаартай товч эвдэрсэн');
+  assert.equal(parsed.ref, 'manifests/2026-08-20/PMN-260820-0001-abcdefghijkmnpqr.json');
+});
+
+test('ЖИНХЭНЭ үүсгэсэн дугаар задлагчийг ДАВНА', () => {
+  /*
+   * Дээрх хоёр тест гараар бичсэн мөр ашигладаг. Энэ нь `makeOrderNumber`,
+   * `makeUploadId` хоёрын ЖИНХЭНЭ гаралтыг задлагч руу оруулна — хэлбэр нь
+   * ирээдүйд өөрчлөгдвөл гараар бичсэн жишээ биш, БОДИТ гаралт унана.
+   */
+  const now = new Date('2026-08-26T06:05:00Z');
+  for (let i = 0; i < 40; i += 1) {
+    const orderNumber = makeOrderNumber(now, Math.random);
+    const uploadId = makeUploadId();
+    const data = payCallback('2026-08-26', orderNumber, uploadId);
+
+    assert.ok(refFromCallback(data), `задарсангүй: ${data}`);
+
+    /*
+     * Telegram-ийн 64 БАЙТЫН хязгаар. Хэтэрвэл товч ажиллахгүй биш,
+     * МЭДЭГДЭЛ БҮХЭЛДЭЭ илгээгдэхгүй болно.
+     */
+    const bytes = new TextEncoder().encode(data).length;
+    assert.ok(bytes <= 64, `callback_data ${bytes} байт болжээ: ${data}`);
+  }
+});
+
+test('хог өгөгдлийг татгалзсаар байна', () => {
+  assert.equal(refFromCallback('pay:2026-08-26:PMN-260826-482:abcdefghijkmnpqr'), null);
+  assert.equal(refFromCallback('pay:2026-08-26:PMN-260826-482134:abcdefghijkmnpqr'), null);
+  assert.equal(refFromCallback('pay:2026-8-26:PMN-260826-48213:abcdefghijkmnpqr'), null);
+  assert.equal(refFromCallback('pay:2026-08-26:PMN-260826-48213:богино'), null);
+  assert.equal(refFromCallback('pay:2026-08-26:../../etc/passwd:abcdefghijkmnpqr'), null);
+  assert.equal(refFromCallback('xxx:2026-08-26:PMN-260826-48213:abcdefghijkmnpqr'), null);
 });

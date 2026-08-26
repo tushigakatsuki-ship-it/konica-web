@@ -116,5 +116,5 @@ test('usedOrderNumbers нь тухайн ӨДРИЙН дугаарыг гарг�
 test('хэлбэр таарахгүй түлхүүрийг алгасна', async () => {
   const numbers = await localStore().usedOrderNumbers('2026-08-06');
   assert.ok(![...numbers].some((n) => n.includes('README')), 'хог утга орлоо');
-  for (const number of numbers) assert.match(number, /^PMN-\d{6}-\d{4}$/);
+  for (const number of numbers) assert.match(number, /^PMN-\d{6}-\d{4,5}$/);
 });

@@ -1,3 +1,5 @@
+import { isDateStamp, isOrderNumber, isUploadId } from './_files';
+
 /**
  * Telegram-ийн товчны `callback_data` — угсрах ба задлах.
  *
@@ -70,9 +72,22 @@ export const refFromCallback = (
   if (parts.length !== 3) return null;
 
   const [date, orderNumber, uploadId] = parts;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (!/^PMN-\d{6}-\d{4}$/.test(orderNumber)) return null;
-  if (!/^[a-z0-9]{16}$/.test(uploadId)) return null;
+
+  /*
+   * ⚠️ Хэлбэрийг ЭНД гараар бүү бич — `_files.ts`-ийн шалгагчийг ашигла.
+   *
+   * Урьд нь энд `/^PMN-\d{6}-\d{4}$/` гэсэн ТУСДАА хуулбар байсан. Захиалгын
+   * дугаарыг 4 → 5 орон болгоход `_files.ts` дэх нэгийг нь зассан ч энэ нь
+   * хэвээр үлдсэн. Үр дүнд нь шинэ дугаартай захиалгын «✅ Төлсөн» товч
+   * «Товчны өгөгдөл танигдсангүй» гэж хариулж, ажилтан төлбөрөө тэмдэглэж
+   * чадахгүй болсон — өөрөөр хэлбэл зураг нь хэзээ ч татагдахгүй.
+   *
+   * Нэг дүрэм, нэг газар. Доорх round-trip тест үүнийг дахин давтахаас
+   * хамгаална.
+   */
+  if (!isDateStamp(date)) return null;
+  if (!isOrderNumber(orderNumber)) return null;
+  if (!isUploadId(uploadId)) return null;
 
   return { action, ref: `manifests/${date}/${orderNumber}-${uploadId}.json` };
 };

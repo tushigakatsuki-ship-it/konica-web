@@ -73,7 +73,7 @@ test('бүтэн урсгал: upload → PUT → order → payment → admin', 
     payment: { bank: { reference: string }; tracking: { date: string; uploadId: string } };
   };
 
-  assert.match(order.orderNumber, /^PMN-\d{6}-\d{4}$/);
+  assert.match(order.orderNumber, /^PMN-\d{6}-\d{4,5}$/);
   assert.equal(order.photos, 'saved');
   assert.equal(order.payment.bank.reference, order.orderNumber);
   assert.deepEqual(order.payment.tracking, { date: up.date, uploadId: up.uploadId });
