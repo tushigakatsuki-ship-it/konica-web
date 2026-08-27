@@ -132,7 +132,13 @@ export default function PromoVideo() {
             className="block aspect-video w-full object-contain"
           />
 
-          {/* Доод талд нь бичиг — бичлэг дээр шууд тавьбал уншигдахгүй. */}
+          {/*
+            * Доод талд нь бичиг — бичлэг дээр шууд тавьбал уншигдахгүй.
+            *
+            * `title` хоосон бол зөвхөн Facebook тэмдэг, сум үлдэнэ: бичлэг нь
+            * өөрөө юу болохыг хэлж байгаа тул давхар тайлбар шаардлагагүй үе
+            * бий. `flex-1` нь хоосон үед ч сумыг баруун ирмэгт барина.
+            */}
           <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6">
             <IconFacebook className="size-4 shrink-0 text-white" />
             <span className="min-w-0 flex-1 truncate text-xs font-semibold text-white">
