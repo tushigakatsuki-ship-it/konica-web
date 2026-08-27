@@ -7,7 +7,7 @@ import LastOrderBanner from '../components/LastOrderBanner';
 import { SERVICES, byCategory, type ServiceCategory, type ServiceItem } from '../data/catalog';
 import CategoryGrid, { CATEGORY_HINT } from '../components/CategoryGrid';
 import { useLang } from '../state/lang';
-import { fitBox, parsePhotoSize } from '../lib/photoSize';
+import { parsePhotoSize } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
 
@@ -542,7 +542,6 @@ export default function Print() {
                  * байсан. Хэмжээгүй бол үйлчилгээний НЭРИЙГ нь харуулна.
                  */
                 const size = parsePhotoSize(service.name);
-                const box = fitBox(size ?? { w: 10, h: 15, label: '' }, 48, 48);
                 /*
                  * Ижил хэмжээтэй ХОЁР үйлчилгээ байвал ялгах тэмдэглэл.
                  *
@@ -594,66 +593,89 @@ export default function Print() {
                      */}
                     {/* Хэмжээтэй бол цаасны харьцааг зурна; үгүй бол зай эзлэхгүй. */}
                     {size && (
-                      <span className="grid h-14 place-items-center">
-                        <span
-                          aria-hidden
-                          style={{ width: box.width, height: box.height }}
-                          /*
-                           * Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр.
-                           * `overflow-hidden` нь доторх зургийг булангийн
-                           * радиусын дотор барина.
-                           */
-                          className="block overflow-hidden rounded-[3px] border-2 border-brand-400 bg-white"
-                        >
-                          {/*
-                            * Жишээ зураг — карт бүр ТУХАЙН хэмжээний харьцаагаар
-                            * тайрч харуулна. Хэрэглэгч «энэ хэмжээнд зураг маань
-                            * яаж багтах вэ» гэдгийг шууд хардаг.
-                            *
-                            * ⚠️ `ugaalt-thumb.jpg` — БҮТЭН постер БИШ.
-                            *
-                            * Хайрцаг хамгийн ихдээ 48px тул бүтэн постер тавихад
-                            * дээд талын «Digital Photo Express» зурвас, доод
-                            * талын «THANK YOU» зурвас хоёр өндрийн 30 орчим
-                            * хувийг эзэлж, зураг нь жижигхэн постер мэт
-                            * харагддаг байв. Тиймээс НҮҮРНИЙ хэсгийг урьдчилж
-                            * тайрсан тусдаа файл ашиглана — тэр нь ямар ч
-                            * харьцаанд зүй зохистой тайрагдана.
-                            *
-                            * Файл дутуу бол зөвхөн цагаан цаас үлдэнэ — карт
-                            * эвдрэхгүй.
-                            */}
-                          {PHOTO_TABS.includes(tab as ServiceCategory) &&
-                            !washImageFailed && (
-                              <img
-                                src="/category/ugaalt-thumb.jpg"
-                                alt=""
-                                decoding="async"
-                                onError={() => setWashImageFailed(true)}
-                                className="size-full object-cover"
-                              />
-                            )}
-                        </span>
+                      /*
+                        ⚠️ Хайрцаг нь БҮХ картад ИЖИЛ хэмжээтэй.
+                        Урьд нь `fitBox`-оор хэмжээ тус бүрийн харьцаагаар
+                        зурдаг байсан тул 6×9 нарийхан, 60×40 өргөн гарч,
+                        тор жигд бус харагддаг байв. Одоо зөвхөн ЗУРАГ л
+                        харагдана — харьцааг доорх шошго хэлнэ.
+                      */
+                      <span
+                        aria-hidden
+                        /* Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр. */
+                        className="block aspect-[6/5] w-full overflow-hidden rounded-md border-2 border-brand-400 bg-white"
+                      >
+                        {/*
+                          * Жишээ зураг — цагаан хайрцгийг БҮТНЭЭР дүүргэнэ.
+                          *
+                          * Хайрцгийн харьцаа (`6/5`) нь зургийнхтай (480×400)
+                          * бараг ижил тул хажуугаар нь хоосон зурвас гарахгүй.
+                          * Гэхдээ багтаалт нь `object-contain` дээр тулгуурлана
+                          * — зургаа солиход харьцаа зөрсөн ч постер БҮТНЭЭРЭЭ
+                          * харагдсаар байна, зөвхөн жаахан зурвас нэмэгдэнэ.
+                          *
+                          * ⚠️ Файлын нэр `ugaalt-poster.jpg` — `ugaalt-thumb`
+                          * БИШ. Хөгжүүлэлтийн явцад тэр нэрээр ТАЙРСАН
+                          * хувилбарууд дарагдаж байсан тул хэрэглэгчийн хөтөч
+                          * хуучин тайралтыг кэшнээсээ өгдөг байв. Агуулга нь
+                          * үндсээрээ өөрчлөгдсөн зурагт ШИНЭ нэр өгөх нь тэр
+                          * ангийн алдааг бүрмөсөн таслана.
+                          *
+                          * Файл дутуу бол зөвхөн цагаан цаас үлдэнэ — карт
+                          * эвдрэхгүй.
+                          */}
+                        {PHOTO_TABS.includes(tab as ServiceCategory) &&
+                          !washImageFailed && (
+                            <img
+                              src="/category/ugaalt-poster.jpg"
+                              alt=""
+                              decoding="async"
+                              onError={() => setWashImageFailed(true)}
+                              /*
+                               * ⚠️ `object-contain` — `object-cover` БИШ.
+                               *
+                               * `cover` нь хайрцгийг дүүргэхийн тулд ЗААВАЛ
+                               * тайрдаг: хайрцаг (1.2051) ба зураг (1.2000)
+                               * хоёрын харьцаа өчүүхэн ч зөрвөл ирмэгээс
+                               * хаздаг. `contain` нь зургийг БҮТНЭЭР багтаана —
+                               * харьцаа хэрхэн ч зөрсөн нэг ч пиксел
+                               * тайрагдахгүй.
+                               */
+                              className="size-full object-contain"
+                            />
+                          )}
                       </span>
                     )}
 
-                    <span
-                      className={
-                        size
-                          ? 'mt-2 text-base font-bold'
-                          : 'flex min-h-14 items-center text-sm font-bold leading-snug'
-                      }
-                    >
-                      {size ? size.label : ts(service.name)}
-                    </span>
+                    {/*
+                      Хэмжээ, үнэ хоёр НЭГ мөрөнд.
+
+                      `justify-between` нь хэмжээг зүүн, үнийг баруун ирмэгт
+                      барина — картууд хооронд нүд гүйлгэхэд үнэ нь нэг
+                      баганад эгнэж, харьцуулахад хялбар.
+                    */}
+                    {size ? (
+                      <span className="mt-2 flex w-full items-baseline justify-between gap-2">
+                        <span className="text-sm font-bold">{size.label}</span>
+                        <span className="shrink-0 text-sm font-bold text-brand-500">
+                          {formatCurrency(price)}
+                        </span>
+                      </span>
+                    ) : (
+                      <>
+                        <span className="flex min-h-14 items-center text-sm font-bold leading-snug">
+                          {ts(service.name)}
+                        </span>
+                        <span className="mt-0.5 text-sm font-bold text-brand-500">
+                          {formatCurrency(price)}
+                        </span>
+                      </>
+                    )}
                     {qualifier && (
-                      <span className="mt-0.5 line-clamp-2 text-[11px] leading-tight text-muted">
+                      <span className="mt-0.5 line-clamp-2 w-full text-left text-[11px] leading-tight text-muted">
                         {qualifier}
                       </span>
                     )}
-                    <span className="mt-0.5 text-sm font-bold text-brand-500">
-                      {formatCurrency(price)}
-                    </span>
                   </button>
                 );
               })}
