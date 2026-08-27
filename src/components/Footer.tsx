@@ -37,13 +37,22 @@ export default function Footer() {
     <footer
       id="kholboo"
       /*
-        Хөлийн бичгийг ЦЭНХЭР болгов (өмнө нь саарал `text-ink-soft`).
+        Хөлийн бичиг нь ЭНГИЙН БАРААН (`text-ink-soft`).
+
+        Урьд нь бүхэл хөл ЦЭНХЭР (`text-brand-600`) байсан: хаяг, ажлын цаг,
+        уриа гээд бүх энгийн бичиг брэндийн өнгөөр гардаг тул хөл нь нэг
+        том линк мэт харагдаж, уншихад ядрааж байв. Энгийн бичиг бараан
+        байх нь ердийн бөгөөд уншихад амар.
+
+        ⚠️ ТОКЕН ашиглана, хатуу hex БИШ — `--color-ink-soft` нь харанхуй
+        горимд цайвар болж эргэдэг. Хатуу өнгө бичвэл харанхуйд хар дэвсгэр
+        дээр хар бичиг болно (тестээр түгжигдсэн).
 
         Гурван баганын гарчиг нь УЛБАР ШАР (`text-accent` — «Google Maps-аар
         нээх» линктэй ЯГ ижил өнгө) — ингэснээр тэр гурван зангуу нүдэнд эхлээд
         тусч, доорх мэдээлэл нь тэдгээрийн доор эрэмбэлэгдэж уншигдана.
       */
-      className="mt-16 scroll-mt-20 border-t border-hairline bg-card text-brand-600"
+      className="mt-16 scroll-mt-20 border-t border-hairline bg-card text-ink-soft"
     >
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-2 lg:grid-cols-4">
         {/* Байгууллага */}
@@ -75,7 +84,7 @@ export default function Footer() {
               * `leading-snug` нь мултарсан хоёр мөрийг ойртуулж, тэмдгийн
               * өндөртэй тэнцүүлнэ.
               */}
-            <span className="text-base font-medium leading-snug text-brand-700">
+            <span className="text-base font-medium leading-snug text-ink">
               {CONTACT.company}
             </span>
           </p>
@@ -137,7 +146,7 @@ export default function Footer() {
           <p className="mt-3 flex gap-2 text-sm leading-relaxed">
             <IconMapPin className="mt-0.5 size-4 shrink-0" />
             <span>
-              <span className="block font-semibold text-brand-700">
+              <span className="block font-semibold text-ink">
                 {CONTACT.address.place}
               </span>
               {CONTACT.address.full}
@@ -162,7 +171,7 @@ export default function Footer() {
               <div key={row.daysKey} className="flex items-start gap-2">
                 <IconClock className="mt-0.5 size-4 shrink-0" />
                 <dt className="flex-1">{t(row.daysKey)}</dt>
-                <dd className="font-semibold text-brand-700">
+                <dd className="font-semibold text-ink">
                   {row.timeKey ? t(row.timeKey) : row.time}
                 </dd>
               </div>
