@@ -50,13 +50,13 @@ export const STRINGS = {
 
   /* ── Нүүр — эхний дэлгэц ── */
   'hero.badge': {
-    mn: 'Konica Minolta · Мэргэжлийн зураг угаалт',
-    en: 'Konica Minolta · Professional photo lab',
+    mn: 'Konica Minolta · FujiFilm · Мэргэжлийн зураг угаалт',
+    en: 'Konica Minolta · FujiFilm · Professional photo lab',
   },
   'hero.titleTop': { mn: 'Чанартай хэвлэл,', en: 'Quality printing,' },
   'hero.titleAccent': { mn: 'хурдан үйлчилгээ', en: 'fast service' },
   'hero.subtitle': {
-    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай — үнэ нь тэр дороо харагдана.',
+    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай',
     en: 'Pick your size and add your photo — the price shows up right away.',
   },
 
