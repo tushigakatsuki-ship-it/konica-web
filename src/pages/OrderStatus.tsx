@@ -184,8 +184,8 @@ export default function OrderStatusPage() {
           <p className="flex items-center gap-2 text-base font-black">
             {paid ? (
               <>
-                <IconCheckCircle className="size-5 text-ok-strong" /> Төлбөр
-                баталгаажсан
+                <IconCheckCircle className="size-5 text-ok-strong" /> Захиалга
+                амжилттай баталгаажлаа
               </>
             ) : (
               <>

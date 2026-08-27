@@ -102,6 +102,14 @@ const GRID_TILES = CATEGORY_TILES.filter(
 );
 
 /** Нэг хавтан дотор нийлсэн, хараахан бэлэн бус ангиллууд. */
+/**
+ * «Нэмэлт үйлчилгээ» хавтанг тор дээр харуулах эсэх.
+ *
+ * `false` — бэлэн бус ангиллуудыг нэгтгэсэн хавтан гарахгүй. Тэдгээр
+ * үйлчилгээ бэлэн болоход `true` болгоход л хангалттай.
+ */
+const SHOW_MORE_TILE = false;
+
 const SOON_TILES = CATEGORY_TILES.filter(
   (tile) => !MERGED_INTO_WASH.includes(tile.key) && !READY.includes(tile.key),
 );
@@ -290,7 +298,22 @@ export default function CategoryGrid({ counts, onPick }: Props) {
             </li>
           ))}
 
-          {SOON_TILES.length > 0 && (
+          {/*
+            ⚠️ «Нэмэлт үйлчилгээ» хавтан НУУГДСАН.
+
+            Бэлэн бус 9 ангиллыг нэг хавтанд нийлүүлж харуулдаг байсныг
+            хассан — тор дээр одоо ЗӨВХӨН бэлэн үйлчилгээ үлдэнэ.
+
+            ⚠️ Код нь ХЭВЭЭР үлдэж байна (`MoreTile`, `SOON_TILES`,
+            `SHOW_MORE_TILE`). Устгаагүй шалтгаан: эдгээр ангилал бэлэн
+            болоход буцааж асаах нь нэг мөр — `SHOW_MORE_TILE`-ыг `true`
+            болгоно. Устгачихвал бүтэн хавтан, орчуулга, тайлбарыг дахин
+            бичих хэрэгтэй болно.
+
+            Ангиллын үнийн жагсаалт нь `/hevlel?t=<ангилал>` хаягаар
+            ХҮРЭЛЦЭЭТЭЙ хэвээр — зөвхөн торны хавтан алга болсон.
+          */}
+          {SHOW_MORE_TILE && SOON_TILES.length > 0 && (
             <li
               className="tile-3d tile-in"
               style={{ animationDelay: `${GRID_TILES.length * 40}ms` }}

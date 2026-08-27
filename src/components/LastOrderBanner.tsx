@@ -33,7 +33,7 @@ export default function LastOrderBanner() {
         <span className="block truncate font-bold">{receipt.orderNumber}</span>
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand-500">
-        Төлөв харах <IconArrowRight className="size-4" />
+        Төлбөр шалгах <IconArrowRight className="size-4" />
       </span>
     </Link>
   );

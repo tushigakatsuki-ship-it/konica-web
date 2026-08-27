@@ -83,7 +83,7 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
     return (
       <div className="mt-8 rounded-lg border border-ok/40 bg-ok/10 p-5 text-left">
         <p className="flex items-center gap-2 text-base font-black text-ok-strong">
-          <IconCheckCircle className="size-5" /> Төлбөр баталгаажлаа
+          <IconCheckCircle className="size-5" /> Захиалга амжилттай баталгаажлаа
         </p>
         <p className="mt-2 text-sm text-ink-soft">
           {photoCount > 0

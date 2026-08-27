@@ -372,7 +372,7 @@ export default function Order({ variant = 'page', onClose, onEdit }: OrderProps 
                 })}
                 className="btn-brand"
               >
-                Захиалгын төлөв харах
+                Төлбөр шалгах
               </Link>
             )}
             <Link to="/" className="btn-outline">
