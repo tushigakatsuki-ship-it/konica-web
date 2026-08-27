@@ -64,7 +64,12 @@ export default function Header() {
             * зэрэг 320px төхөөрөмж дээр «Printmn» бичиг 41px-ээр халгаж
             * байсан. `P` тэмдэг нь брэндийг таниулж, нүүр рүү ч хөтөлнө.
             */}
-          <span className="hidden text-xl font-extrabold tracking-tight min-[360px]:inline">
+          {/*
+            * Жин 800 → 500. `CONTACT.company` нь урт нэр болсон тул хэт бүдүүн
+            * бичиг толгойн нарийхан зурваст бөөгнөрч, утасны дугаар руу шахдаг.
+            * Хөлийн ижил блоктой нэг жинтэй байлгав.
+            */}
+          <span className="hidden text-lg font-medium tracking-tight min-[360px]:inline">
             {CONTACT.company}
           </span>
         </Link>

@@ -48,11 +48,36 @@ export default function Footer() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-2 lg:grid-cols-4">
         {/* Байгууллага */}
         <div>
-          <p className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-md bg-brand-500 text-lg font-black text-white">
+          {/*
+            * ⚠️ `shrink-0` нь тэмдэг дээр ЗААВАЛ.
+            *
+            * Flex-ийн хүүхэд анхдагчаар шахагддаг (`flex-shrink: 1`). Хөлийн
+            * багана нарийн (≈220px) тул нэр урт болоход тэмдэг 36px-ээс 24px
+            * болж шахагдаж, дөрвөлжин нь ЗУУВАН болдог байв — лого гажна.
+            * `size-9` нь өөрөө үүнээс хамгаалдаггүй: тэр зөвхөн үндсэн хэмжээг
+            * заана, шахалтыг зогсоодоггүй.
+            */}
+          {/*
+            * `items-start` — нэр 2 мөр болох тул тэмдгийг ЭХНИЙ мөртэй эгнүүлнэ.
+            *
+            * Багана 220px, тэмдэг+зай 46px тул нэрэнд 174px үлдэнэ. «Printmn.net
+            * Онлайн үйлчилгээ» нэг мөрөнд 234px эзэлдэг — багтах боломжгүй тул
+            * зайлшгүй мултарна. `items-center` үед тэмдэг хоёр мөрийн ГОЛД
+            * хөвж, лого нэрнээсээ салсан мэт харагддаг байв.
+            */}
+          <p className="flex items-start gap-2.5">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-500 text-lg font-bold text-white">
               P
             </span>
-            <span className="text-lg font-extrabold text-brand-700">{CONTACT.company}</span>
+            {/*
+              * Жинг сулруулав (800 → 500). `CONTACT.company` нь урт нэр болсон
+              * тул хэт бүдүүн бичиг хөлийн нарийн баганад бөөгнөрч харагдана.
+              * `leading-snug` нь мултарсан хоёр мөрийг ойртуулж, тэмдгийн
+              * өндөртэй тэнцүүлнэ.
+              */}
+            <span className="text-base font-medium leading-snug text-brand-700">
+              {CONTACT.company}
+            </span>
           </p>
           <p className="mt-3 text-sm leading-relaxed">{t('common.tagline')}</p>
 

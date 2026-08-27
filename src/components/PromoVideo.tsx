@@ -21,15 +21,25 @@ import { IconArrowRight, IconFacebook, IconPlay } from './icons';
  *
  * ── Хоёр төлөв ───────────────────────────────────────────────────
  *
- * `PROMO.video` файл байвал → бичлэг тоглоно.
- * Байхгүй бол        → одоогийн холбоос зурвас хэвээр.
+ * `PROMO.videos` дотор файл байвал → бичлэг тоглоно.
+ * Хоосон бол                       → одоогийн холбоос зурвас хэвээр.
  *
  * Ингэснээр файл ирэх хүртэл хуудас эвдрэхгүй, файл нэмэхэд өөрөө асна.
+ *
+ * ── Олон бичлэг ──────────────────────────────────────────────────
+ *
+ * Нэгээс олон байвал ЭЭЛЖЛЭН тоглоно — нэг нь дуусахад (`onEnded`) дараагийнх
+ * нь эхэлнэ. Ганц байвал `loop`-оор тасралтгүй давтагдана.
+ *
+ * ⚠️ `loop`-ыг олон бичлэгтэй үед тавьж БОЛОХГҮЙ: тэр үед `onEnded` хэзээ ч
+ * дуудагдахгүй тул эхний бичлэг мөнхөд давтагдаж, бусад нь гарахгүй.
  */
 
 export default function PromoVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  /** Одоо тоглож буй бичлэгийн дугаар. */
+  const [current, setCurrent] = useState(0);
 
   /*
    * ⚠️ Хөдөлгөөн багасгах тохиргоог ХҮНДЭТГЭНЭ.
@@ -39,6 +49,12 @@ export default function PromoVideo() {
    * тэдэнд шууд нөлөөлнө. Тэр үед бичлэг эхлэхгүй — хэрэглэгч өөрөө дарж
    * тоглуулна.
    */
+  /*
+   * ⚠️ `current`-ээс хамаарна. Бичлэг солигдоход `key` нь `<video>` зангилааг
+   * СОЛЬДОГ тул `videoRef` шинэ элемент рүү заана — хамаарлыг хоосон (`[]`)
+   * үлдээвэл энэ эффект зөвхөн ЭХНИЙ бичлэг дээр ажиллаж, «хөдөлгөөнийг
+   * багасга» гэсэн хүнд 2 дахь бичлэгээс эхлэн автоматаар тоглож эхэлнэ.
+   */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -47,9 +63,10 @@ export default function PromoVideo() {
       video.autoplay = false;
       video.pause();
     }
-  }, []);
+  }, [current]);
 
-  const hasVideo = Boolean(PROMO.video) && !failed;
+  const clips = PROMO.videos.filter(Boolean);
+  const hasVideo = clips.length > 0 && !failed;
 
   if (!PROMO.url && !hasVideo) return null;
 
@@ -64,24 +81,55 @@ export default function PromoVideo() {
       >
         <span className="relative block">
           <video
+            /*
+             * ⚠️ `key` ЗААВАЛ. Үүнгүй бол React нь ижил `<video>` зангилааг
+             * дахин ашиглаж, зөвхөн `src`-ыг сольдог — зарим хөтөч тэр үед
+             * шинэ файлыг өөрөө эхлүүлдэггүй тул ээлж солигдоод зогсчихдог.
+             * `key` нь зангилааг СОЛИУЛЖ, `autoPlay` дахин ажиллана.
+             */
+            key={clips[current]}
             ref={videoRef}
-            src={PROMO.video}
+            src={clips[current]}
             poster={PROMO.poster || undefined}
             /*
-             * Энэ дөрөв ЗААВАЛ хамт байна — аль нэг нь дутвал автоматаар
+             * Эхний гурав ЗААВАЛ хамт байна — аль нэг нь дутвал автоматаар
              * эхлэхгүй:
              *   muted       — дуутай бичлэгийг ямар ч хөтөч өөрөө эхлүүлдэггүй
              *   playsInline — iPhone дээр эс тэгвээс бүтэн дэлгэц рүү үсэрнэ
              *   autoPlay    — эхлүүлэх хүсэлт
-             *   loop        — богино бичлэг тасралтгүй давтагдана
+             *
+             * `loop` нь ЗӨВХӨН ганц бичлэгтэй үед. Олон байвал `onEnded`-ээр
+             * дараагийнх руу шилжинэ — `loop` тавибал тэр хэзээ ч дуудагдахгүй.
              */
             muted
             playsInline
             autoPlay
-            loop
-            preload="metadata"
+            loop={clips.length === 1}
+            onEnded={
+              clips.length > 1
+                ? () => setCurrent((i) => (i + 1) % clips.length)
+                : undefined
+            }
+            /*
+             * ⚠️ Зөвхөн ЭХНИЙ бичлэгийн мэдээллийг урьдчилж татна. Бусад нь
+             * ээлж ирэхэд л татагдана — эс бөгөөс нүүр хуудас нээхэд дөрвүүлээ
+             * зэрэг татагдаж, утасны сүлжээнд шууд цохилт болно.
+             */
+            preload={current === 0 ? 'metadata' : 'none'}
             onError={() => setFailed(true)}
-            className="block aspect-video w-full object-cover"
+            /*
+             * ⚠️ `object-contain` — `object-cover` БИШ.
+             *
+             * Дэлгүүрийн бичлэгүүд утаснаас ирдэг тул зарим нь БОСОО (9:16),
+             * зарим нь хэвтээ (16:9) байна. Зурвас нь 16:9 тул `object-cover`
+             * үед босоо бичлэгээс зөвхөн дунд хэсгийн НИМГЭН зурвас үлдэж,
+             * юу болж буй нь огт ойлгогдохгүй болно — хэмжсэн: өндрийн 32%.
+             *
+             * `contain` нь бичлэгийг БҮТНЭЭР харуулна: хэвтээ нь хайрцгийг
+             * бүрэн дүүргэнэ, босоо нь голлон сууж хажуугаар нь зурвасын
+             * өөрийн бүдэг дэвсгэр харагдана.
+             */
+            className="block aspect-video w-full object-contain"
           />
 
           {/* Доод талд нь бичиг — бичлэг дээр шууд тавьбал уншигдахгүй. */}

@@ -350,7 +350,7 @@ export const STRINGS = {
    * төрлүүд түүний дараа орно.
    */
   'common.tagline': {
-    mn: 'Онлайн үйлчилгээ · Зураг угаалт · Хэвлэл',
+    mn: 'Зураг угаах, хэвлэл, бэлэг дурсгал, бичиг хэргийн үйлчилгээ',
     en: 'Online service · Photo printing · Print',
   },
 } as const satisfies Record<string, Entry>;
