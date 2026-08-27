@@ -54,7 +54,17 @@ export const removeLine = (lines: readonly OrderLine[], id: number): OrderLine[]
 /** Хүргэлтийн суурь хураамж — хотын дотор. */
 export const DELIVERY_FEE = 5000;
 
+/**
+ * Захиалагч хэн бэ.
+ *
+ * НӨАТ-ын баримт хоёр төрөлд ӨӨР бөглөгддөг: хувь хүнд регистрийн дугаараар,
+ * байгууллагад ТТД-аар. Ажилтан баримт бэлдэхийн өмнө үүнийг мэдэх ёстой тул
+ * захиалгын тайлбарт тэмдэглэгдэж, ажлын самбарт харагдана.
+ */
+export type CustomerKind = 'person' | 'org';
+
 export interface CustomerInfo {
+  kind: CustomerKind;
   name: string;
   phone: string;
   email: string;

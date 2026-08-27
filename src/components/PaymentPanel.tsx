@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PRIMARY_PHONE } from '../data/site';
+import { PAYMENT_QR, PRIMARY_PHONE } from '../data/site';
 import { formatCurrency } from '../lib/price';
 import type { PaymentDetails } from '../lib/api';
 import { IconAlert, IconCheckCircle, IconClock } from './icons';
@@ -20,6 +20,15 @@ interface Props {
 export default function PaymentPanel({ payment, orderNumber, photoCount }: Props) {
   const [paid, setPaid] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+
+  /**
+   * Ирээгүй QR-ын замууд.
+   *
+   * ⚠️ Нэг QR дутуу байхад НӨГӨӨГ нь хамт нуух ёсгүй — тиймээс ганц
+   * `boolean` биш, ЖАГСААЛТ. Хоёулаа дутвал хэсэг бүхэлдээ гарахгүй.
+   */
+  const [qrFailed, setQrFailed] = useState<string[]>([]);
+  const qrShown = PAYMENT_QR.filter((qr) => !qrFailed.includes(qr.src));
 
   /*
    * Төлөв шалгах давтамж.
@@ -162,6 +171,51 @@ export default function PaymentPanel({ payment, orderNumber, photoCount }: Props
                 </ul>
               </>
             )}
+          </div>
+        )}
+
+        {/*
+          ── Банкны QR кодууд ────────────────────────────────────
+
+          Хоёр QR ЗЭРЭГЦЭЭ: хэрэглэгч ямар банктай болохоо мэддэг тул
+          сонголтыг нь зэрэгцүүлж тавих нь дараалуулснаас хурдан —
+          нүд нэг хараад өөрийнхөө аппыг олно.
+
+          ⚠️ Эдгээр нь QPay-ийн динамик QR-аас ТУСДАА: QPay нь нэхэмжлэл
+          бүрт өөр QR үүсгэж төлбөрийг автоматаар баталгаажуулдаг бол
+          эдгээр нь тогтмол данс руу шилжүүлэх бөгөөд ажилтан гараар
+          баталгаажуулна. Тиймээс доорх дансны мэдээлэлтэй нэг бүлэгт.
+
+          Файл дутуу бол тэр QR ганцаараа алга болно (`failed`) — үлдсэн нь
+          хэвийн гарна.
+        */}
+        {PAYMENT_QR.length > 0 && qrShown.length > 0 && (
+          <div className={payment.qpay ? 'mt-6 border-t border-hairline pt-5' : ''}>
+            <p className="text-sm font-bold">Банкны аппаараа QR уншуулах</p>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {qrShown.map((qr) => (
+                <div key={qr.src} className="rounded-lg border border-hairline p-3">
+                  {/*
+                    ⚠️ Цагаан дэвсгэр ЗААВАЛ. QR уншигч хар/цагаан ялгаа
+                    шаарддаг тул харанхуй горимд ч цагаан хэвээр байх ёстой —
+                    эс бөгөөс камер уншихаа болино.
+                  */}
+                  <img
+                    src={qr.src}
+                    alt={`${qr.label} QR код`}
+                    decoding="async"
+                    onError={() =>
+                      setQrFailed((list) =>
+                        list.includes(qr.src) ? list : [...list, qr.src],
+                      )
+                    }
+                    className="mx-auto block w-full max-w-[160px] rounded-md bg-white"
+                  />
+                  <p className="mt-2 text-center text-xs font-bold">{qr.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

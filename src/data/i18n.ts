@@ -83,7 +83,25 @@ export const STRINGS = {
   'contact.hours': { mn: 'Ажлын цаг', en: 'Opening hours' },
 
   /* ── Хэвлэлийн хуудас ── */
-  'print.title': { mn: 'Хэмжээгээ сонгоод зургаа оруул', en: 'Pick a size, add your photo' },
+  /*
+   * ⚠️ `print.title` ХАСАГДСАН — доорх `print.pitch` түүнийг орлов.
+   *
+   * Хуучин гарчиг нь ЗААВАР байсан («Хэмжээгээ сонгоод зургаа оруул») —
+   * хэрэглэгч хуудсанд орсон л бол юу хийхээ мэдэж байгаа. Оронд нь
+   * ЯАГААД энд угаалгах вэ гэдгийг хэлнэ: Fuji лабораторийн чанар.
+   */
+  'print.pitch1a': {
+    mn: 'Хүссэн хэмжээгээ сонгоод зургаа угаалгаарай.',
+    en: 'Pick any size and have your photos developed.',
+  },
+  'print.pitch1b': {
+    mn: 'Konica Fuji лаборатори угаалга',
+    en: 'Konica Fuji lab prints',
+  },
+  'print.pitch2': {
+    mn: '100 жил гандахгүй, усанд норохгүй',
+    en: '100 years without fading, waterproof',
+  },
   'print.subtitle': {
     mn: 'Хэмжээ бүрийн үнэ шууд харагдана. Хэмжээ дээрээ дараад зургаа оруулж, хэдэн ширхэг хэвлэхээ л сонгоно.',
     en: 'Every price is shown up front. Tap a size, add your photo and choose how many prints you need.',
@@ -132,6 +150,8 @@ export const STRINGS = {
   'print.veryComingSoon': { mn: 'Тун удахгүй', en: 'Very soon' },
   'print.showAll': { mn: 'Бүх хэмжээ харах', en: 'Show all sizes' },
   'print.continue': { mn: 'Захиалга үргэлжлүүлэх', en: 'Continue to order' },
+  'print.finish': { mn: 'Захиалга дуусгах', en: 'Finish order' },
+  'print.finishShort': { mn: 'Дуусгах', en: 'Finish' },
   'print.back': { mn: 'Буцах', en: 'Back' },
   'print.staffTool': {
     mn: 'Ажилтны хэрэгсэл — цээж зураг автоматаар',
@@ -306,6 +326,12 @@ export const STRINGS = {
   'editor.yourPhoto': { mn: 'Таны зураг', en: 'Your photo' },
   'editor.unitPrice': { mn: 'Нэгжийн үнэ', en: 'Unit price' },
   'editor.amount': { mn: 'Дүн', en: 'Amount' },
+  'editor.vat': { mn: 'НӨАТ-тай баримт (+10%)', en: 'VAT receipt (+10%)' },
+  'editor.vatNote': {
+    mn: 'Захиалгын НИЙТ дүнд нэг удаа нэмэгдэнэ — зураг тус бүрд биш.',
+    en: 'Added once to the whole order total — not per photo.',
+  },
+  'editor.vatIncluded': { mn: 'НӨАТ {a} багтсан', en: 'incl. {a} VAT' },
   'editor.lowResOne': {
     mn: 'Энэ зураг {size} хэвлэхэд нягтрал багавтар байна.',
     en: 'This photo is a little low-resolution for {size} prints.',

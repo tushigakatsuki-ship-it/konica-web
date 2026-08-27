@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { ServiceItem } from '../data/catalog';
 import type { EditorValue } from '../components/PhotoEditor';
-import { parsePrice } from '../lib/price';
+import { parsePrice, vatPortion } from '../lib/price';
 
 /**
  * Сагс — `/hevlel` дээр сонгосон зурагтай мөрүүд.
@@ -24,8 +24,22 @@ export interface BasketItem {
 
 interface BasketApi {
   items: BasketItem[];
+  /** НӨАТ-гүй дүн. */
   total: number;
+  /**
+   * НӨАТ-ын дүн. `vat` унтраалттай үед 0.
+   *
+   * Сагсанд байгаа шалтгаан: НӨАТ нь мөр тус бүрийнх БИШ, бүтэн ЗАХИАЛГЫН
+   * шинж чанар. Хэрэглэгч түүнийг зураг нэмэх цонхноос сонгодог болсон ч
+   * утга нь бүх мөрөнд нэг удаа бодогдох ёстой — тиймээс сагсны төлөвт
+   * амьдарна, зураг тус бүрийн `EditorValue` дотор биш.
+   */
+  tax: number;
+  /** НӨАТ-тай эцсийн дүн — хэрэглэгчийн төлөх мөнгө. */
+  grandTotal: number;
   totalQty: number;
+  vat: boolean;
+  setVat(on: boolean): void;
   /** Тухайн үйлчилгээгээр нийт хэдэн ширхэг сонгосон бэ. */
   countFor(serviceId: number): number;
   add(service: ServiceItem, value: EditorValue): void;
@@ -39,6 +53,7 @@ const BasketContext = createContext<BasketApi | null>(null);
 
 export function BasketProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<BasketItem[]>([]);
+  const [vat, setVat] = useState(false);
 
   /*
    * Мутациудыг `useCallback`-аар тогтвортой байлгана: тэдгээр нь `items`-ээс
@@ -77,15 +92,34 @@ export function BasketProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const clear = useCallback(() => setItems([]), []);
+  /*
+   * Сагсыг цэвэрлэхэд НӨАТ-ын сонголт ч тэглэгдэнэ. Эс бөгөөс дараагийн
+   * захиалга нь өмнөх хүний сонголтыг чимээгүй өвлөж, ажилтан буруу
+   * баримт бэлдэнэ.
+   */
+  const clear = useCallback(() => {
+    setItems([]);
+    setVat(false);
+  }, []);
 
   const api = useMemo<BasketApi>(() => {
     const priceOf = (item: BasketItem) => parsePrice(item.service.price) * item.value.qty;
+    const total = items.reduce((sum, item) => sum + priceOf(item), 0);
+    /*
+     * ⚠️ Дүнг ЭНД нэг л газар бодно. Урьд нь `/zakhialga` хуудас өөрөө бодож
+     * байсан тул сагсны хажуугийн дүн НӨАТ-гүй, захиалгын хуудасных НӨАТ-тай
+     * гарч, хоёр өөр тоо харагддаг байв.
+     */
+    const tax = vat ? vatPortion(total) : 0;
 
     return {
       items,
-      total: items.reduce((sum, item) => sum + priceOf(item), 0),
+      total,
+      tax,
+      grandTotal: total + tax,
       totalQty: items.reduce((sum, item) => sum + item.value.qty, 0),
+      vat,
+      setVat,
       countFor: (serviceId) =>
         items
           .filter((item) => item.service.id === serviceId)
@@ -96,7 +130,7 @@ export function BasketProvider({ children }: { children: ReactNode }) {
       remove,
       clear,
     };
-  }, [add, clear, items, remove, setQty, update]);
+  }, [add, clear, items, remove, setQty, update, vat]);
 
   return <BasketContext.Provider value={api}>{children}</BasketContext.Provider>;
 }

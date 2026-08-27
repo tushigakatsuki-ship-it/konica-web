@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import { PRIMARY_PHONE } from '../data/site';
@@ -32,10 +33,13 @@ import {
   IconAlert,
   IconArrowRight,
   IconCheckCircle,
+  IconClose,
   IconImage,
 } from '../components/icons';
 
 const EMPTY_CUSTOMER: CustomerInfo = {
+  /* Анхдагч нь хувь хүн — үйлчлүүлэгчдийн дийлэнх нь тийм. */
+  kind: 'person',
   name: '',
   phone: '',
   email: '',
@@ -75,7 +79,30 @@ const validate = (customer: CustomerInfo, lines: readonly OrderLine[]): FieldErr
   return errors;
 };
 
-export default function Order() {
+interface OrderProps {
+  /**
+   * `page` — өөрийн хуудсаараа (`/zakhialga`). Шууд линк, буцах товч ажиллана.
+   * `modal` — `/hevlel` дээрээс сагсанд нэмэх даруйд гарч ирэх цонх.
+   *
+   * ⚠️ Хоёр горим ИЖИЛ компонентыг хуваалцана. Урьд нь маягтыг хоёр газар
+   * хуулбарлах санал байсан ч тэр нь баталгаатай алдаа: талбар нэмэхэд нэгийг
+   * нь мартаж, хэрэглэгч аль замаар орсноосоо хамаараад өөр маягт хардаг
+   * болно. Ялгаа нь зөвхөн ГАДНА бүрхүүлд — доторх логик нэг.
+   */
+  variant?: 'page' | 'modal';
+  /** Зөвхөн `modal` горимд. */
+  onClose?: () => void;
+  /**
+   * «Засах» — зураг оруулах цонх руу буцаана (зөвхөн `modal` горимд).
+   *
+   * Өгөөгүй бол товч ОГТ гарахгүй: буцах газаргүй байхад товч харуулбал
+   * хэрэглэгч дарж, юу ч болохгүйд эргэлзэнэ.
+   */
+  onEdit?: () => void;
+}
+
+export default function Order({ variant = 'page', onClose, onEdit }: OrderProps = {}) {
+  const asModal = variant === 'modal';
   const basket = useBasket();
   /*
    * Энэ хуудас бүхэлдээ хараахан орчуулагдаагүй. Гэхдээ «Тохиролцоно» нь
@@ -102,7 +129,16 @@ export default function Order() {
    * харуулж, `splitContact`-ыг зөвхөн СЕРВЕР рүү явуулах утгад хэрэглэнэ.
    */
   const [contactText, setContactText] = useState(() => joinContact(EMPTY_CUSTOMER));
-  const [vat, setVat] = useState(false);
+  /** Цонхны гүйдэг хэсэг — илгээсний дараа дээш нь авчрахад. */
+  const modalScroller = useRef<HTMLDivElement>(null);
+  /*
+   * ⚠️ НӨАТ-ыг ЭНД төлөвлөхөө болив — сагсанд амьдардаг болсон.
+   *
+   * Хэрэглэгч түүнийг зураг нэмэх цонхноос сонгодог болсон тул энд тусдаа
+   * төлөв барьвал хоёр өөр утга үүсч, товчны дээр харсан дүн нь эцсийн
+   * дүнтэй таарахаа болино.
+   */
+  const vat = basket.vat;
   const [errors, setErrors] = useState<FieldErrors>({});
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -247,7 +283,16 @@ export default function Order() {
 
       setConfirmed({ ...result, photoCount });
       basket.clear();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      /*
+       * ⚠️ Цонх горимд `window.scrollTo` нь БУРУУ зүйлийг гүйлгэнэ: гүйлт нь
+       * цонхны дотоод хэсэгт байдаг тул хуудас хөдөлж, цонх байрандаа үлдэнэ —
+       * хэрэглэгч баталгаажуулалтын оройг харахгүй.
+       */
+      if (asModal) {
+        modalScroller.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch (error) {
       setSendError(
         error instanceof Error ? error.message : 'Захиалга илгээхэд алдаа гарлаа.',
@@ -258,14 +303,27 @@ export default function Order() {
     }
   };
 
-  if (confirmed) {
-    return (
+  /*
+   * ⚠️ Баталгаажуулалт нь ЭРТ БУЦДАГ байсныг зассан.
+   *
+   * `if (confirmed) return (...)` нь доорх portal бүрхүүлийг БҮРМӨСӨН
+   * алгасдаг байв. Цонх горимд үүний үр дүнд баталгаажуулалт нь Print
+   * хуудасны ДОТОР шууд зурагдаж, ард нь хэвлэлийн хуудас хэвээр харагдаж,
+   * дээр нь `PageHero` (хуудасны толгой) хамт гарч — хоёр хуудас
+   * давхарласан мэт харагддаг байлаа.
+   *
+   * Одоо энэ нь ердөө агуулгын нэг хувилбар: доод талын НЭГ бүрхүүл
+   * хоёуланг нь адилхан ороож өгнө.
+   */
+  const confirmedContent = confirmed && (
       <>
-        <PageHero
-          eyebrow="Захиалга"
-          title="Захиалга хүлээн авлаа"
-          subtitle="Ажлын цагт операторууд тань руу залгаж баталгаажуулна."
-        />
+        {!asModal && (
+          <PageHero
+            eyebrow="Захиалга"
+            title="Захиалга хүлээн авлаа"
+            subtitle="Ажлын цагт операторууд тань руу залгаж баталгаажуулна."
+          />
+        )}
         <div className="mx-auto max-w-2xl px-4 py-14 text-center sm:px-6 sm:py-20">
           <span className="mx-auto grid size-16 place-items-center rounded-full bg-ok/10 text-ok-strong">
             <IconCheckCircle className="size-8" />
@@ -329,18 +387,42 @@ export default function Order() {
           )}
         </div>
       </>
-    );
-  }
+  );
 
-  return (
+  const formContent = (
     <>
-      <PageHero
-        eyebrow="Онлайн захиалга"
-        title="Захиалга өгөх"
-        subtitle="Мэдээллээ бөглөөд илгээхэд зураг тань хамт очно."
-      />
+      {!asModal && (
+        <PageHero
+          eyebrow="Онлайн захиалга"
+          title="Захиалга өгөх"
+          subtitle="Мэдээллээ бөглөөд илгээхэд зураг тань хамт очно."
+        />
+      )}
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 sm:py-16 lg:grid-cols-[1fr_380px] lg:gap-10">
+      {/*
+        * Цонх горимд НЭГ баганаар. Хоёр багана (зураг | маягт) нь өргөн
+        * дэлгэцэд зориулагдсан бөгөөд цонхны дотор багтахгүй — хэрэглэгч
+        * хажуу тийш гүйлгэх болно.
+        */}
+      <div
+        className={
+          asModal
+            ? 'grid gap-6 px-4 py-5 sm:px-6'
+            : 'mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 sm:py-16 lg:grid-cols-[1fr_380px] lg:gap-10'
+        }
+      >
+        {/*
+          * ⚠️ Зураг ба захиалгын хураангуй нь ЗӨВХӨН хуудас горимд.
+          *
+          * Цонх нь зураг оруулах цонхны ДАРАА шууд гардаг тул хэрэглэгч
+          * зургаа, ширхэгээ, дүнгээ тэндээ дөнгөж сая харсан байна. Дахин
+          * харуулбал нэг мэдээлэл хоёр удаа гарч, цонх уртсаж, холбоо барих
+          * талбар нугалаас доош унана.
+          *
+          * Хуудас горимд (`/zakhialga` руу шууд линкээр орсон) эдгээр
+          * ЗААВАЛ хэрэгтэй — тэр хүн зураг оруулах цонхыг огт хараагүй.
+          */}
+        {!asModal && (
         <div>
           {/* ── Зурагтай мөрүүд ──────────────────────────────── */}
           <section>
@@ -385,9 +467,14 @@ export default function Order() {
             )}
           </section>
         </div>
+        )}
 
         {/* ── Сагс + маягт ────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} className="lg:sticky lg:top-24 lg:self-start">
+        <form
+          onSubmit={handleSubmit}
+          className={asModal ? undefined : 'lg:sticky lg:top-24 lg:self-start'}
+        >
+          {!asModal && (
           <div className="card p-4 sm:p-5">
             <h2 className="text-lg font-bold sm:text-xl">2. Таны захиалга</h2>
 
@@ -440,13 +527,22 @@ export default function Order() {
               авах чадвартай хэвээр тул буцаан асаахад зөвхөн энэ хэсгийг
               сэргээхэд хангалттай.
             */}
+            {/*
+              НӨАТ-ын сонголт зураг нэмэх цонх руу НҮҮСЭН — хэрэглэгч дүнг
+              тэндээс шууд хардаг. Гэвч энд ч ҮЛДЭЭВ: `/zakhialga` руу шууд
+              линкээр орсон хүн зураг нэмэх цонхыг огт харахгүй тул үгүй бол
+              НӨАТ сонгох бололцоогүй болно.
+
+              ⚠️ Хоёул САГСНЫ нэг утгыг уншиж бичнэ — тусдаа төлөв барьвал
+              товчны дээр харсан дүн эцсийн дүнтэй таарахаа болино.
+            */}
             <div className="mt-4 space-y-2">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={vat}
-                  onChange={(e) => setVat(e.target.checked)}
-                  className="size-4 accent-[#1a56db]"
+                  onChange={(e) => basket.setVat(e.target.checked)}
+                  className="size-4 accent-brand-500"
                 />
                 НӨАТ-тай баримт (+10%)
               </label>
@@ -487,25 +583,69 @@ export default function Order() {
               )}
             </dl>
           </div>
+          )}
 
-          <div className="card mt-6 p-4 sm:p-5">
-            <h2 className="text-lg font-bold sm:text-xl">3. Холбоо барих мэдээлэл</h2>
+          <div className={asModal ? 'card p-4 sm:p-5' : 'card mt-6 p-4 sm:p-5'}>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-lg font-bold sm:text-xl">
+                {asModal ? 'Холбоо барих мэдээлэл' : '3. Холбоо барих мэдээлэл'}
+              </h2>
+              {/*
+                Зураг, ширхэг, НӨАТ бүгд зураг оруулах цонхонд тохирогддог тул
+                «Засах» нь ТЭР цонх руу буцаана — сагсны хуудас руу биш.
+              */}
+              {asModal && onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="shrink-0 text-sm font-semibold text-brand-500"
+                >
+                  Засах
+                </button>
+              )}
+            </div>
 
             <div className="mt-4 space-y-4">
+              {/*
+                ── Захиалагчийн төрөл ─────────────────────────────────
+
+                Нэрний талбарын ДЭЭР байрлана: сонголт нь доорх талбарын
+                утгыг өөрчилдөг (хүний нэр үү, байгууллагын нэр үү) тул
+                эхлээд асуух нь уншигдах дараалалд зөв.
+
+                НӨАТ-ын баримт хоёр төрөлд өөр бөглөгддөг тул ажилтанд энэ
+                мэдээлэл захиалгын хамт очно.
+              */}
+              <div>
+                <label className="label" htmlFor="kind">
+                  Захиалагч
+                </label>
+                <select
+                  id="kind"
+                  name="kind"
+                  value={customer.kind}
+                  onChange={(e) => setField('kind', e.target.value as CustomerInfo['kind'])}
+                  className="field"
+                >
+                  <option value="person">Хувь хүн</option>
+                  <option value="org">Байгууллага</option>
+                </select>
+              </div>
+
               <div>
                 <label className="label" htmlFor="name">
-                  Нэр *
+                  {customer.kind === 'org' ? 'Байгууллагын нэр' : 'Нэр'} *
                 </label>
                 <input
                   id="name"
                   name="name"
-                  autoComplete="name"
+                  autoComplete={customer.kind === 'org' ? 'organization' : 'name'}
                   enterKeyHint="next"
                   aria-invalid={Boolean(errors.name)}
                   value={customer.name}
                   onChange={(e) => setField('name', e.target.value)}
                   className="field"
-                  placeholder="Батболд"
+                  placeholder={customer.kind === 'org' ? 'Блюрайгел ХХК' : 'Батболд'}
                 />
                 {errors.name && (
                   <p role="alert" className="mt-1 text-xs text-danger">
@@ -665,6 +805,32 @@ export default function Order() {
               </div>
             )}
 
+            {/*
+              ⚠️ Цонх горимд НИЙТ дүнг ЗААВАЛ харуулна.
+
+              Захиалгын хураангуй нуугдсан тул үүнгүй бол хэрэглэгч төлөх
+              дүнгээ ХАРАЛГҮЙ «Захиалга илгээх» дарах болно. Мөнгө холбогдсон
+              үйлдлийн өмнө дүн нь нүдний өмнө байх ёстой.
+            */}
+            {asModal && (
+              <dl className="mt-5 space-y-1.5 border-t border-hairline pt-4 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted">Дүн</dt>
+                  <dd>{formatCurrency(base)}</dd>
+                </div>
+                {tax > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted">НӨАТ</dt>
+                    <dd>{formatCurrency(tax)}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-hairline pt-1.5 text-base font-black">
+                  <dt>Нийт</dt>
+                  <dd className="text-brand-500">{formatCurrency(total)}</dd>
+                </div>
+              </dl>
+            )}
+
             <button type="submit" disabled={sending} className="btn-accent mt-6 w-full">
               {sending ? (
                 'Илгээж байна…'
@@ -681,5 +847,56 @@ export default function Order() {
         </form>
       </div>
     </>
+  );
+
+  const content = confirmedContent || formContent;
+
+  if (!asModal) return content;
+
+  /*
+   * Цонх нь `document.body` дээр portal-аар зурагдана.
+   *
+   * `PhotoEditor`-той ЯГ адил шалтгаанаар: `<main>` дээрх `page-enter`
+   * хөдөлгөөн нь `transform`-ыг идэвхтэй үлдээдэг тул `position: fixed` нь
+   * дэлгэц биш `<main>`-ы өндөр рүү суудаг. Portal тэр гинжийг тасална.
+   */
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={confirmed ? 'Захиалга хүлээн авлаа' : 'Захиалга өгөх'}
+      className="fixed inset-0 z-60 flex items-end justify-center bg-ink/60 backdrop-blur-sm sm:items-center"
+      onClick={(event) => {
+        /* Зөвхөн ДЭВСГЭР дээр дарахад хаана — дотор дарахад биш. */
+        if (event.target === event.currentTarget) onClose?.();
+      }}
+    >
+      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-xl bg-canvas sm:max-h-[88dvh] sm:rounded-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3 sm:px-6">
+          {/* Илгээсний дараа гарчиг ч өөрчлөгдөнө — «Захиалга өгөх» гэсэн
+              хэвээр үлдвэл хэрэглэгч илгээгдсэн эсэхэд эргэлзэнэ. */}
+          <h2 className="text-base font-bold">
+            {confirmed ? 'Захиалга хүлээн авлаа' : 'Захиалга өгөх'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Хаах"
+            className="grid size-9 shrink-0 place-items-center rounded-md hover:bg-brand-50"
+          >
+            <IconClose className="size-5" />
+          </button>
+        </div>
+
+        {/*
+          * ⚠️ Гүйлт нь ЭНД, гадна биш. Гадна талд тавибал утсан дээр цонхны
+          * толгой ч хамт гүйж, хаах товч дэлгэцээс гарна.
+          */}
+        <div ref={modalScroller} className="min-h-0 flex-1 overflow-y-auto">
+          {content}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

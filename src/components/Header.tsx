@@ -51,8 +51,20 @@ export default function Header() {
       * толгойн доогуур ороод алга болохгүй.
       */
     <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
-      <div className="glass mx-auto flex h-16 max-w-6xl items-center justify-between rounded-xl px-3 sm:px-5">
-        <Link to="/" className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+      {/*
+        * `gap-3` — лого ба nav хоёрын ХООРОНДОХ хамгийн бага зай.
+        *
+        * `justify-between` дангаараа зай БАТАЛГААЖУУЛДАГГҮЙ: нэр нь боломжит
+        * бүх өргөнийг эзэлмэгц таслагдаж, утасны дугаарт 0px-ээр наалддаг
+        * байв. `gap` нь тэр зайг үргэлж үлдээнэ.
+        */}
+      <div className="glass mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 rounded-xl px-3 sm:px-5">
+        {/*
+          * ⚠️ `shrink-0` → `min-w-0`. `shrink-0` нь блокийг шахагдахыг хориглодог
+          * тул доторх `truncate` ХЭЗЭЭ Ч ажиллахгүй байв — нэр богиносохын
+          * оронд nav руу түрдэг байлаа.
+          */}
+        <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-2.5">
           <span className="grid size-9 place-items-center rounded-md bg-brand-500 text-lg font-black text-white">
             P
           </span>
@@ -68,13 +80,37 @@ export default function Header() {
             * Жин 800 → 500. `CONTACT.company` нь урт нэр болсон тул хэт бүдүүн
             * бичиг толгойн нарийхан зурваст бөөгнөрч, утасны дугаар руу шахдаг.
             * Хөлийн ижил блоктой нэг жинтэй байлгав.
+            *
+            * ⚠️ Утсан дээр ХЭМЖЭЭГ БУУРУУЛСАН (18px → 13px).
+            *
+            * Хэмжсэн утга: 375px дэлгэцэд нэр нь 247px эзэлж, 351px зурваст
+            * утасны дугаар, хэл сонгогчтой ЯГ 0px завсартай нийлж байв —
+            * толгой шахагдаж, эвдэрсэн мэт харагдана.
+            *
+            * `truncate` + `min-w-0` нь баталгаа: нэр цаашид уртсах юм уу
+            * дугаар нэмэгдсэн ч тэр нь nav руу ОГТ түрэхгүй, оронд нь
+            * гурван цэгээр таслагдана.
             */}
-          <span className="hidden text-lg font-medium tracking-tight min-[360px]:inline">
+          {/*
+            * Утсан дээр БОГИНО нэр, `sm:`-ээс дээш бүтэн нэр.
+            *
+            * Хоёр `<span>`-ыг CSS-ээр сэлгэж байгаа шалтгаан: JS-ийн дэлгэцийн
+            * өргөн хэмжих нь эхний зурагдалтад буруу утга өгч, нэр нь нэг
+            * анивчаад солигддог.
+            */}
+          <span className="hidden min-w-0 truncate text-[15px] font-medium tracking-tight min-[360px]:inline sm:hidden">
+            {CONTACT.shortName}
+          </span>
+          <span className="hidden min-w-0 truncate font-medium tracking-tight sm:inline sm:text-base lg:text-lg">
             {CONTACT.company}
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1 sm:gap-1.5">
+        {/*
+          * `shrink-0` — утас, сагс, хэл гурав нь ХЭЗЭЭ Ч шахагдах ёсгүй.
+          * Зай дутвал нэр нь (`truncate`) богиносох ёстой, дугаар биш.
+          */}
+        <nav className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           {/*
             * Утасны дугаар — дарахад ШУУД залгана.
             *

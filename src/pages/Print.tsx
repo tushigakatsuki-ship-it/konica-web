@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Suspense, lazy, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import PhotoEditor, { type EditorValue } from '../components/PhotoEditor';
 import PhotoLimitNote from '../components/PhotoLimitNote';
@@ -10,6 +10,7 @@ import { useLang } from '../state/lang';
 import { fitBox, parsePhotoSize } from '../lib/photoSize';
 import { formatCurrency, parsePrice } from '../lib/price';
 import { useBasket } from '../state/basket';
+
 import {
   IconAlert,
   IconArrowRight,
@@ -20,6 +21,12 @@ import {
   IconPalette,
   IconRuler,
 } from '../components/icons';
+/*
+ * Захиалгын цонх нь ЗӨВХӨН сагсанд нэмсний дараа хэрэгтэй тул тусдаа chunk-д
+ * үлдээв. Нүүр болон хэвлэлийн хуудас нээхэд татагдахгүй — маягт, төлбөрийн
+ * панель, огнооны сонгогч бүгд түүнтэй хамт явдаг тул хэмжээ багагүй.
+ */
+const Order = lazy(() => import('./Order'));
 
 /**
  * Ангилал сонгосны дараа дээр гарах ХУРДАН табууд.
@@ -35,6 +42,16 @@ import {
  * тул тэдгээрт орсон хүн «Бүх төрөл» дээр дарж буцна.
  */
 const QUICK_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 'Цээж зураг'];
+
+/**
+ * Хэмжээний картан дээр ЖИШЭЭ ЗУРАГ харуулах ангиллууд.
+ *
+ * Гурвуулаа зурагтай ажилладаг тул «энэ хэмжээнд зураг яаж багтах вэ»
+ * гэдэг нь утга учиртай. Медаль, өргөмжлөл, тууз зэрэгт зураг байхгүй
+ * тул тэдгээрт цагаан цаас нь илүү зөв — тэнд жишээ зураг тавибал
+ * тухайн ажил зурагтай холбоотой мэт төөрөгдүүлнэ.
+ */
+const PHOTO_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 'Цээж зураг'];
 
 /**
  * Онлайнаар захиалах БОЛОМЖГҮЙ үйлчилгээ.
@@ -157,7 +174,6 @@ const WALK_IN: readonly ServiceCategory[] = [
 const POPULAR_IDS: Partial<Record<ServiceCategory, readonly number[]>> = {};
 
 export default function Print() {
-  const navigate = useNavigate();
   const basket = useBasket();
 
   const { t, tc, ts } = useLang();
@@ -205,6 +221,26 @@ export default function Print() {
   const [editorFor, setEditorFor] = useState<
     { service: ServiceItem; itemKey?: string } | null
   >(null);
+
+  /**
+   * Захиалгын цонх нээлттэй эсэх.
+   *
+   * Хаагаад буцаж болно — хэрэглэгч өөр хэмжээ нэмэхийг хүсвэл сагс нь
+   * хэвээр үлдэнэ. Тиймээс хаах нь захиалгыг цуцлахгүй.
+   */
+  const [orderOpen, setOrderOpen] = useState(false);
+
+  /** Жишээ зураг ирээгүй үед картан дээр цагаан цаас үлдээх. */
+  const [washImageFailed, setWashImageFailed] = useState(false);
+
+  /**
+   * Зураг оруулах цонх нь ЗАХИАЛГЫН цонхны «Засах»-аас нээгдсэн эсэх.
+   *
+   * Хэрэглэгч тэндээс ирсэн бол хадгалсны дараа буцаж тэр цонх руугаа
+   * ОРОХ ёстой. Үүнгүй бол засвараа хийгээд хоосон хуудсан дээр үлдэж,
+   * «Дуусгах» товчийг дахин хайх болно — өөрөө үүсгээгүй алхам нэмэгдэнэ.
+   */
+  const [editCameFromOrder, setEditCameFromOrder] = useState(false);
 
   /* Өөрийн хэмжээний самбар — `null` бол хаалттай. */
   const [custom, setCustom] = useState<{ w: string; h: string; error: string } | null>(
@@ -291,16 +327,42 @@ export default function Print() {
    */
   const saveFromEditor = (values: EditorValue[]) => {
     if (!editorFor || values.length === 0) return;
+    const wasEditing = Boolean(editorFor.itemKey);
     if (editorFor.itemKey) basket.update(editorFor.itemKey, values[0]);
     else for (const value of values) basket.add(editorFor.service, value);
     setEditorFor(null);
+
+    /*
+     * ШИНЭ зураг нэмсэн даруйд захиалгын цонх нээгдэнэ.
+     *
+     * Урьд нь хэрэглэгч сагс руу буцаж, «Захиалга үргэлжлүүлэх» дараад өөр
+     * хуудас руу шилждэг байв — гурван алхам. Одоо мэдээллээ шууд бөглөнө.
+     *
+     * ⚠️ ЗАСВАР хийсэн үед НЭЭХГҮЙ: хэрэглэгч сагсанд байгаа зургаа
+     * тохируулж байгаа бөгөөд захиалга өгөх гэж яараагүй. Тэр үед цонх
+     * гарах нь ажлыг нь тасалдана.
+     */
+    if (!wasEditing) setOrderOpen(true);
+    else if (editCameFromOrder) {
+      /* «Засах»-аас ирсэн бол буцаагаад захиалгын цонхыг нээнэ. */
+      setEditCameFromOrder(false);
+      setOrderOpen(true);
+    }
   };
 
   return (
     <>
       <PageHero
         eyebrow={t('nav.print')}
-        title={t('print.title')}
+        /*
+         * `title` нь `revealLines` байхад ХАРАГДАХГҮЙ ч ЗААВАЛ утгатай байна:
+         * хэл солиход эсвэл анимаци унтарсан үед эргэж хэрэглэгдэнэ.
+         */
+        title={t('print.pitch1a')}
+        pushSlides={[
+          [t('print.pitch1a'), t('print.pitch1b')],
+          [t('print.pitch2')],
+        ]}
         subtitle={t('print.subtitle')}
       />
 
@@ -536,9 +598,42 @@ export default function Print() {
                         <span
                           aria-hidden
                           style={{ width: box.width, height: box.height }}
-                          /* Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр. */
-                          className="block rounded-[3px] border-2 border-brand-400 bg-white"
-                        />
+                          /*
+                           * Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр.
+                           * `overflow-hidden` нь доторх зургийг булангийн
+                           * радиусын дотор барина.
+                           */
+                          className="block overflow-hidden rounded-[3px] border-2 border-brand-400 bg-white"
+                        >
+                          {/*
+                            * Жишээ зураг — карт бүр ТУХАЙН хэмжээний харьцаагаар
+                            * тайрч харуулна. Хэрэглэгч «энэ хэмжээнд зураг маань
+                            * яаж багтах вэ» гэдгийг шууд хардаг.
+                            *
+                            * ⚠️ `ugaalt-thumb.jpg` — БҮТЭН постер БИШ.
+                            *
+                            * Хайрцаг хамгийн ихдээ 48px тул бүтэн постер тавихад
+                            * дээд талын «Digital Photo Express» зурвас, доод
+                            * талын «THANK YOU» зурвас хоёр өндрийн 30 орчим
+                            * хувийг эзэлж, зураг нь жижигхэн постер мэт
+                            * харагддаг байв. Тиймээс НҮҮРНИЙ хэсгийг урьдчилж
+                            * тайрсан тусдаа файл ашиглана — тэр нь ямар ч
+                            * харьцаанд зүй зохистой тайрагдана.
+                            *
+                            * Файл дутуу бол зөвхөн цагаан цаас үлдэнэ — карт
+                            * эвдрэхгүй.
+                            */}
+                          {PHOTO_TABS.includes(tab as ServiceCategory) &&
+                            !washImageFailed && (
+                              <img
+                                src="/category/ugaalt-thumb.jpg"
+                                alt=""
+                                decoding="async"
+                                onError={() => setWashImageFailed(true)}
+                                className="size-full object-cover"
+                              />
+                            )}
+                        </span>
                       </span>
                     )}
 
@@ -811,13 +906,21 @@ export default function Print() {
                 </p>
               )}
 
+              {/*
+                * Сагсанд зураг байгаа хүнд ЗАХИАЛГА ДУУСГАХ гарц.
+                *
+                * Урьд нь энэ товч `/zakhialga` руу ШИЛЖДЭГ байсан — тусдаа
+                * хуудас, дунд нь нэмэлт алхам. Одоо цонх нээгдэнэ: зураг нэмэх
+                * даруйд өөрөө гарч ирдэг болсон тул энэ нь зөвхөн хаачихсан
+                * хүнд зориулсан БУЦАХ гарц.
+                */}
               <button
                 type="button"
-                onClick={() => navigate('/zakhialga')}
+                onClick={() => setOrderOpen(true)}
                 disabled={basket.items.length === 0}
                 className="btn-accent mt-3 hidden w-full lg:inline-flex"
               >
-                {t('print.continue')} <IconArrowRight className="size-4" />
+                {t('print.finish')} <IconArrowRight className="size-4" />
               </button>
 
               <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
@@ -886,10 +989,10 @@ export default function Print() {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/zakhialga')}
+              onClick={() => setOrderOpen(true)}
               className="btn-accent flex-1"
             >
-              {t('print.continueShort')} <IconArrowRight className="size-4" />
+              {t('print.finishShort')} <IconArrowRight className="size-4" />
             </button>
           </div>
         </div>
@@ -907,9 +1010,54 @@ export default function Print() {
            * бүгдийг бэлдэж дуусаад л сервер татгалзана.
            */
           alreadyInBasket={basket.items.filter((item) => item.value.file).length}
-          onCancel={() => setEditorFor(null)}
+          onCancel={() => {
+            setEditorFor(null);
+            /*
+             * Цуцлахад ч буцаана. Хэрэглэгч «Засах» дараад бодлоо өөрчилсөн
+             * бол захиалгаа алдах ёсгүй — зүгээр л өмнөх байдалдаа эргэнэ.
+             */
+            if (editCameFromOrder) {
+              setEditCameFromOrder(false);
+              setOrderOpen(true);
+            }
+          }}
           onSave={saveFromEditor}
         />
+      )}
+
+      {/*
+        * Захиалгын цонх — сагсанд зураг нэмсэн даруйд өөрөө нээгдэнэ.
+        *
+        * `Suspense`-ийн `fallback` нь ХООСОН: цонхны агуулга нь хэдхэн
+        * миллисекундэд ирдэг (мөн `PhotoEditor`-той ажиллах зуур урьдчилж
+        * татагдсан байх магадлалтай) тул тэр зуур эргэлдэх дүрс харуулбал
+        * анивчилт нэмнэ.
+        */}
+      {orderOpen && (
+        <Suspense fallback={null}>
+          <Order
+            variant="modal"
+            onClose={() => setOrderOpen(false)}
+            /*
+             * «Засах» — цонхыг хааж, СҮҮЛД нэмсэн зургийн тохируулах цонхыг
+             * дахин нээнэ. Хэрэглэгч тэндээс зураг, ширхэг, НӨАТ-аа өөрчилнө.
+             *
+             * ⚠️ `itemKey` дамжуулах нь ЗААВАЛ: үүнгүй бол `PhotoEditor` нь
+             * ШИНЭ мөр гэж үзээд сагсанд хоёр дахь хувийг нэмнэ — хэрэглэгч
+             * засах гэж ороод давхардуулсан захиалга үүсгэнэ.
+             */
+            onEdit={
+              basket.items.length > 0
+                ? () => {
+                    const last = basket.items[basket.items.length - 1];
+                    setOrderOpen(false);
+                    setEditCameFromOrder(true);
+                    setEditorFor({ service: last.service, itemKey: last.key });
+                  }
+                : undefined
+            }
+          />
+        </Suspense>
       )}
     </>
   );

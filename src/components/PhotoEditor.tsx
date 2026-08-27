@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ServiceItem } from '../data/catalog';
-import { formatCurrency, parsePrice } from '../lib/price';
+import { formatCurrency, parsePrice, vatPortion } from '../lib/price';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
 import { orientSize, recommendedPixels, sizeOf } from '../lib/photoSize';
 import { MAX_PHOTOS_PER_ORDER } from '../lib/limits';
 import { useLang } from '../state/lang';
+import { useBasket } from '../state/basket';
 import CropStudio from './CropStudio';
 import { IconAlert, IconClose, IconImage, IconZoom } from './icons';
 import PrintPreview3D from './PrintPreview3D';
@@ -79,6 +80,8 @@ export default function PhotoEditor({
   alreadyInBasket = 0,
 }: Props) {
   const { t, ts } = useLang();
+  /* НӨАТ нь захиалгын түвшний тохиргоо — сагсанд амьдардаг. */
+  const basket = useBasket();
 
   /** Энэ цонхноос дахин хэдэн зураг нэмж болох вэ. */
   const remaining = Math.max(0, MAX_PHOTOS_PER_ORDER - alreadyInBasket);
@@ -277,6 +280,14 @@ export default function PhotoEditor({
 
   const lowResCount = photos.filter((photo) => isLowRes(photo.natural)).length;
   const totalQty = photos.reduce((sum, photo) => sum + photo.qty, 0);
+
+  /*
+   * Энэ сонголтын дүн. НӨАТ асаалттай бол товчны дээрх тоо нь ТӨЛӨХ дүнг
+   * шууд харуулна — хэрэглэгч дараагийн алхам дээр гэнэтийн 10% олохгүй.
+   */
+  const amountBase = unitPrice * totalQty;
+  const amountVat = basket.vat ? vatPortion(amountBase) : 0;
+  const amountWithVat = amountBase + amountVat;
   const single = photos.length === 1 ? photos[0] : null;
 
   const openPicker = () => fileInput.current?.click();
@@ -612,10 +623,38 @@ export default function PhotoEditor({
             <div className="text-right">
               <p className="text-[11px] text-muted">{t('editor.amount')}</p>
               <p className="text-base font-black text-brand-500">
-                {formatCurrency(unitPrice * totalQty)}
+                {formatCurrency(amountWithVat)}
               </p>
+              {basket.vat && (
+                <p className="text-[11px] text-muted">
+                  {t('editor.vatIncluded', { a: formatCurrency(amountVat) })}
+                </p>
+              )}
             </div>
           </div>
+
+          {/*
+            * НӨАТ-ын сонголт — товчны ЯГ дээр.
+            *
+            * ⚠️ Энэ нь ЗАХИАЛГЫН түвшний тохиргоо, зураг тус бүрийнх БИШ:
+            * утга нь сагсанд хадгалагдаж, бүх мөрөнд нэг удаа бодогдоно.
+            * Тиймээс тайлбарт «захиалгын дүнд» гэдгийг ил хэлнэ — эс бөгөөс
+            * олон зураг нэмсэн хүн зураг бүрдээ 10% нэмэгдэнэ гэж ойлгоно.
+            */}
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md border border-hairline px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={basket.vat}
+              onChange={(event) => basket.setVat(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-brand-500"
+            />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold">{t('editor.vat')}</span>
+              <span className="block text-[11px] leading-relaxed text-muted">
+                {t('editor.vatNote')}
+              </span>
+            </span>
+          </label>
 
           {/*
             ⚠️ Хоёр төлөвт ИЖИЛ өнгө.

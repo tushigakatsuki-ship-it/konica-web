@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import type { ServiceCategory } from '../data/catalog';
 import type { StringKey } from '../data/i18n';
 import { useTilt } from '../lib/useTilt';
@@ -24,6 +24,13 @@ interface Tile {
   key: ServiceCategory;
   hint: StringKey;
   Icon: (props: IconProps) => ReactElement;
+  /**
+   * Картан дээр гарах зураг — `public/` доторх зам.
+   *
+   * Байхгүй бол зөвхөн дүрс (`Icon`) харагдана. Файл нь дутуу байсан ч
+   * карт ЭВДРЭХГҮЙ: `onError` дээр дүрс рүү буцна.
+   */
+  image?: string;
   /** Тухайн ангилалд хэдэн үйлчилгээ байгаа — картан дээр харагдана. */
   count: number;
 }
@@ -126,13 +133,47 @@ function Tile({
    */
   const ref = useTilt<HTMLButtonElement>();
 
+  /*
+   * Зураг ирээгүй үед дүрс рүү буцна.
+   *
+   * ⚠️ Файл байхгүй үед хөтөч эвдэрсэн зургийн дүрс харуулдаг бөгөөд карт
+   * гэмтсэн мэт харагдана. Тэрнээс дүрстэй хэвээр байх нь хамаагүй дээр —
+   * шинэ ангилал нэмэхэд зургаа хожим тавих нь бодитой.
+   */
+  const [imageFailed, setImageFailed] = useState(false);
+
   return (
     <button ref={ref} type="button" onClick={() => onPick(tile.key)} className={TILE_CLASS}>
       <span aria-hidden className="glass-tile-sheen" />
 
-      <span className="relative grid size-10 place-items-center rounded-md bg-brand-500/10 text-brand-500">
-        <tile.Icon className="size-5" />
-      </span>
+      {tile.image && !imageFailed ? (
+        /*
+          Зурагтай хувилбар — дүрсийг ОРЛОНО.
+
+          `aspect-[4/3]` нь эх зургийн харьцаанд (≈1.2) ойр тул `object-cover`
+          бага зэрэг л тайрна. `object-top` нь дээд талын гарчгийг («Digital
+          Photo Express») үлдээнэ — тайрагдвал зураг юуны тухай нь ойлгогдохоо
+          болино.
+        */
+        <span className="relative block w-full overflow-hidden rounded-md">
+          <img
+            src={tile.image}
+            alt=""
+            /*
+             * ⚠️ `loading="lazy"` НЭ. Тор нь хуудасны эхэнд байдаг тул
+             * хойшлуулах ашиггүй, харин файл дутуу үед `onError` нь бас
+             * хойшилно — карт дээр хоосон дөрвөлжин удаан үлдэнэ.
+             */
+            decoding="async"
+            onError={() => setImageFailed(true)}
+            className="block aspect-[4/3] w-full object-cover object-top"
+          />
+        </span>
+      ) : (
+        <span className="relative grid size-10 place-items-center rounded-md bg-brand-500/10 text-brand-500">
+          <tile.Icon className="size-5" />
+        </span>
+      )}
 
       <span className="relative mt-3 block text-sm font-bold leading-snug text-ink sm:text-base">
         {tc(tile.key)}

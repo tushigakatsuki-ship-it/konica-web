@@ -279,6 +279,7 @@ export default async function handler(request: Request): Promise<Response> {
   const customer = (
     payload as {
       customer: {
+        kind?: 'person' | 'org';
         name: string;
         phone: string;
         email?: string;
@@ -290,6 +291,20 @@ export default async function handler(request: Request): Promise<Response> {
   ).customer;
   const name = customer.name.trim();
   const phone = customer.phone.trim();
+  /*
+   * Байгууллагын захиалгыг тайлбарт ИЛ тэмдэглэнэ.
+   *
+   * НӨАТ-ын баримт хувь хүнд регистрээр, байгууллагад ТТД-аар бөглөгддөг тул
+   * ажилтан баримт бэлдэхээсээ ӨМНӨ энэ ялгааг мэдэх ёстой. Тусдаа талбар
+   * нэмэхийн оронд тайлбарт бичих шалтгаан: аппын `WorkLog` бүтэц бидний
+   * мэдэлд байдаггүй бөгөөд шинэ талбар нэмбэл Firebase-ийн rules татгалзаж
+   * болзошгүй. Тайлбар нь ажлын самбарт аль хэдийн харагддаг.
+   */
+  const customerNote = (customer.note ?? '').trim();
+  const noteWithKind =
+    customer.kind === 'org'
+      ? `[Байгууллага] ${customerNote}`.trim()
+      : customerNote;
 
   /**
    * Зургийн manifest-ыг R2 руу бичнэ.
@@ -367,7 +382,7 @@ export default async function handler(request: Request): Promise<Response> {
            */
           address: built.address,
           email: (customer.email ?? '').trim(),
-          note: (customer.note ?? '').trim(),
+          note: noteWithKind,
           /*
            * Хүссэн өдөр нь ЗАХИАЛГА.txt дээр гарна — ажилтан хэвлэх
            * дарааллаа түүгээр тохируулна.
