@@ -50,13 +50,13 @@ export const STRINGS = {
 
   /* ── Нүүр — эхний дэлгэц ── */
   'hero.badge': {
-    mn: 'Konica Minolta · FujiFilm · Мэргэжлийн зураг угаалт',
+    mn: 'Konica Minolta · Мэргэжлийн зураг угаалт',
     en: 'Konica Minolta · Professional photo lab',
   },
   'hero.titleTop': { mn: 'Чанартай хэвлэл,', en: 'Quality printing,' },
   'hero.titleAccent': { mn: 'хурдан үйлчилгээ', en: 'fast service' },
   'hero.subtitle': {
-    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай.',
+    mn: 'Хэмжээгээ сонгоод зургаа шууд оруулаарай — үнэ нь тэр дороо харагдана.',
     en: 'Pick your size and add your photo — the price shows up right away.',
   },
 
@@ -344,9 +344,14 @@ export const STRINGS = {
 
   /* ── Нийтлэг ── */
   'common.phoneNote': { mn: 'Захиалга, лавлагаа', en: 'Orders and enquiries' },
+  /*
+   * «Онлайн» гэдэг үг ЭХЭНД байх нь зориуд: энэ сайтын гол ялгаа нь
+   * дэлгүүр хүртэл явахгүйгээр захиалж болдогт байгаа. Үйлчилгээний
+   * төрлүүд түүний дараа орно.
+   */
   'common.tagline': {
-    mn: 'Зураг угаалт · Хэвлэлийн үйлчилгээ',
-    en: 'Photo printing · Print services',
+    mn: 'Онлайн үйлчилгээ · Зураг угаалт · Хэвлэл',
+    en: 'Online service · Photo printing · Print',
   },
 } as const satisfies Record<string, Entry>;
 

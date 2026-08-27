@@ -51,14 +51,62 @@ HTTP_TIMEOUT = 60          # секунд, нэг хүсэлт
 DOWNLOAD_TIMEOUT = 300     # секунд, нэг файл (30MB хүртэл байж болно)
 MAX_RETRIES = 3
 RETRY_BACKOFF = 5          # секунд, дараа нь 10, 20 ...
-USER_AGENT = "konica-nas-sync/1.1"
+USER_AGENT = "konica-nas-sync/1.2"
+
+# ── Урт хугацааны хамгаалалт ───────────────────────────────────────────────
+#
+# Энэ скрипт 10 минут тутам, ЖИЛЭЭР ажиллана. Тиймээс «нэг удаа ажиллахад
+# өчүүхэн» зүйл бүр 52,000 дахин давтагдана. Доорх гурван тогтмол нь тэр
+# хуримтлалыг барина.
+
+# Логийн дээд хэмжээ. Хэтэрвэл нэг архив үлдээгээд шинээр эхэлнэ.
+#
+# Тооцоо: ажиллалт бүрт 3 мөр × 52,560 ажиллалт/жил × ~130 байт ≈ 20MB/жил.
+# Эргэлтгүй бол 5 жилийн дараа 100MB — Notepad нээхэд удаан, хэн ч уншихгүй.
+LOG_MAX_BYTES = 2 * 1024 * 1024
+LOG_KEEP = 1  # sync.log.1 — өмнөх үеийн лог
+
+# Төлөв файлд захиалгыг хэдэн хоног санах вэ.
+#
+# Сервер өөрөө `state=pending-sync`-ээр шүүдэг тул энэ жагсаалт нь зөвхөн
+# ДАВХАР хамгаалалт. Хайлтын цонх хамгийн ихдээ 31 хоног тул түүнээс хол
+# хуучин бичлэг ямар ч ажил хийхгүй, зөвхөн файлыг томруулна.
+STATE_KEEP_DAYS = 90
+
+# Хадгалах дискэнд үлдэх ёстой хамгийн бага зай.
+#
+# Өдөрт ~20 захиалга × 15 зураг × 6.5MB ≈ 2GB. 5GB нь хоёр өдрийн зай —
+# ажилтан анзаарч, цэвэрлэх хугацаа гаргана. Диск дүүрвэл таталт чимээгүй
+# унаж, хэн ч мэдэхгүй үлдэнэ.
+DISK_WARN_BYTES = 5 * 1024 * 1024 * 1024
 
 # Windows/macOS/DSM бүгдэд аюулгүй файлын нэр болгоно.
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _SPACES = re.compile(r"\s+")
 
+# `PMN-260826-48213` → огноо нь дугаарын дотор байдаг. Дөрөв, таван орон хоёул.
+_ORDER_DATE = re.compile(r"^PMN-(\d{2})(\d{2})(\d{2})-\d{4,5}$")
+
 
 # ── Туслах функцууд ────────────────────────────────────────────────────────
+
+def rotate_log(logfile: Path) -> None:
+    """
+    Лог хэтэрвэл нэрийг нь солиод шинээр эхлүүлнэ.
+
+    Гуравдагч сан (`logging.handlers`) хэрэглээгүй шалтгаан: энэ скрипт
+    ажиллалт бүрт шинээр эхэлдэг тул `RotatingFileHandler`-ийн төлөв
+    хадгалагддаггүй. Хэмжээг өөрөө шалгах нь илүү энгийн бөгөөд найдвартай.
+    """
+    try:
+        if not logfile.exists() or logfile.stat().st_size < LOG_MAX_BYTES:
+            return
+        archive = logfile.with_suffix(logfile.suffix + ".1")
+        # `replace` нь байгаа файлыг дарна — LOG_KEEP=1 тул нэг архив үлдэнэ.
+        logfile.replace(archive)
+    except OSError:
+        pass  # эргүүлж чадахгүй байгаа нь ажлыг зогсоох шалтгаан биш
+
 
 def log(message: str, *, logfile: Path | None = None) -> None:
     """Дэлгэц болон файл руу зэрэг бичнэ. Cron дор ажиллахад файл нь чухал."""
@@ -68,10 +116,52 @@ def log(message: str, *, logfile: Path | None = None) -> None:
     if logfile is not None:
         try:
             logfile.parent.mkdir(parents=True, exist_ok=True)
+            rotate_log(logfile)
             with logfile.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
         except OSError:
             pass  # лог бичиж чадахгүй байгаа нь ажлыг зогсоох шалтгаан биш
+
+
+def prune_synced(orders: set[str], today: datetime, keep_days: int = STATE_KEEP_DAYS) -> set[str]:
+    """
+    Төлөв файлаас хэт хуучин захиалгыг хасна.
+
+    Огноог захиалгын дугаараас гаргана (`PMN-YYMMDD-NNNNN`) — тусдаа талбар
+    хадгалах шаардлагагүй.
+
+    ⚠️ Танигдахгүй хэлбэрийг ХАСАХГҮЙ. Хасвал тэр захиалга «татаагүй» болж,
+    дахин татагдана. Файл бага зэрэг томрох нь давхар татахаас дээр.
+    """
+    kept: set[str] = set()
+    for number in orders:
+        if not number:
+            continue
+        match = _ORDER_DATE.match(number)
+        if not match:
+            kept.add(number)
+            continue
+        try:
+            year, month, day = (int(part) for part in match.groups())
+            made = datetime(2000 + year, month, day)
+        except ValueError:
+            kept.add(number)
+            continue
+        if (today - made).days <= keep_days:
+            kept.add(number)
+    return kept
+
+
+def free_space_bytes(path: Path) -> int | None:
+    """Хадгалах дискэнд үлдсэн зай. Мэдэх боломжгүй бол `None`."""
+    try:
+        return shutil.disk_usage(str(path)).free
+    except OSError:
+        return None
+
+
+def human_gb(size: int) -> str:
+    return f"{size / 1_073_741_824:.1f}GB"
 
 
 def safe_name(value: str, *, fallback: str = "unnamed", limit: int = 60) -> str:
@@ -492,6 +582,17 @@ def main() -> int:
             print(f"✗ Хавтас:  бичиж чадсангүй — {error}", file=sys.stderr)
             return 2
 
+        # Диск дүүрэх нь ХАМГИЙН чимээгүй эвдрэл: таталт унаад, лог руу бичих
+        # ч зай байхгүй тул хаана ч мөр үлдэхгүй. Тиймээс энд ил хэлнэ.
+        free = free_space_bytes(dest_root)
+        if free is None:
+            print("? Диск:    үлдсэн зайг мэдэх боломжгүй")
+        elif free < DISK_WARN_BYTES:
+            print(f"⚠ Диск:    ЗАЙ БАГА — зөвхөн {human_gb(free)} үлдсэн "
+                  f"(доод хэмжээ {human_gb(DISK_WARN_BYTES)})")
+        else:
+            print(f"✓ Диск:    {human_gb(free)} сул зай")
+
         print("\nБүх шалгалт өнгөрлөө. `--dry-run`-аар үргэлжлүүлнэ үү.")
         return 0
 
@@ -524,6 +625,16 @@ def main() -> int:
         pass
 
     try:
+        # ── Диск дүүрэхээс сэргийлэх ───────────────────────────────────
+        #
+        # Зай дуусахад `download()` унаж, лог бичих ч боломжгүй болдог —
+        # өөрөөр хэлбэл эвдрэл нь БҮРЭН чимээгүй. Урьдчилж анхааруулна.
+        free = free_space_bytes(dest_root)
+        if free is not None and free < DISK_WARN_BYTES:
+            log(f"⚠ АНХААР: дискэнд зөвхөн {human_gb(free)} үлдлээ. "
+                f"Хуучин сарын хавтсуудыг архив диск рүү зөөнө үү.",
+                logfile=logfile)
+
         # ── Төлөв унших ─────────────────────────────────────────────────
         synced: set[str] = set()
         if state_path.exists():
@@ -596,6 +707,9 @@ def main() -> int:
                         logfile=logfile)
 
         if not arguments.dry_run:
+            # Хайлтын цонх хамгийн ихдээ 31 хоног тул түүнээс хол хуучин
+            # бичлэг ямар ч ажил хийхгүй — зөвхөн файлыг томруулна.
+            synced = prune_synced(synced, datetime.now())
             try:
                 state_path.write_text(
                     json.dumps(

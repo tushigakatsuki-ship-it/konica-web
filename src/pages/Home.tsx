@@ -3,6 +3,7 @@ import { useLang } from '../state/lang';
 import LastOrderBanner from '../components/LastOrderBanner';
 import HeroSlideshow from '../components/HeroSlideshow';
 import { IconAward, IconPrinter } from '../components/icons';
+import PromoVideo from '../components/PromoVideo';
 
 /**
  * Нүүр хуудас — эхний дэлгэц ба хоёр гарц.
@@ -27,19 +28,28 @@ function Hero() {
       {/*
         * Текстийн хэсэг нь зурагны ДЭЭР — `relative` заавал хэрэгтэй.
         * Доод талд цэгүүд сууж байгаа тул `pb` нэмэгдсэн.
+        *
+        * ── Яагаад дээд зай нь доодоосоо БАГА вэ ─────────────────────
+        *
+        * Урьд нь дээш доош тэнцүү (`py-16` / `sm:py-28`) байсан тул гарчиг
+        * дэлгэцийн голд сууж, «Хэвлэл» товч нугалаас доош унадаг байв —
+        * утсан дээр хэрэглэгч гүйлгэхгүй бол үндсэн үйлдлийг олохгүй.
+        *
+        * Дээд зайг багасгаснаар бүх бичиг дээшилж, товч нугалаас дээш гарна.
+        * Доод зай нь хэвээр: слайдын цэгүүд тэнд сууна.
         */}
-      <div className="relative mx-auto max-w-6xl px-4 py-16 pb-20 sm:px-6 sm:py-28 sm:pb-32">
+      <div className="relative mx-auto max-w-6xl px-4 pb-20 pt-10 sm:px-6 sm:pb-32 sm:pt-16">
         <span className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/25 backdrop-blur-sm sm:px-4 sm:py-2 sm:text-sm">
           <IconAward className="size-4 text-accent" /> {t('hero.badge')}
         </span>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.08] text-white sm:mt-8 sm:text-6xl lg:text-7xl">
+        <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.08] text-white sm:mt-6 sm:text-6xl lg:text-7xl">
           {t('hero.titleTop')}
           <br />
           <span className="text-accent">{t('hero.titleAccent')}</span>
         </h1>
 
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:mt-6 sm:text-lg">
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:mt-5 sm:text-lg">
           {t('hero.subtitle')}
         </p>
 
@@ -76,6 +86,15 @@ function Hero() {
             </span>
           </span>
         </div>
+
+        {/*
+          * Жижиг сурталчилгааны хэсэг — «Хэвлэл» товчны ДООД талд.
+          *
+          * ⚠️ Гол товчноос ДООШ байх нь зориуд. Дээр тавибал хэрэглэгч
+          * эхлээд САЙТААС ГАРАХ холбоос руу гараа сунгана — нүүр хуудасны
+          * ажил бол захиалга авах, Facebook руу үдэх биш.
+          */}
+        <PromoVideo />
       </div>
     </section>
   );

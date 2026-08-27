@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PRIMARY_PHONE } from '../data/site';
+import { CONTACT, PRIMARY_PHONE } from '../data/site';
 import { useLang } from '../state/lang';
 import LangToggle from './LangToggle';
 import BasketButton from './BasketButton';
@@ -65,7 +65,7 @@ export default function Header() {
             * байсан. `P` тэмдэг нь брэндийг таниулж, нүүр рүү ч хөтөлнө.
             */}
           <span className="hidden text-xl font-extrabold tracking-tight min-[360px]:inline">
-            Printmn
+            {CONTACT.company}
           </span>
         </Link>
 

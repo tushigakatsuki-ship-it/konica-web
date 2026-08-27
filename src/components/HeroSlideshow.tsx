@@ -91,7 +91,19 @@ export default function HeroSlideshow() {
             onError={i === 0 ? () => setReady(true) : undefined}
             fetchPriority={i === 0 ? 'high' : 'low'}
             decoding="async"
-            className="absolute inset-0 size-full object-cover transition-opacity duration-700"
+            /*
+             * ⚠️ Нарийн дэлгэцэнд байрлалыг БАРУУН тийш шилжүүлнэ.
+             *
+             * Эх зураг 1376×768 (харьцаа 1.79) бөгөөд хэвлэгч нь голоос
+             * баруун тийш байрладаг. Утсан дээр хүрээний харьцаа ~0.75 болох
+             * тул `object-cover` нь өргөний зөвхөн 42%-ийг үлдээж, ГОЛООС нь
+             * тасалдаг — үр дүнд нь хэвлэгчийн зөвхөн зүүн ирмэг харагдаж,
+             * зураг нь юуны тухай болох нь ойлгогдохгүй болно.
+             *
+             * 72% нь тэр цонхыг субъект дээр буулгана. `sm:`-ээс дээш хүрээ
+             * өргөн болж бүх зураг багтдаг тул голд нь буцаана.
+             */
+            className="absolute inset-0 size-full object-cover object-[72%_center] transition-opacity duration-700 sm:object-center"
             style={{ opacity: i === index ? 1 : 0 }}
           />
         ),

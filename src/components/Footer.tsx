@@ -36,7 +36,14 @@ export default function Footer() {
       */
     <footer
       id="kholboo"
-      className="mt-16 scroll-mt-20 border-t border-hairline bg-card text-ink-soft"
+      /*
+        Хөлийн бичгийг ЦЭНХЭР болгов (өмнө нь саарал `text-ink-soft`).
+
+        Гурван баганын гарчиг нь УЛБАР ШАР (`text-accent` — «Google Maps-аар
+        нээх» линктэй ЯГ ижил өнгө) — ингэснээр тэр гурван зангуу нүдэнд эхлээд
+        тусч, доорх мэдээлэл нь тэдгээрийн доор эрэмбэлэгдэж уншигдана.
+      */
+      className="mt-16 scroll-mt-20 border-t border-hairline bg-card text-brand-600"
     >
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-2 lg:grid-cols-4">
         {/* Байгууллага */}
@@ -45,7 +52,7 @@ export default function Footer() {
             <span className="grid size-9 place-items-center rounded-md bg-brand-500 text-lg font-black text-white">
               P
             </span>
-            <span className="text-lg font-extrabold text-ink">{CONTACT.company}</span>
+            <span className="text-lg font-extrabold text-brand-700">{CONTACT.company}</span>
           </p>
           <p className="mt-3 text-sm leading-relaxed">{t('common.tagline')}</p>
 
@@ -53,7 +60,7 @@ export default function Footer() {
 
         {/* Холбоо барих */}
         <div>
-          <h2 className="text-sm font-bold text-ink">{t('footer.contact')}</h2>
+          <h2 className="text-sm font-bold text-accent">{t('footer.contact')}</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {CONTACT.phones.map((phone) => (
               <li key={phone.href}>
@@ -101,11 +108,11 @@ export default function Footer() {
 
         {/* Байршил */}
         <div>
-          <h2 className="text-sm font-bold text-ink">{t('footer.location')}</h2>
+          <h2 className="text-sm font-bold text-accent">{t('footer.location')}</h2>
           <p className="mt-3 flex gap-2 text-sm leading-relaxed">
             <IconMapPin className="mt-0.5 size-4 shrink-0" />
             <span>
-              <span className="block font-semibold text-ink">
+              <span className="block font-semibold text-brand-700">
                 {CONTACT.address.place}
               </span>
               {CONTACT.address.full}
@@ -124,13 +131,13 @@ export default function Footer() {
 
         {/* Ажлын цаг */}
         <div>
-          <h2 className="text-sm font-bold text-ink">{t('footer.hours')}</h2>
+          <h2 className="text-sm font-bold text-accent">{t('footer.hours')}</h2>
           <dl className="mt-3 space-y-1.5 text-sm">
             {CONTACT.hours.map((row) => (
               <div key={row.daysKey} className="flex items-start gap-2">
                 <IconClock className="mt-0.5 size-4 shrink-0" />
                 <dt className="flex-1">{t(row.daysKey)}</dt>
-                <dd className="font-semibold text-ink">
+                <dd className="font-semibold text-brand-700">
                   {row.timeKey ? t(row.timeKey) : row.time}
                 </dd>
               </div>

@@ -230,6 +230,19 @@ export const IconMoon = (props: IconProps) => (
   </Base>
 );
 
+/**
+ * Тоглуулах гурвалжин — «энэ бол бичлэг» гэдгийг НЭГ харцаар хэлнэ.
+ *
+ * Дүүргэсэн (`fill`) нь зориуд: бусад дүрс контуртай ч, тоглуулах тэмдэг нь
+ * дэлхий даяар дүүрэн гурвалжнаар танигддаг. Контуроор зурвал «сум уу,
+ * заагч уу» гэж эргэлзэнэ.
+ */
+export const IconPlay = (props: IconProps) => (
+  <Base {...props} fill="currentColor" stroke="none">
+    <path d="M8 5.6v12.8a1 1 0 0 0 1.54.84l9.6-6.4a1 1 0 0 0 0-1.68l-9.6-6.4A1 1 0 0 0 8 5.6Z" />
+  </Base>
+);
+
 /** Системийн горимыг дагана — дэлгэц. */
 export const IconDisplay = (props: IconProps) => (
   <Base {...props}>

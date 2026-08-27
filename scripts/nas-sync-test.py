@@ -182,6 +182,53 @@ ok(_config.get("KONICA_DEST") == "\\\\SERVER\\photo",
    "UNC зам (\\\\SERVER\\photo) гэмтэлгүй уншигдана")
 shutil.rmtree(_bom_dir, ignore_errors=True)
 
+
+# ── Урт хугацааны хамгаалалтууд ───────────────────────────────────────────
+#
+# Энэ скрипт 10 минут тутам, ЖИЛЭЭР ажиллана. Доорх гурав нь «нэг ажиллалтад
+# өчүүхэн» зүйл 52,000 дахин давтагдахаас хамгаална.
+
+import datetime as _dt
+
+# 1. Лог хязгааргүй өсөхгүй
+_log_dir = tempfile.mkdtemp()
+_logfile = pathlib.Path(_log_dir) / "sync.log"
+_logfile.write_text("х" * (_mod.LOG_MAX_BYTES + 10), encoding="utf-8")
+_before = _logfile.stat().st_size
+_mod.log("шинэ мөр", logfile=_logfile)
+ok(_logfile.stat().st_size < _before,
+   f"лог хэтэрвэл эргэлдэнэ ({_before} → {_logfile.stat().st_size} байт)")
+ok(_logfile.with_suffix(".log.1").exists(), "хуучин лог архив болж үлдсэн")
+
+# Хэмжээ хүрээгүй үед эргэлдэх ЁСГҮЙ — эс тэгвээс мөр бүрт файл солигдоно.
+_small = pathlib.Path(_log_dir) / "small.log"
+_mod.log("нэг", logfile=_small)
+_mod.log("хоёр", logfile=_small)
+ok(not _small.with_suffix(".log.1").exists(), "жижиг лог дэмий эргэлддэггүй")
+ok(len(_small.read_text(encoding="utf-8").splitlines()) == 2, "хоёр мөр хоёулаа үлдсэн")
+shutil.rmtree(_log_dir, ignore_errors=True)
+
+# 2. Төлөв файл хязгааргүй өсөхгүй
+_today = _dt.datetime(2026, 8, 26)
+_orders = {
+    "PMN-260826-48213",   # өнөөдөр
+    "PMN-260701-1234",    # ~2 сарын өмнө, 4 оронтой (хуучин хэлбэр)
+    "PMN-250101-11111",   # 1.5 жилийн өмнө
+    "ГАРААР-БИЧСЭН",      # танигдахгүй
+}
+_kept = _mod.prune_synced(_orders, _today, keep_days=90)
+ok("PMN-260826-48213" in _kept, "өнөөдрийн захиалга үлдсэн")
+ok("PMN-260701-1234" in _kept, "90 хоногийн доторх ХУУЧИН хэлбэр ч үлдсэн")
+ok("PMN-250101-11111" not in _kept, "хэт хуучин захиалга хасагдсан")
+ok("ГАРААР-БИЧСЭН" in _kept,
+   "танигдахгүй утгыг ХАСАХГҮЙ — хасвал тэр захиалга дахин татагдана")
+
+# 3. Дискний зайг мэдэрдэг
+_free = _mod.free_space_bytes(pathlib.Path(tempfile.gettempdir()))
+ok(isinstance(_free, int) and _free > 0, f"дискний сул зайг уншина ({_mod.human_gb(_free or 0)})")
+ok(_mod.free_space_bytes(pathlib.Path("/ийм/зам/байхгүй")) is None,
+   "байхгүй зам дээр унахгүй, None буцаана")
+
 shutil.rmtree(dest, ignore_errors=True)
 print("\n=== ДҮН ===")
 print("БҮГД ТЭНЦЛЭЭ" if not fails else f"УНАСАН ({len(fails)}): " + " | ".join(fails))
