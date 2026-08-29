@@ -278,8 +278,14 @@ export default function CategoryGrid({ counts, onPick }: Props) {
       */
     <section className="category-sky relative overflow-hidden py-10 sm:py-14">
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Дэвсгэр цагаан болсон тул текст нь ердийн бэхний өнгөтэй. */}
-        <h2 className="text-2xl font-black tracking-tight sm:text-3xl">
+        {/*
+          * `text-accent` БИШ `text-accent-strong` — дэвсгэр цагаан
+          * (`category-sky`) тул жижиг бус ч гарчгийн бичигт AA харьцаа
+          * шаардлагатай. `--color-accent` (#f59e0b) нь товчны ДЭВСГЭРт
+          * зориулагдсан, текстэд зориулсан хувилбар нь `accent-strong`
+          * (`src/index.css` тайлбарыг үз, 4.9:1).
+          */}
+        <h2 className="text-2xl font-black tracking-tight text-accent-strong sm:text-3xl">
           {t('print.categories')}
         </h2>
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">

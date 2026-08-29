@@ -111,9 +111,9 @@ export const STRINGS = {
     en: 'Tap a size, add your photo and choose how many prints you need.',
   },
   'print.categories': { mn: 'Үйлчилгээний төрөл', en: 'Service categories' },
-  'print.allCategories': { mn: 'Бүх төрөл', en: 'All categories' },
+  'print.allCategories': { mn: 'Үйлчилгээ', en: 'All categories' },
   'print.categoriesHint': {
-    mn: 'Төрөл дээрээ дарж үнийн жагсаалтаа хараарай.',
+    mn: 'Манайхыг сонгон үйлчлүүлж байгаа харилцагч танд баярлалаа.',
     en: 'Tap a category to see its price list.',
   },
   'print.itemCount': { mn: 'төрөл', en: 'options' },
@@ -521,8 +521,9 @@ export const serviceNameIn = (name: string, lang: Lang): string => {
  * нь өөр байна.
  */
 const CATEGORY_MN: Record<string, string> = {
-  Угаалт: 'Зураг угаалт',
-  Засвар: 'Засвартай зураг',
+  Угаалт: 'Зураг угаах үйлчилгээ',
+  Засвар: 'Зураг засуулах үйлчилгээ',
+  'Цээж зураг': 'Цээж зураг үйлчилгээ',
   Хэвлэл: 'Фото цаас',
 };
 
