@@ -35,7 +35,7 @@ interface Props {
 
 export default function PushSlides({ slides, className }: Props) {
   return (
-    <span className={`grid overflow-hidden ${className ?? ''}`}>
+    <span className={`grid w-full overflow-hidden ${className ?? ''}`}>
       {slides.map((lines, i) => (
         <span
           key={lines.join('|')}
@@ -43,12 +43,17 @@ export default function PushSlides({ slides, className }: Props) {
             Хоёулаа НЭГ нүдэнд — өндөр нь өндөр слайдаараа тогтоно.
             `push-slide-1` / `push-slide-2` нь мөчлөгийн өөр өөр үе шатыг
             хариуцна (`index.css`).
+
+            ⚠️ `min-w-0` ЗААВАЛ. Grid item анхдагч `min-width: auto` тул урт,
+            зайгүй мөр (жишээ нь урт орчуулга) ирвэл хайрцгаас гарч, дэлгэцээс
+            цухуйж болно — `min-w-0` + доорх мөр бүрийн `break-words` хамт
+            үүнээс сэргийлнэ.
           */
           style={{ gridArea: '1 / 1' }}
-          className={i === 0 ? 'push-slide-1 block' : 'push-slide-2 block'}
+          className={`min-w-0 ${i === 0 ? 'push-slide-1' : 'push-slide-2'} block`}
         >
           {lines.map((line) => (
-            <span key={line} className="block">
+            <span key={line} className="block break-words">
               {line}
             </span>
           ))}

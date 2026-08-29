@@ -98,13 +98,17 @@ export const STRINGS = {
     mn: 'Konica Fuji лаборатори угаалга',
     en: 'Konica Fuji lab prints',
   },
-  'print.pitch2': {
-    mn: '100 жил гандахгүй, усанд норохгүй',
-    en: '100 years without fading, waterproof',
+  'print.pitch2a': {
+    mn: '100 жил гандахгүй,',
+    en: '100 years without fading,',
+  },
+  'print.pitch2b': {
+    mn: 'усанд норохгүй',
+    en: 'waterproof',
   },
   'print.subtitle': {
-    mn: 'Хэмжээ бүрийн үнэ шууд харагдана. Хэмжээ дээрээ дараад зургаа оруулж, хэдэн ширхэг хэвлэхээ л сонгоно.',
-    en: 'Every price is shown up front. Tap a size, add your photo and choose how many prints you need.',
+    mn: 'Хэмжээ дээрээ дараад зургаа оруулж, хэдэн ширхэг хэвлэхээ л сонгоно.',
+    en: 'Tap a size, add your photo and choose how many prints you need.',
   },
   'print.categories': { mn: 'Үйлчилгээний төрөл', en: 'Service categories' },
   'print.allCategories': { mn: 'Бүх төрөл', en: 'All categories' },

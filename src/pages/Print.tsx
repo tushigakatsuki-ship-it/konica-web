@@ -361,7 +361,7 @@ export default function Print() {
         title={t('print.pitch1a')}
         pushSlides={[
           [t('print.pitch1a'), t('print.pitch1b')],
-          [t('print.pitch2')],
+          [t('print.pitch2a'), t('print.pitch2b')],
         ]}
         subtitle={t('print.subtitle')}
       />

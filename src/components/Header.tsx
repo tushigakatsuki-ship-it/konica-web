@@ -101,8 +101,21 @@ export default function Header() {
           <span className="hidden min-w-0 truncate text-[15px] font-medium tracking-tight min-[360px]:inline sm:hidden">
             {CONTACT.shortName}
           </span>
-          <span className="hidden min-w-0 truncate font-medium tracking-tight sm:inline sm:text-base lg:text-lg">
-            {CONTACT.company}
+          {/*
+            * Хоёр давхаргатай лого: нэр том, тайлбар доор нь жижиг.
+            *
+            * Урьд нь `CONTACT.company` («Printmn.net Онлайн үйлчилгээ») нэг
+            * мөрөнд, НЭГ жинтэй бичигдэж байсан тул хоёрын хооронд ердийн
+            * зайны тэмдэгт л байсан ч хэт том зай мэт харагдаж байв. Тайлбар
+            * хэсэг нь брэндийн нэртэй адил жин, хэмжээтэй байх шаардлагагүй.
+            */}
+          <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+            <span className="truncate font-medium tracking-tight sm:text-base lg:text-lg">
+              {CONTACT.shortName}
+            </span>
+            <span className="truncate text-[11px] text-ink-soft sm:text-xs">
+              {CONTACT.serviceLabel}
+            </span>
           </span>
         </Link>
 
