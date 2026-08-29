@@ -33,3 +33,5 @@ __pycache__/
 # `public/promo/*.mp4` нь эдгээрээс шахагдсан хувилбар — тэр нь git-д ОРНО.
 # Эхийг оруулбал түүхэнд үүрд үлдэж, Vercel-ийн deploy хязгаарт тулна.
 promo-source/
+.vercel
+.env*.local

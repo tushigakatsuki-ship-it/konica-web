@@ -1,0 +1,42 @@
+# Vercel руу ИЛГЭЭХГҮЙ зүйлс.
+#
+# ⚠️ Энэ файл нь `vercel --prod` (терминалаас гараар deploy) хийхэд л
+# хэрэгтэй. GitHub-аар автоматаар явдаг deploy нь `.gitignore`-ыг дагадаг
+# тул эдгээрийг аль хэдийн харахгүй.
+#
+# Үүнгүй бол терминалаас deploy хийхэд:
+#   Error: File size limit exceeded (100 MB)
+# — `promo-source/1.MP4` дангаараа 246MB.
+#
+# ⚠️⚠️ ЭНД ЮУ НЭМЭХЭЭ БОЛГООМЖИЛ. Build нь эх кодоос ГАДНА хоёр хавтас
+# шаарддаг бөгөөд тэдгээрийг хасвал deploy ЧИМЭЭГҮЙ УНАНА
+# («npm run build exited with 2»):
+#
+#   test/ → `tsconfig.api.json` дотор `"include": ["api", "test"]`
+#           тул `tsc -b` унана
+#   dev/  → `vite.config.ts` дотор `import { mockApi } from './dev/mock-api.ts'`
+#           тул `vite build` унана
+#
+# Хоёулаа үйлдвэрлэлийн bundle-д ОРДОГГҮЙ (mock нь `apply: 'serve'`) ч
+# build-ийн ОРОЛТ болдог. Тиймээс эндээс хасахгүй.
+
+# Бичлэгийн ЭХ файлууд (утаснаас шууд, нийт ~338MB).
+# `public/promo/*.mp4` нь эдгээрээс шахагдсан хувилбар бөгөөд ТЭР нь deploy-д
+# орно. Эхийг илгээх нь утгагүй — зөвхөн дахин шахахад л хэрэгтэй.
+promo-source/
+
+# Build-ийн гаралт — Vercel өөрөө шинээр үүсгэдэг.
+dist/
+.tmp/
+node_modules/
+
+# Хуучин код. Кодын хамаарал байхгүйг шалгасан.
+_to_delete/
+
+# Локал нууц утгууд.
+.env
+.env*.local
+.vercel/
+
+# macOS
+.DS_Store
