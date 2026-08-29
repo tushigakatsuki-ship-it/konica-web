@@ -599,20 +599,18 @@ export default function Print() {
                         зурдаг байсан тул 6×9 нарийхан, 60×40 өргөн гарч,
                         тор жигд бус харагддаг байв. Одоо зөвхөн ЗУРАГ л
                         харагдана — харьцааг доорх шошго хэлнэ.
+
+                        Жишээ зураг цаана нь БҮДЭГ дэвсгэр болж, хэмжээ/үнэ
+                        голд нь давхарлагдана: урьд нь зураг том, үнэ доор
+                        бага бичигдсэн тул хамгийн чухал мэдээлэл (хэмжээ,
+                        үнэ) хамгийн бага анхаарал татдаг байв.
                       */
                       <span
-                        aria-hidden
-                        /* Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр. */
-                        className="block aspect-[6/5] w-full overflow-hidden rounded-md border-2 border-brand-400 bg-white"
+                        /* Дүрс тайлбарлахгүй ч хэмжээ/үнэ дотор нь унших мэдээлэлтэй. */
+                        className="relative block aspect-[6/5] w-full overflow-hidden rounded-md border-2 border-brand-400 bg-white"
                       >
                         {/*
-                          * Жишээ зураг — цагаан хайрцгийг БҮТНЭЭР дүүргэнэ.
-                          *
-                          * Хайрцгийн харьцаа (`6/5`) нь зургийнхтай (480×400)
-                          * бараг ижил тул хажуугаар нь хоосон зурвас гарахгүй.
-                          * Гэхдээ багтаалт нь `object-contain` дээр тулгуурлана
-                          * — зургаа солиход харьцаа зөрсөн ч постер БҮТНЭЭРЭЭ
-                          * харагдсаар байна, зөвхөн жаахан зурвас нэмэгдэнэ.
+                          * Жишээ зураг — БҮДЭГ дэвсгэр болгож тавьсан.
                           *
                           * ⚠️ Файлын нэр `ugaalt-poster.jpg` — `ugaalt-thumb`
                           * БИШ. Хөгжүүлэлтийн явцад тэр нэрээр ТАЙРСАН
@@ -621,47 +619,48 @@ export default function Print() {
                           * үндсээрээ өөрчлөгдсөн зурагт ШИНЭ нэр өгөх нь тэр
                           * ангийн алдааг бүрмөсөн таслана.
                           *
-                          * Файл дутуу бол зөвхөн цагаан цаас үлдэнэ — карт
-                          * эвдрэхгүй.
+                          * Одоо зөвхөн дэвсгэр тул `object-cover` — тайрагдсан
+                          * ч харагдац алдагдахгүй, харин `blur`-ээр текстийг
+                          * дарахгүй байх нь чухал. Файл дутуу бол цагаан цаас
+                          * үлдэнэ — карт эвдрэхгүй.
                           */}
                         {PHOTO_TABS.includes(tab as ServiceCategory) &&
                           !washImageFailed && (
                             <img
                               src="/category/ugaalt-poster.jpg"
                               alt=""
+                              aria-hidden
                               decoding="async"
                               onError={() => setWashImageFailed(true)}
-                              /*
-                               * ⚠️ `object-contain` — `object-cover` БИШ.
-                               *
-                               * `cover` нь хайрцгийг дүүргэхийн тулд ЗААВАЛ
-                               * тайрдаг: хайрцаг (1.2051) ба зураг (1.2000)
-                               * хоёрын харьцаа өчүүхэн ч зөрвөл ирмэгээс
-                               * хаздаг. `contain` нь зургийг БҮТНЭЭР багтаана —
-                               * харьцаа хэрхэн ч зөрсөн нэг ч пиксел
-                               * тайрагдахгүй.
-                               */
-                              className="size-full object-contain"
+                              className="absolute inset-0 size-full scale-110 object-cover blur-md"
                             />
                           )}
+
+                        {/*
+                          * Харанхуйлах давхарга — зургийн агуулгаас үл
+                          * хамааран текст үргэлж уншигдахын тулд. Хатуу
+                          * хар/цагаан өнгө ЗОРИУДАА: энэ бол интерфейсийн
+                          * гадаргуу биш, зургийн дэвсгэр тул `--color-*`
+                          * дагах шаардлагагүй (README-ийн QR/цаасны
+                          * загвартай адил үл хамаарал).
+                          */}
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10"
+                        />
+
+                        <span className="relative flex h-full flex-col items-center justify-center gap-1 px-2 text-center">
+                          <span className="text-base font-black text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_0.5)] sm:text-lg">
+                            {size.label}
+                          </span>
+                          <span className="text-sm font-bold text-amber-300 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.5)]">
+                            {formatCurrency(price)}
+                          </span>
+                        </span>
                       </span>
                     )}
 
-                    {/*
-                      Хэмжээ, үнэ хоёр НЭГ мөрөнд.
-
-                      `justify-between` нь хэмжээг зүүн, үнийг баруун ирмэгт
-                      барина — картууд хооронд нүд гүйлгэхэд үнэ нь нэг
-                      баганад эгнэж, харьцуулахад хялбар.
-                    */}
-                    {size ? (
-                      <span className="mt-2 flex w-full items-baseline justify-between gap-2">
-                        <span className="text-sm font-bold">{size.label}</span>
-                        <span className="shrink-0 text-sm font-bold text-brand-500">
-                          {formatCurrency(price)}
-                        </span>
-                      </span>
-                    ) : (
+                    {!size && (
                       <>
                         <span className="flex min-h-14 items-center text-sm font-bold leading-snug">
                           {ts(service.name)}
