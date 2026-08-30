@@ -623,6 +623,16 @@ export default function Print() {
                           * ч харагдац алдагдахгүй, харин `blur`-ээр текстийг
                           * дарахгүй байх нь чухал. Файл дутуу бол цагаан цаас
                           * үлдэнэ — карт эвдрэхгүй.
+                          *
+                          * ⚠️ `objectPosition` ЗААВАЛ зүүн дээшээ хазайсан,
+                          * `scale-150` (110 БИШ). Зураг (900×750) box-той
+                          * (6/5) яг ижил харьцаатай тул зургийн ГОЛ хэсэгт
+                          * хүүхний нүүр биш, «Keep Having Fun» бичгийн ард
+                          * байрлах ХАР дэвсгэр байдаг. Бага (110%) томруулга
+                          * тэр хар хэсгийг хэвээр багтаадаг байсан тул карт
+                          * бараг бүтэн хар харагдаж байв — 150%-иар зүүн
+                          * дээш (өнгөлөг үс/царай руу) илүү шахаж, хар хэсгийг
+                          * хайрцгаас гаргав.
                           */}
                         {PHOTO_TABS.includes(tab as ServiceCategory) &&
                           !washImageFailed && (
@@ -632,7 +642,8 @@ export default function Print() {
                               aria-hidden
                               decoding="async"
                               onError={() => setWashImageFailed(true)}
-                              className="absolute inset-0 size-full scale-110 object-cover blur-md"
+                              style={{ objectPosition: '15% 25%' }}
+                              className="absolute inset-0 size-full scale-150 object-cover blur-sm"
                             />
                           )}
 
@@ -643,10 +654,16 @@ export default function Print() {
                           * гадаргуу биш, зургийн дэвсгэр тул `--color-*`
                           * дагах шаардлагагүй (README-ийн QR/цаасны
                           * загвартай адил үл хамаарал).
+                          *
+                          * ⚠️ `blur-md` → `blur-sm`, давхарга ХӨНГӨРСӨН
+                          * (60/30/10 → 40/20/5). Картны хайрцаг жижиг тул
+                          * хүчтэй blur + бараан давхарга хосолсноор жишээ
+                          * зураг бараг БҮТЭН хар боов болж, «зураг эвдэрсэн
+                          * үү» гэсэн сэтгэгдэл төрүүлдэг байв.
                           */}
                         <span
                           aria-hidden
-                          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10"
+                          className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/20 to-black/5"
                         />
 
                         <span className="relative flex h-full flex-col items-center justify-center gap-1 px-2 text-center">
