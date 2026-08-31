@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  DEFAULT_ADJUST,
+  brightnessFilterValue,
+  isDefaultAdjust,
+  type Adjust,
+} from '../lib/adjust';
+import {
+  BACKGROUNDS,
+  BACKGROUND_FEATHER_RADIUS,
+  BACKGROUND_TOLERANCE,
+  applyBackground,
+  autoWhiteBalance,
+  backgroundMask,
+  featherMask,
+  fitBackdrop,
+} from '../lib/backdrop';
+import {
   DEFAULT_CROP,
   MAX_ZOOM,
   isDefaultCrop,
@@ -19,7 +35,10 @@ interface Props {
   size: PhotoSize;
   initial: Crop;
   onCancel(): void;
-  onApply(crop: Crop): void;
+  onApply(crop: Crop, adjust: Adjust): void;
+  /** Цээж зураг уу — brightness/blur/sharpen/дэвсгэрийн хяналт зөвхөн энд. */
+  idPhoto?: boolean;
+  initialAdjust?: Adjust;
 }
 
 /**
@@ -42,12 +61,99 @@ interface Props {
  * ашигладаг. Хоёр газар тусад нь томьёо бичих нь «харсан зүйл хэвлэгдсэнээсээ
  * зөрөх» алдааг зайлшгүй төрүүлдэг.
  */
-export default function CropStudio({ source, size, initial, onCancel, onApply }: Props) {
+export default function CropStudio({
+  source,
+  size,
+  initial,
+  onCancel,
+  onApply,
+  idPhoto = false,
+  initialAdjust,
+}: Props) {
   const { t } = useLang();
 
   const [crop, setCrop] = useState<Crop>(() => normalizeCrop(initial));
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
+
+  /* ── Цээж зургийн засвар (brightness/blur/sharpen/дэвсгэр) ── */
+  const [adjust, setAdjust] = useState<Adjust>(() => initialAdjust ?? DEFAULT_ADJUST);
+  /** Дэлгэц дээрх зураг элемент — жижиг canvas дээр дахин зурахад хэрэглэнэ. */
+  const imgRef = useRef<HTMLImageElement>(null);
+  /** `null` = хараахан шалгаагүй. Нэг удаа, зураг ирэнгүүт л бодогдоно. */
+  const [backdropEligible, setBackdropEligible] = useState<boolean | null>(null);
+  const [bgPreview, setBgPreview] = useState<string | null>(null);
+  const [bgPreviewBusy, setBgPreviewBusy] = useState(false);
+
+  /**
+   * «Жигд дэвсгэр эсэх» — НЭГ удаа, зураг дэлгэцэнд ачаалагдмагц.
+   *
+   * ⚠️ Энэ бол дэвсгэр СОЛИХООС ӨМНӨХ, боловсруулаагүй пиксел дээрх шалгалт
+   * — солилтын өөрийнх нь үр дүнгээс хамаардаггүй тул «үргэлж зөвшөөрнө»
+   * гэсэн байдалд орохгүй. `photoRender.ts` render хийх мөчид ижил
+   * шалгалтыг ХОЁР ДАХИН, эцсийн canvas дээр давхар хийдэг.
+   */
+  useEffect(() => {
+    if (!idPhoto || !natural || !imgRef.current) return;
+    const img = imgRef.current;
+    const maxW = 480;
+    const scale = Math.min(1, maxW / natural.w);
+    const w = Math.max(1, Math.round(natural.w * scale));
+    const h = Math.max(1, Math.round(natural.h * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+    setBackdropEligible(fitBackdrop(data, w, h).uniform);
+  }, [idPhoto, natural]);
+
+  /**
+   * Дэвсгэрийн товч дарахад л (slider drag БИШ) жижиг canvas дээр нэг удаа
+   * дахин зурж, урьдчилан харуулна — гүйцэтгэлийн үүднээс.
+   */
+  const previewBackground = (bg: Adjust['bg']) => {
+    if (bg === 'none' || !imgRef.current || !natural) {
+      setBgPreview(null);
+      return;
+    }
+    setBgPreviewBusy(true);
+    try {
+      const img = imgRef.current;
+      const maxW = 240;
+      const scale = Math.min(1, maxW / natural.w);
+      const w = Math.max(1, Math.round(natural.w * scale));
+      const h = Math.max(1, Math.round(natural.h * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+
+      const backdrop = fitBackdrop(imageData.data, w, h);
+      if (!backdrop.uniform) {
+        setBgPreview(null);
+        return;
+      }
+      const mask = backgroundMask(imageData.data, w, h, BACKGROUND_TOLERANCE, undefined, {
+        backdrop,
+      });
+      const feathered = featherMask(mask, w, h, BACKGROUND_FEATHER_RADIUS);
+      autoWhiteBalance(imageData.data, feathered);
+      const color = BACKGROUNDS.find((entry) => entry.key === bg)?.rgb;
+      if (color) applyBackground(imageData.data, feathered, color);
+      ctx.putImageData(imageData, 0, 0);
+      setBgPreview(canvas.toDataURL('image/jpeg', 0.85));
+    } finally {
+      setBgPreviewBusy(false);
+    }
+  };
 
   /** Боломжит талбай. Хүрээ нь энэ дотор багтах хамгийн том зөв харьцаат хэсэг. */
   const stageRef = useRef<HTMLDivElement>(null);
@@ -217,6 +323,7 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
         >
           {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
           <img
+            ref={imgRef}
             src={source}
             alt=""
             draggable={false}
@@ -245,6 +352,24 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
                     maxWidth: 'none',
                     maxHeight: 'none',
                     transform: `translate(${placement.x}px, ${placement.y}px)`,
+                    /*
+                     * Brightness/blur-ийн АМЬД урьдчилсан харагдац — CSS
+                     * `filter`-ээр, canvas-гүйгээр. Sharpen, дэвсгэр солих
+                     * хоёрт CSS дүйцэхүйц зүйл байхгүй тул эндхийн preview
+                     * бодит хэвлэх файлтай (`photoRender.ts`) яг тэнцүү БИШ —
+                     * зөвхөн ойролцоо мэдрэмж өгнө.
+                     */
+                    filter:
+                      idPhoto && !isDefaultAdjust(adjust)
+                        ? [
+                            adjust.brightness !== 0
+                              ? `brightness(${brightnessFilterValue(adjust.brightness)})`
+                              : '',
+                            adjust.blur > 0 ? `blur(${adjust.blur}px)` : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ') || undefined
+                        : undefined,
                   }
                 : { opacity: 0 }
             }
@@ -291,6 +416,122 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
             {t('crop.hint')}
           </p>
 
+          {/*
+            * Цээж зургийн засварын нэмэлт хяналт — ЗӨВХӨН `idPhoto` үед.
+            * Бусад бүх ангилалд энэ блок ОГТ зурагдахгүй.
+            */}
+          {idPhoto && (
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              <label className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-xs font-semibold text-white/70">
+                  {t('adjust.brightness')}
+                </span>
+                <input
+                  type="range"
+                  min={-40}
+                  max={40}
+                  step={1}
+                  value={adjust.brightness}
+                  aria-label={t('adjust.brightness')}
+                  onChange={(event) =>
+                    setAdjust((a) => ({ ...a, brightness: Number(event.target.value) }))
+                  }
+                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/25 accent-white"
+                />
+              </label>
+
+              <label className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-xs font-semibold text-white/70">
+                  {t('adjust.blur')}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={adjust.blur}
+                  aria-label={t('adjust.blur')}
+                  onChange={(event) =>
+                    setAdjust((a) => ({ ...a, blur: Number(event.target.value) }))
+                  }
+                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/25 accent-white"
+                />
+              </label>
+
+              <label className="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={adjust.sharpen}
+                  onChange={(event) =>
+                    setAdjust((a) => ({ ...a, sharpen: event.target.checked }))
+                  }
+                  className="size-4 accent-white"
+                />
+                <span className="text-xs font-semibold text-white/80">
+                  {t('adjust.sharpen')}
+                </span>
+                <span className="text-[11px] text-white/50">{t('adjust.sharpenNote')}</span>
+              </label>
+
+              <div>
+                <p className="text-xs font-semibold text-white/70">{t('adjust.background')}</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdjust((a) => ({ ...a, bg: 'none' }));
+                      setBgPreview(null);
+                    }}
+                    aria-pressed={adjust.bg === 'none'}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${
+                      adjust.bg === 'none' ? 'border-white bg-white/15' : 'border-white/25'
+                    }`}
+                  >
+                    {t('adjust.bgNone')}
+                  </button>
+                  {BACKGROUNDS.map((background) => (
+                    <button
+                      key={background.key}
+                      type="button"
+                      disabled={backdropEligible !== true}
+                      onClick={() => {
+                        setAdjust((a) => ({ ...a, bg: background.key }));
+                        previewBackground(background.key);
+                      }}
+                      aria-pressed={adjust.bg === background.key}
+                      className={`rounded-md border px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-30 ${
+                        adjust.bg === background.key ? 'border-white bg-white/15' : 'border-white/25'
+                      }`}
+                    >
+                      {background.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/*
+                  * `backdropEligible === false` — жигд бус дэвсгэр. Товч
+                  * НУУГДАХГҮЙ, зөвхөн идэвхгүй + тайлбартай: харилцагч
+                  * сонголт хаана байгааг мэдэж, яагаад ажиллахгүйг ойлгоно.
+                  */}
+                {backdropEligible === false && (
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-white/60">
+                    {t('adjust.bgUnavailable')}
+                  </p>
+                )}
+
+                {bgPreview && (
+                  <img
+                    src={bgPreview}
+                    alt=""
+                    className={`mt-2 h-16 w-auto rounded-md border border-white/20 ${
+                      bgPreviewBusy ? 'opacity-50' : ''
+                    }`}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex gap-3">
             <button
               type="button"
@@ -301,7 +542,7 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
             </button>
             <button
               type="button"
-              onClick={() => onApply(crop)}
+              onClick={() => onApply(crop, adjust)}
               className="btn-accent flex-1"
             >
               {t('crop.apply')}

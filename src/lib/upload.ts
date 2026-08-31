@@ -10,6 +10,7 @@
  */
 
 import type { BasketItem } from '../state/basket';
+import { DEFAULT_ADJUST } from './adjust';
 import { ServiceUnavailableError } from './api';
 import { DEFAULT_CROP } from './crop';
 import { renderPrintBlob } from './photoRender';
@@ -178,8 +179,18 @@ async function preparePhoto(
    * Хэрэглэгчийн тайралтыг ЗААВАЛ дамжуулна. Үүнийг мартвал дэлгэц дээр
    * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
    * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
+   *
+   * ⚠️ `item.value.adjust`-ыг ч мөн ЗААВАЛ дамжуулна (Цээж зурагт л утгатай,
+   * бусад ангилалд `undefined` → `DEFAULT_ADJUST`, өөрчлөлтгүй). Үүнийг
+   * мартвал харилцагчийн тохируулсан brightness/blur/sharpen/дэвсгэр зөвхөн
+   * дэлгэцэн дээрх preview дээр үлдэж, ХЭВЛЭХ файлд огт ордоггүй болно.
    */
-  const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
+  const print = await renderPrintBlob(
+    original,
+    size,
+    item.value.crop ?? DEFAULT_CROP,
+    item.value.adjust ?? DEFAULT_ADJUST,
+  );
   const files: Planned[] = [];
 
   if (print) {

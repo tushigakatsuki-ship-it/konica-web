@@ -14,7 +14,19 @@
  *     илгээхэд эх `File`-аас дахин задална. Санах ойд том зураг үлдэхгүй.
  */
 
+import {
+  BACKGROUNDS,
+  BACKGROUND_FEATHER_RADIUS,
+  BACKGROUND_TOLERANCE,
+  applyBackground,
+  autoWhiteBalance,
+  backgroundMask,
+  featherMask,
+  fitBackdrop,
+} from './backdrop';
+import { DEFAULT_ADJUST, brightnessFilterValue, isDefaultAdjust, scaledBlurPx, type Adjust } from './adjust';
 import { DEFAULT_CROP, placeCover, type Crop } from './crop';
+import { sharpenKernel3x3 } from './pixelOps';
 import { PRINT_DPI, orientSize, type PhotoSize } from './photoSize';
 
 /** `ImageBitmap` ба `HTMLImageElement` хоёулаа энэ хэлбэрт тохирно. */
@@ -61,11 +73,60 @@ export async function decodeImage(blob: Blob): Promise<Decoded> {
  * Байрлалыг `placeCover` тооцоолно — дэлгэц дээрх тайрах цонх ЯГ ижил функцийг
  * ашигладаг тул хэрэглэгчийн харсан зүйл хэвлэгдэхтэйгээ таарна.
  */
+/**
+ * Цээж зургийн харилцагчийн засвар — brightness/blur/sharpen/дэвсгэр.
+ *
+ * ⚠️ ЦОРЫН ГАНЦ газар (`renderPreview` БОЛОН `renderPrintBlob` хоёулаа энд
+ * ирдэг) — «дэлгэц дээр харсан зүйл яг тэр хэвлэгдэнэ» гэсэн баталгааг
+ * зөвхөн энд эффект нэмснээр хадгална. `adjust` өгөөгүй (`DEFAULT_ADJUST`)
+ * үед энэ функц ямар ч нэмэлт зурах ажил хийхгүй тул бусад 11 ангиллын
+ * гаралт өмнөх шигээ БАЙТ ХУВЬД яг ижил үлдэнэ (`test/adjust.test.ts`).
+ */
+const applyAdjust = (ctx: CanvasRenderingContext2D, outW: number, outH: number, adjust: Adjust): void => {
+  if (isDefaultAdjust(adjust)) return;
+
+  if (adjust.sharpen || adjust.bg !== 'none') {
+    const imageData = ctx.getImageData(0, 0, outW, outH);
+    let pixels: Uint8ClampedArray = imageData.data;
+
+    /*
+     * Sharpen ЭХЛЭЭД. Дэвсгэрийг ХАВТГАЙ өнгөөр сольсны дараа sharpen хийвэл
+     * mask-ийн ирмэг дээр хиймэл artifact гарна — жинхэнэ субьектийг л
+     * тодотгож, дараа нь дэвсгэрийг тэгш сольсон нь зөв дараалал.
+     */
+    if (adjust.sharpen) pixels = sharpenKernel3x3(pixels, outW, outH);
+
+    if (adjust.bg !== 'none') {
+      /*
+       * ⚠️ ХОЁР ДАХЬ, бие даасан «жигд эсэх» шалгалт — CropStudio дээр
+       * сонголт нээх үед НЭГ удаа шалгасан байсан ч тэр өөр (жижиг, тайраагүй)
+       * зурган дээр хийгдсэн байдаг. Энд ГАРАЛТЫН яг тэр canvas дээр дахин
+       * шалгана: `uniform === false` гарвал дэвсгэрт огт хүрэхгүй орхино —
+       * «баталгаагүй атал оролдох» гэдэгт хэзээ ч орохгүй.
+       */
+      const backdrop = fitBackdrop(pixels, outW, outH);
+      if (backdrop.uniform) {
+        const mask = backgroundMask(pixels, outW, outH, BACKGROUND_TOLERANCE, undefined, {
+          backdrop,
+        });
+        const feathered = featherMask(mask, outW, outH, BACKGROUND_FEATHER_RADIUS);
+        autoWhiteBalance(pixels, feathered);
+        const color = BACKGROUNDS.find((entry) => entry.key === adjust.bg)?.rgb;
+        if (color) applyBackground(pixels, feathered, color);
+      }
+    }
+
+    if (pixels !== imageData.data) imageData.data.set(pixels);
+    ctx.putImageData(imageData, 0, 0);
+  }
+};
+
 const drawCover = (
   source: Source,
   size: PhotoSize,
   outW: number,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): HTMLCanvasElement | null => {
   const outH = Math.max(1, Math.round(outW * (size.h / size.w)));
 
@@ -81,8 +142,25 @@ const drawCover = (
   ctx.fillRect(0, 0, outW, outH);
   ctx.imageSmoothingQuality = 'high';
 
+  /*
+   * Brightness/blur — canvas 2D-ийн `filter`-ээр шууд, `drawImage`-аас өмнө.
+   * Хоёулаа CSS filter функц шиг зурах ажлын үед л ажилладаг тул `fillRect`-
+   * ийн дараа, `drawImage`-аас өмнө тавихад ЗӨВХӨН зураг өөрөө нөлөөлнэ.
+   *
+   * ⚠️ Blur-ийн радиусыг ГАРАЛТЫН нягтралаар хэмжээлнэ (`scaledBlurPx`) —
+   * эс тэгвээс 640px preview дээрх «2px» 3500px+ хэвлэлийн canvas дээр
+   * бараг үл ажиглагдана.
+   */
+  const filterParts: string[] = [];
+  if (adjust.brightness !== 0) filterParts.push(`brightness(${brightnessFilterValue(adjust.brightness)})`);
+  if (adjust.blur > 0) filterParts.push(`blur(${scaledBlurPx(adjust.blur, outW).toFixed(2)}px)`);
+  ctx.filter = filterParts.length > 0 ? filterParts.join(' ') : 'none';
+
   const at = placeCover(source, { width: outW, height: outH }, crop);
   ctx.drawImage(source, at.x, at.y, at.width, at.height);
+
+  ctx.filter = 'none';
+  applyAdjust(ctx, outW, outH, adjust);
 
   return canvas;
 };
@@ -106,6 +184,7 @@ export async function renderPreview(
   paper: PhotoSize,
   maxWidth = 640,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): Promise<PreviewResult> {
   const decoded = await decodeImage(blob);
   try {
@@ -114,7 +193,7 @@ export async function renderPreview(
     const size = orientSize(paper, decoded.source);
     const outW = Math.min(maxWidth, Math.max(160, natural.w || maxWidth));
     const preview =
-      drawCover(decoded.source, size, outW, crop)?.toDataURL('image/jpeg', 0.82) ?? '';
+      drawCover(decoded.source, size, outW, crop, adjust)?.toDataURL('image/jpeg', 0.82) ?? '';
     return { preview, natural };
   } finally {
     decoded.close();
@@ -170,6 +249,7 @@ export async function renderPrintBlob(
   blob: Blob,
   paper: PhotoSize,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): Promise<Blob | null> {
   const decoded = await decodeImage(blob);
   try {
@@ -198,7 +278,7 @@ export async function renderPrintBlob(
     );
     const outW = Math.max(floor, Math.min(target, available || target));
 
-    const canvas = drawCover(decoded.source, size, outW, crop);
+    const canvas = drawCover(decoded.source, size, outW, crop, adjust);
     if (!canvas) return null;
 
     /*

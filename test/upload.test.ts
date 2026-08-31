@@ -124,7 +124,7 @@ test('ЭХ файл болон хэвлэх файл ХОЁУЛАА илгээг
 test('хэрэглэгчийн тайралт хэвлэх файлд дамжина', () => {
   assert.match(
     code,
-    /renderPrintBlob\(original, size, item\.value\.crop \?\? DEFAULT_CROP\)/,
+    /renderPrintBlob\(\s*original,\s*size,\s*item\.value\.crop \?\? DEFAULT_CROP,/,
     'тайралт алдагдаж байна',
   );
 });
@@ -227,4 +227,31 @@ test('интерфейст нэг мөр, нэг шошго үлдсэн', () =>
   const order = readFileSync(path.join(root, 'src/pages/Order.tsx'), 'utf8');
   assert.match(order, /progress\.done\}\/\{progress\.total\} зураг/, 'тоолуур алга');
   assert.ok(!order.includes("progress.phase"), 'хоёр үе шатны салаа буцаж орсон');
+});
+
+test('adjust (brightness/blur/sharpen/дэвсгэр) print-д ордог, original-ыг хөндөхгүй', () => {
+  /*
+   * Цээж зургийн харилцагчийн засварын хэрэгсэл: `item.value.adjust`-ыг
+   * `renderPrintBlob`-т ЗААВАЛ дамжуулна, эс тэгвээс дэлгэц дээр тохируулсан
+   * brightness/blur/sharpen/дэвсгэр зөвхөн preview дээр үлдэж, ХЭВЛЭХ файлд
+   * огт ордоггүй болно.
+   *
+   * `original`-ийн мөр нь `item.value.file`-г шууд, ямар ч хувиргалтгүй
+   * дамжуулдаг хэвээр байх ёстой — adjust ЗӨВХӨН `print`-д нөлөөлнө. Эх
+   * файл өөрчлөгдвөл ажилтан буруу тохируулгаас буцаж сэргээх боломжгүй
+   * болно (README-ийн «Цээж зураг — шийдвэр ЭРГЭСЭН» түүхэн 3 алдааны
+   * гурав дахь нь яг үүнээс болсон).
+   */
+  assert.match(
+    code,
+    /renderPrintBlob\(\s*original,\s*size,\s*item\.value\.crop \?\? DEFAULT_CROP,\s*item\.value\.adjust \?\? DEFAULT_ADJUST,?\s*\)/,
+    'adjust-ыг renderPrintBlob руу дамжуулаагүй байна',
+  );
+
+  const originalEntry = code.slice(code.indexOf("kind: 'original'"), code.indexOf("kind: 'original'") + 200);
+  assert.ok(
+    !originalEntry.includes('adjust') && !originalEntry.includes('renderPrintBlob'),
+    'original файлыг adjust/renderPrintBlob-оор дамжуулж байна — эх файл өөрчлөгдөх эрсдэлтэй',
+  );
+  assert.match(code, /blob: original,\s*\n\s*photo,\s*\n\s*meta: \{\s*\n\s*kind: 'original'/, 'original blob шууд дамжаагүй байна');
 });

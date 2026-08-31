@@ -324,6 +324,17 @@ export const STRINGS = {
   'crop.cancel': { mn: 'Болих', en: 'Cancel' },
   'crop.apply': { mn: 'Болсон', en: 'Done' },
   'crop.edited': { mn: 'Тайрсан', en: 'Cropped' },
+  /* ── Цээж зургийн засварын хэрэгсэл (зөвхөн `idPhoto`) ── */
+  'adjust.brightness': { mn: 'Тодруулах', en: 'Brightness' },
+  'adjust.blur': { mn: 'Зөөлрүүлэх', en: 'Soften' },
+  'adjust.sharpen': { mn: 'Тодотгох', en: 'Sharpen' },
+  'adjust.sharpenNote': { mn: '(Хадгалахад орно)', en: '(applied on save)' },
+  'adjust.background': { mn: 'Дэвсгэр', en: 'Background' },
+  'adjust.bgNone': { mn: 'Хэвээр', en: 'Keep' },
+  'adjust.bgUnavailable': {
+    mn: 'Энэ зургийн дэвсгэр жигд биш тул автоматаар солих боломжгүй — манай ажилтан үүнийг өөрөө бэлтгэнэ.',
+    en: "This photo's background isn't even, so we can't swap it automatically — our staff will prepare it for you.",
+  },
   'editor.recommended': { mn: 'Санал болгох нягтрал', en: 'Recommended resolution' },
   'editor.recommendedShort': { mn: 'Санал болгох нягтрал: {n}', en: 'Recommended resolution: {n}' },
   'editor.sizeLabel': { mn: 'Хэмжээ', en: 'Size' },

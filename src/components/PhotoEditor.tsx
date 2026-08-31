@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice, vatPortion } from '../lib/price';
+import { DEFAULT_ADJUST, type Adjust } from '../lib/adjust';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
 import { orientSize, recommendedPixels, sizeOf } from '../lib/photoSize';
@@ -26,6 +27,11 @@ export interface EditorValue {
    * төлөв). `preview` нь ҮРГЭЛЖ энэ тайралтыг тусгасан байна.
    */
   crop?: Crop;
+  /**
+   * Brightness/blur/sharpen/дэвсгэр — ЗӨВХӨН Цээж зурагт (`idPhoto` prop).
+   * Байхгүй бол `DEFAULT_ADJUST` — бусад ангиллын зан төлөв өөрчлөгдөхгүй.
+   */
+  adjust?: Adjust;
 }
 
 interface Props {
@@ -47,6 +53,12 @@ interface Props {
    * дуусаад сервер татгалзах бөгөөд хийсэн ажил бүхэлдээ хаягдана.
    */
   alreadyInBasket?: number;
+  /**
+   * Цээж зургийн ангилал уу — brightness/blur/sharpen/дэвсгэрийн хяналт
+   * зөвхөн энд `CropStudio`-д харагдана. Бусад бүх ангилалд `undefined`
+   * (`false`-той адил) тул шинэ UI огт унших/зурагдахгүй.
+   */
+  idPhoto?: boolean;
 }
 
 /**
@@ -78,6 +90,7 @@ export default function PhotoEditor({
   onSave,
   editing = false,
   alreadyInBasket = 0,
+  idPhoto = false,
 }: Props) {
   const { t, ts } = useLang();
   /* НӨАТ нь захиалгын түвшний тохиргоо — сагсанд амьдардаг. */
@@ -146,7 +159,7 @@ export default function PhotoEditor({
    * харагдсаар байх бөгөөд хэвлэгдэх файл нь өөр болно. Хэрэглэгчийн итгэл
    * бүхэлдээ «харсан зүйл минь хэвлэгдэнэ» гэдэг дээр тогтдог.
    */
-  const applyCrop = async (crop: Crop) => {
+  const applyCrop = async (crop: Crop, adjust: Adjust) => {
     const target = cropping;
     setCropping(null);
     if (!target) return;
@@ -156,10 +169,10 @@ export default function PhotoEditor({
 
     setCropLoading(target.index);
     try {
-      const result = await renderPreview(photo.file, size, 640, crop);
+      const result = await renderPreview(photo.file, size, 640, crop, adjust);
       setPhotos((list) =>
         list.map((item, i) =>
-          i === target.index ? { ...item, crop, preview: result.preview } : item,
+          i === target.index ? { ...item, crop, adjust, preview: result.preview } : item,
         ),
       );
     } catch {
@@ -224,6 +237,7 @@ export default function PhotoEditor({
           preview: result.preview,
           natural: result.natural,
           crop: DEFAULT_CROP,
+          adjust: DEFAULT_ADJUST,
         });
       } catch {
         if (seq !== pickSeq.current) return;
@@ -699,8 +713,10 @@ export default function PhotoEditor({
           source={cropping.source}
           size={size}
           initial={photos[cropping.index]?.crop ?? DEFAULT_CROP}
+          idPhoto={idPhoto}
+          initialAdjust={photos[cropping.index]?.adjust ?? DEFAULT_ADJUST}
           onCancel={() => setCropping(null)}
-          onApply={(crop) => void applyCrop(crop)}
+          onApply={(crop, adjust) => void applyCrop(crop, adjust)}
         />
       )}
     </div>,
