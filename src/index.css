@@ -626,6 +626,206 @@
   opacity: calc(0.35 + var(--tilt-x) * 0.25);
 }
 
+/* ── Медалийн 3D загвар ──────────────────────────────────────────── */
+
+/**
+ * Алтан медалийн диск.
+ *
+ * `print-card`-тай ижил зарчим: жинхэнэ 3D биет (three.js) хэрэггүй.
+ * Метал гэдгийг гурван зүйл л итгүүлдэг — тойрог дагуу ЭЭЛЖИЛСЭН
+ * цайралт/бараалт (`conic-gradient`), тогтмол гэрлийн эх үүсвэр
+ * (`radial-gradient`), ирмэгийн хурц зааг (`inset` сүүдэр).
+ *
+ * `conic-gradient` нь энд гол нь: шулуун градиент нь хуванцар мэт
+ * хавтгай харагддаг бол тойрог дагуух давталт нь эргэлдэх гадаргуугаас
+ * гэрэл ойх байдлыг дуурайдаг.
+ */
+@utility medal-disc {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  /*
+   * Гүйдэг гялбаа (`::after`) диск дээгүүр өнгөрөхдөө ГАДАГШАА гарах тул
+   * заавал тайрна — эс бөгөөс медалийн хажууд цагаан зураас хөвж
+   * харагдана. Элементийн ӨӨРИЙН гадна сүүдэрт энэ нөлөөлөхгүй.
+   */
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 34% 26%, rgb(255 255 255 / 0.5), transparent 46%),
+    conic-gradient(
+      from 210deg,
+      #b8860b 0deg,
+      #f7e08a 40deg,
+      #fff8dc 78deg,
+      #d4af37 128deg,
+      #8b6914 180deg,
+      #d4af37 232deg,
+      #fff8dc 282deg,
+      #f7e08a 320deg,
+      #b8860b 360deg
+    );
+  box-shadow:
+    /* Гадна ирмэгийн гялбаа ба бараан зааг — зузааныг заана. */
+    inset 0 0 0 2px rgb(255 252 232 / 0.55),
+    inset 0 0 0 7px rgb(139 105 20 / 0.42),
+    inset 0 -6px 12px rgb(92 64 8 / 0.35),
+    inset 0 6px 12px rgb(255 248 220 / 0.3),
+    /* Хазайлт дагасан сүүдэр — `print-card`-тай ижил томьёо. */
+    calc(var(--tilt-x) * -14px) calc(var(--tilt-y) * 14px + 16px) 30px rgb(15 23 42 / 0.3);
+}
+
+/**
+ * Заагч дагасан гялбаа — `print-card::after`-ийн дугуй хувилбар.
+ */
+.medal-disc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    calc(105deg + var(--tilt-x) * 30deg),
+    transparent 36%,
+    rgb(255 255 255 / 0.4) 50%,
+    transparent 64%
+  );
+  opacity: calc(0.4 + var(--tilt-x) * 0.3);
+}
+
+/**
+ * Өөрөө гүйдэг гялбааны туяа.
+ *
+ * ⚠️ Энэ нь чимэглэл БИШ, харин ГАР УТСАНД зориулсан хөдөлгөөн:
+ * `useTilt` нь `hover: hover` төхөөрөмж дээр л ажилладаг тул утсан дээр
+ * дээрх заагч дагасан гялбаа ХЭЗЭЭ Ч хөдлөхгүй. Хэрэглэгчийн ихэнх нь
+ * утсаар ордог учир медаль тэнд амьд харагдах цорын ганц зам.
+ *
+ * Эхлэл ба төгсгөлийн агшинд туяа дискнээс ГАДНА байна. Ингэснээр
+ * `prefers-reduced-motion` үед (нэгдсэн дүрэм нь үргэлжлэлийг 0.01ms
+ * болгож, эцсийн байрлалд шууд суулгадаг) цэвэр алтан диск л үлдэнэ.
+ */
+.medal-disc::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /*
+   * Тунгалаг байдал 0.6 — 0.85 БИШ. Туяа зөвхөн алтан ирмэгээр биш,
+   * хэрэглэгчийн ЗУРАГ дээгүүр ч өнгөрдөг. 0.85 дээр лого хэсэг зуур
+   * бүрэн цайж, «миний лого ямар харагдах вэ» гэдэг гол асуултад
+   * саад болж байв.
+   */
+  background: linear-gradient(
+    72deg,
+    transparent 28%,
+    rgb(255 255 255 / 0.6) 50%,
+    transparent 72%
+  );
+  animation: medal-shine 5.5s ease-in-out infinite;
+}
+
+@keyframes medal-shine {
+  0%,
+  100% {
+    transform: translateX(-170%);
+  }
+  50%,
+  72% {
+    transform: translateX(170%);
+  }
+}
+
+/**
+ * Оосроор өлгөгдсөн медалийн найгалт.
+ *
+ * ⚠️ Хазайлт (`stage-face`) болон найгалт ХОЁР ӨӨР элемент дээр байх
+ * ёстой: нэг элементийн `transform`-ыг анимац эзэмдэнэ, тэгвэл заагч
+ * дагасан хазайлт дарагдана. Тиймээс найгалтыг дотор давхаргад,
+ * `rotate` (тусдаа шинж чанар) ашиглан хийнэ.
+ *
+ * Төгсгөлийн агшинд өнцөг 0 — `prefers-reduced-motion` үед (нэгдсэн
+ * дүрэм эцсийн байрлалд шууд суулгадаг) медаль хазайлгүй, шулуун үлдэнэ.
+ */
+@utility medal-swing {
+  transform-origin: top center;
+  animation: medal-swing 4.5s ease-in-out infinite;
+}
+
+@keyframes medal-swing {
+  0%,
+  100% {
+    rotate: 0deg;
+  }
+  25% {
+    rotate: -3.2deg;
+  }
+  75% {
+    rotate: 3.2deg;
+  }
+}
+
+/**
+ * Зургийн цонх — метал дотор СУУСАН мэт.
+ *
+ * `inset` сүүдэр нь гүнийг өгнө: зураг дискний гадаргуу дээр наалдсан
+ * биш, дотор нь суулгасан мэт харагдана.
+ */
+@utility medal-window {
+  position: absolute;
+  inset: 14%;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 2px 8px rgb(60 40 4 / 0.5),
+    0 0 0 3px rgb(255 248 220 / 0.45);
+}
+
+/**
+ * Оосор — хоёр тууз V хэлбэрээр уулзана.
+ *
+ * Оосоргүй бол медаль зоос мэт харагдана. Хоёр туузыг тусдаа элемент
+ * болгохын оронд pseudo-элемент ашигласан нь JSX-ийг цэвэр байлгана.
+ */
+@utility medal-ribbon {
+  position: relative;
+  /*
+   * Өндрийг ХУВИАР өгч БОЛОХГҮЙ: эцэг элементийн өндөр нь агуулгаасаа
+   * тодорхойлогддог тул хувь нь 0 болж унана. Өргөн нь (62%) эцгийн
+   * тодорхой өргөнөөс гарах тул `aspect-ratio` өндрийг найдвартай өгнө.
+   */
+  width: 64%;
+  aspect-ratio: 1 / 0.82;
+  /* Диск оосрын доод үзүүрийг ДАРЖ суух ёстой — медаль өлгөөтэй мэт. */
+  margin-bottom: -15%;
+}
+
+.medal-ribbon::before,
+.medal-ribbon::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  transform-origin: bottom center;
+  /* Дундах цайвар судал нь даавууны нугалаа мэт мэдрэмж өгнө. */
+  background: linear-gradient(
+    90deg,
+    var(--color-brand-700) 0%,
+    var(--color-brand-400) 46%,
+    var(--color-brand-700) 100%
+  );
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.28);
+}
+.medal-ribbon::before {
+  left: 14%;
+  transform: rotate(15deg);
+}
+.medal-ribbon::after {
+  right: 14%;
+  transform: rotate(-15deg);
+}
+
 
 /**
  * Ангиллын торны цэнхэр дэвсгэр.
