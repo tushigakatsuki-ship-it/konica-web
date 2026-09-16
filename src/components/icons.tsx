@@ -145,6 +145,14 @@ export const IconCrop = (props: IconProps) => (
   </Base>
 );
 
+/** Цагийн зүүний дагуу эргүүлэх — зүүн тийш эргүүлэхэд CSS `scale-x-[-1]`. */
+export const IconRotate = (props: IconProps) => (
+  <Base {...props}>
+    <path d="M21 12a9 9 0 1 1-3-6.7" />
+    <path d="M21 3v5h-5" />
+  </Base>
+);
+
 export const IconRuler = (props: IconProps) => (
   <Base {...props}>
     <path d="M21.3 15.3 8.7 2.7a1 1 0 0 0-1.4 0L2.7 7.3a1 1 0 0 0 0 1.4l12.6 12.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4Z" />

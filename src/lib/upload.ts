@@ -11,6 +11,7 @@
 
 import type { BasketItem } from '../state/basket';
 import { ServiceUnavailableError } from './api';
+import { DEFAULT_ADJUST } from './adjust';
 import { DEFAULT_CROP } from './crop';
 import { renderPrintBlob } from './photoRender';
 import { sizeOf } from './photoSize';
@@ -179,7 +180,12 @@ async function preparePhoto(
    * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
    * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
    */
-  const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
+  const print = await renderPrintBlob(
+    original,
+    size,
+    item.value.crop ?? DEFAULT_CROP,
+    item.value.adjust ?? DEFAULT_ADJUST,
+  );
   const files: Planned[] = [];
 
   if (print) {

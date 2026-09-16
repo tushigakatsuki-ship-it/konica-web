@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice, vatPortion } from '../lib/price';
+import { DEFAULT_ADJUST, isDefaultAdjust, type Adjust } from '../lib/adjust';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
 import { orientSize, recommendedPixels, sizeOf } from '../lib/photoSize';
 import { MAX_PHOTOS_PER_ORDER } from '../lib/limits';
 import { useLang } from '../state/lang';
 import { useBasket } from '../state/basket';
-import CropStudio from './CropStudio';
+import PhotoStudio from './PhotoStudio';
 import { IconAlert, IconClose, IconImage, IconZoom } from './icons';
 import PrintPreview3D from './PrintPreview3D';
 
@@ -26,6 +27,8 @@ export interface EditorValue {
    * төлөв). `preview` нь ҮРГЭЛЖ энэ тайралтыг тусгасан байна.
    */
   crop?: Crop;
+  /** Эргүүлэх, гэрэлтүүлэг/контраст, шүүлтүүр. `preview` энийг ч тусгасан байна. */
+  adjust?: Adjust;
 }
 
 interface Props {
@@ -95,10 +98,18 @@ export default function PhotoEditor({
    * харуулна — хайрцаг хоосон байх тэр хэдэн зуун миллисекундэд ямар харьцаа
    * байх нь хамаагүй, харин хэмжээ нь нэг л удаа үсрэх нь дээр.
    */
-  const frameOf = (natural: { w: number; h: number } | null | undefined): string => {
+  const frameOf = (
+    natural: { w: number; h: number } | null | undefined,
+    adjust?: Adjust,
+  ): string => {
+    const rotate90 = adjust?.rotate === 90 || adjust?.rotate === 270;
     const oriented = orientSize(
       size,
-      natural ? { width: natural.w, height: natural.h } : null,
+      natural
+        ? rotate90
+          ? { width: natural.h, height: natural.w }
+          : { width: natural.w, height: natural.h }
+        : null,
     );
     return `${oriented.w} / ${oriented.h}`;
   };
@@ -146,7 +157,7 @@ export default function PhotoEditor({
    * харагдсаар байх бөгөөд хэвлэгдэх файл нь өөр болно. Хэрэглэгчийн итгэл
    * бүхэлдээ «харсан зүйл минь хэвлэгдэнэ» гэдэг дээр тогтдог.
    */
-  const applyCrop = async (crop: Crop) => {
+  const applyEdits = async (crop: Crop, adjust: Adjust) => {
     const target = cropping;
     setCropping(null);
     if (!target) return;
@@ -156,10 +167,10 @@ export default function PhotoEditor({
 
     setCropLoading(target.index);
     try {
-      const result = await renderPreview(photo.file, size, 640, crop);
+      const result = await renderPreview(photo.file, size, 640, crop, adjust);
       setPhotos((list) =>
         list.map((item, i) =>
-          i === target.index ? { ...item, crop, preview: result.preview } : item,
+          i === target.index ? { ...item, crop, adjust, preview: result.preview } : item,
         ),
       );
     } catch {
@@ -224,6 +235,7 @@ export default function PhotoEditor({
           preview: result.preview,
           natural: result.natural,
           crop: DEFAULT_CROP,
+          adjust: DEFAULT_ADJUST,
         });
       } catch {
         if (seq !== pickSeq.current) return;
@@ -341,7 +353,7 @@ export default function PhotoEditor({
                 болж, хэрэглэгч буруу тайралт харна.
               */}
               <div
-                style={{ aspectRatio: frameOf(single?.natural) }}
+                style={{ aspectRatio: frameOf(single?.natural, single?.adjust) }}
                 className="relative w-full overflow-hidden rounded-md bg-brand-50"
               >
                 {single?.preview ? (
@@ -371,7 +383,8 @@ export default function PhotoEditor({
                       <IconZoom className="size-3.5" />
                       {cropLoading === 0 ? t('editor.loading') : t('crop.short')}
                     </span>
-                    {!isDefaultCrop(single.crop ?? DEFAULT_CROP) && (
+                    {(!isDefaultCrop(single.crop ?? DEFAULT_CROP) ||
+                      !isDefaultAdjust(single.adjust ?? DEFAULT_ADJUST)) && (
                       <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-on-accent">
                         {t('crop.edited')}
                       </span>
@@ -435,7 +448,7 @@ export default function PhotoEditor({
                       onClick={() => void openCrop(index)}
                       disabled={cropLoading !== null || loading}
                       aria-label={t('crop.openNth', { n: index + 1 })}
-                      style={{ aspectRatio: frameOf(photo.natural) }}
+                      style={{ aspectRatio: frameOf(photo.natural, photo.adjust) }}
                       className="relative block w-full overflow-hidden rounded-md bg-brand-50"
                     >
                       {photo.preview && (
@@ -454,7 +467,8 @@ export default function PhotoEditor({
                           {t('editor.loading')}
                         </span>
                       )}
-                      {!isDefaultCrop(photo.crop ?? DEFAULT_CROP) && (
+                      {(!isDefaultCrop(photo.crop ?? DEFAULT_CROP) ||
+                        !isDefaultAdjust(photo.adjust ?? DEFAULT_ADJUST)) && (
                         <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-on-accent">
                           {t('crop.edited')}
                         </span>
@@ -695,12 +709,13 @@ export default function PhotoEditor({
         * шууд үргэлжлүүлнэ.
         */}
       {cropping && (
-        <CropStudio
+        <PhotoStudio
           source={cropping.source}
           size={size}
           initial={photos[cropping.index]?.crop ?? DEFAULT_CROP}
+          initialAdjust={photos[cropping.index]?.adjust ?? DEFAULT_ADJUST}
           onCancel={() => setCropping(null)}
-          onApply={(crop) => void applyCrop(crop)}
+          onApply={(crop, adjust) => void applyEdits(crop, adjust)}
         />
       )}
     </div>,

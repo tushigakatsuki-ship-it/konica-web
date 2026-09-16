@@ -14,6 +14,7 @@
  *     илгээхэд эх `File`-аас дахин задална. Санах ойд том зураг үлдэхгүй.
  */
 
+import { DEFAULT_ADJUST, cssFilterFor, type Adjust } from './adjust';
 import { DEFAULT_CROP, placeCover, type Crop } from './crop';
 import { PRINT_DPI, orientSize, type PhotoSize } from './photoSize';
 
@@ -66,6 +67,7 @@ const drawCover = (
   size: PhotoSize,
   outW: number,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): HTMLCanvasElement | null => {
   const outH = Math.max(1, Math.round(outW * (size.h / size.w)));
 
@@ -81,8 +83,29 @@ const drawCover = (
   ctx.fillRect(0, 0, outW, outH);
   ctx.imageSmoothingQuality = 'high';
 
-  const at = placeCover(source, { width: outW, height: outH }, crop);
-  ctx.drawImage(source, at.x, at.y, at.width, at.height);
+  /*
+   * Эргүүлсэн үед `placeCover`-т СОЛИСОН хэмжээ өгнө — тэр функц өөрчлөгдөхгүй,
+   * зөвхөн оролт нь эргүүлсний дараах бодит харагдах хэмжээг илэрхийлнэ.
+   * Дараа нь `at`-ийн ТӨВД нь эх зургийг (СОЛИГДООГҮЙ хэмжээгээр) зурж,
+   * canvas-ийн трансформоор эргүүлнэ — ингэснээр байрлалын цорын ганц эх
+   * сурвалж (`placeCover`) хэвээр үлдэнэ.
+   */
+  const rotate90 = adjust.rotate === 90 || adjust.rotate === 270;
+  const effectiveSource = rotate90 ? { width: source.height, height: source.width } : source;
+  const at = placeCover(effectiveSource, { width: outW, height: outH }, crop);
+
+  const filter = cssFilterFor(adjust);
+  ctx.save();
+  if (filter) ctx.filter = filter;
+
+  const cx = at.x + at.width / 2;
+  const cy = at.y + at.height / 2;
+  const drawW = rotate90 ? at.height : at.width;
+  const drawH = rotate90 ? at.width : at.height;
+  ctx.translate(cx, cy);
+  if (adjust.rotate !== 0) ctx.rotate((adjust.rotate * Math.PI) / 180);
+  ctx.drawImage(source, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.restore();
 
   return canvas;
 };
@@ -106,15 +129,24 @@ export async function renderPreview(
   paper: PhotoSize,
   maxWidth = 640,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): Promise<PreviewResult> {
   const decoded = await decodeImage(blob);
   try {
     const natural = { w: decoded.source.width, h: decoded.source.height };
-    // Хэвлэх файлтай ИЖИЛ дүрмээр эргүүлнэ — эс тэгвээс дэлгэц худал хэлнэ.
-    const size = orientSize(paper, decoded.source);
+    /*
+     * Хэвлэх файлтай ИЖИЛ дүрмээр эргүүлнэ — эс тэгвээс дэлгэц худал хэлнэ.
+     * Хэрэглэгч 90°-аар эргүүлсэн бол цаасны чиглэлийг ЭРГҮҮЛСЭН ХАРАГДАХ
+     * хэмжээгээр сонгоно, эх файлын түүхий чиглэлээр биш.
+     */
+    const rotate90 = adjust.rotate === 90 || adjust.rotate === 270;
+    const effectiveNatural = rotate90
+      ? { width: decoded.source.height, height: decoded.source.width }
+      : decoded.source;
+    const size = orientSize(paper, effectiveNatural);
     const outW = Math.min(maxWidth, Math.max(160, natural.w || maxWidth));
     const preview =
-      drawCover(decoded.source, size, outW, crop)?.toDataURL('image/jpeg', 0.82) ?? '';
+      drawCover(decoded.source, size, outW, crop, adjust)?.toDataURL('image/jpeg', 0.82) ?? '';
     return { preview, natural };
   } finally {
     decoded.close();
@@ -170,6 +202,7 @@ export async function renderPrintBlob(
   blob: Blob,
   paper: PhotoSize,
   crop: Crop = DEFAULT_CROP,
+  adjust: Adjust = DEFAULT_ADJUST,
 ): Promise<Blob | null> {
   const decoded = await decodeImage(blob);
   try {
@@ -178,9 +211,14 @@ export async function renderPrintBlob(
      *
      * `renderPreview` ч мөн адил хийдэг тул хэрэглэгчийн дэлгэц дээр харсан
      * хүрээ хэвлэгдэх файлтай яг таарна. Хоёрын нэгэнд нь мартвал дэлгэц
-     * дээр бүтэн харагдаад, хэвлэхэд тал нь тасарна.
+     * дээр бүтэн харагдаад, хэвлэхэд тал нь тасарна. 90°-аар эргүүлсэн бол
+     * ЭРГҮҮЛСЭН ХАРАГДАХ хэмжээгээр (`effectiveNatural`) сонгоно.
      */
-    const size = orientSize(paper, decoded.source);
+    const rotate90 = adjust.rotate === 90 || adjust.rotate === 270;
+    const effectiveNatural = rotate90
+      ? { width: decoded.source.height, height: decoded.source.width }
+      : { width: decoded.source.width, height: decoded.source.height };
+    const size = orientSize(paper, effectiveNatural);
 
     const target = Math.round((size.w / 2.54) * PRINT_DPI);
     const floor = Math.round((size.w / 2.54) * MIN_DPI);
@@ -190,15 +228,17 @@ export async function renderPrintBlob(
      * Ойртуулсан бол харагдах хэсэг нь `zoom` дахин жижиг болно: 2× ойртуулбал
      * эх зургийн талыг л ашиглах тул боломжит нягтрал ч хоёр дахин буурна.
      * Үүнийг тооцохгүй бол canvas дутуу мэдээллийг хиймлээр сунгаж, файл
-     * томорсон ч чанар нэмэгдэхгүй.
+     * томорсон ч чанар нэмэгдэхгүй. `effectiveNatural`-г ашигладаг шалтгаан:
+     * 90°-аар эргүүлсэн үед өргөн/өндөр СОЛИГДСОН тул тооцоо буруу тэнхлэгээр
+     * хийгдэж, нягтралын доод хязгаар алдаатай гарахаас сэргийлнэ.
      */
     const available = Math.round(
-      Math.min(decoded.source.width, decoded.source.height * (size.w / size.h)) /
+      Math.min(effectiveNatural.width, effectiveNatural.height * (size.w / size.h)) /
         Math.max(1, crop.zoom),
     );
     const outW = Math.max(floor, Math.min(target, available || target));
 
-    const canvas = drawCover(decoded.source, size, outW, crop);
+    const canvas = drawCover(decoded.source, size, outW, crop, adjust);
     if (!canvas) return null;
 
     /*

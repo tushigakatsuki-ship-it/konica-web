@@ -121,11 +121,11 @@ test('ЭХ файл болон хэвлэх файл ХОЁУЛАА илгээг
   assert.ok(code.includes('blob: original,'), 'эх файлын оронд өөр зүйл');
 });
 
-test('хэрэглэгчийн тайралт хэвлэх файлд дамжина', () => {
+test('хэрэглэгчийн тайралт, тохируулга хэвлэх файлд дамжина', () => {
   assert.match(
     code,
-    /renderPrintBlob\(original, size, item\.value\.crop \?\? DEFAULT_CROP\)/,
-    'тайралт алдагдаж байна',
+    /renderPrintBlob\(\s*original,\s*size,\s*item\.value\.crop \?\? DEFAULT_CROP,\s*item\.value\.adjust \?\? DEFAULT_ADJUST,?\s*\)/,
+    'тайралт эсвэл тохируулга алдагдаж байна',
   );
 });
 

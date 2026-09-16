@@ -319,7 +319,32 @@ export const STRINGS = {
   'crop.reset': { mn: 'Буцаах', en: 'Reset' },
   'crop.cancel': { mn: 'Болих', en: 'Cancel' },
   'crop.apply': { mn: 'Болсон', en: 'Done' },
-  'crop.edited': { mn: 'Тайрсан', en: 'Cropped' },
+  'crop.edited': { mn: 'Засварласан', en: 'Edited' },
+
+  // ── Тохируулах студи: эргүүлэх, гэрэлтүүлэг, шүүлтүүр ────────────
+  'studio.tabCrop': { mn: 'Тайрах', en: 'Crop' },
+  'studio.tabRotate': { mn: 'Эргүүлэх', en: 'Rotate' },
+  'studio.tabAdjust': { mn: 'Тохируулга', en: 'Adjust' },
+  'studio.tabFilters': { mn: 'Шүүлтүүр', en: 'Filters' },
+  'studio.rotateLeft': { mn: 'Зүүн тийш 90° эргүүлэх', en: 'Rotate 90° left' },
+  'studio.rotateRight': { mn: 'Баруун тийш 90° эргүүлэх', en: 'Rotate 90° right' },
+  'studio.rotateHint': {
+    mn: 'Хажуу тийш авагдсан зургийг босоо болгоно.',
+    en: 'Straighten a sideways photo.',
+  },
+  'studio.brightness': { mn: 'Гэрэлтүүлэг', en: 'Brightness' },
+  'studio.contrast': { mn: 'Контраст', en: 'Contrast' },
+  'studio.autoEnhance': { mn: 'Автомат сайжруулах', en: 'Auto-enhance' },
+  'studio.autoEnhanceApplied': {
+    mn: 'Тохируулав — доороос нарийвчилж болно',
+    en: 'Adjusted for you — fine-tune below',
+  },
+  'filter.none': { mn: 'Анхных', en: 'None' },
+  'filter.bw': { mn: 'Хар цагаан', en: 'B&W' },
+  'filter.warm': { mn: 'Дулаан', en: 'Warm' },
+  'filter.cool': { mn: 'Хүйтэн', en: 'Cool' },
+  'filter.vivid': { mn: 'Тод', en: 'Vivid' },
+
   'editor.recommended': { mn: 'Санал болгох нягтрал', en: 'Recommended resolution' },
   'editor.recommendedShort': { mn: 'Санал болгох нягтрал: {n}', en: 'Recommended resolution: {n}' },
   'editor.sizeLabel': { mn: 'Хэмжээ', en: 'Size' },
