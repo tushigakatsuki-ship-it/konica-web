@@ -106,6 +106,10 @@ export const STRINGS = {
     mn: 'Хэмжээ бүрийн үнэ шууд харагдана. Хэмжээ дээрээ дараад зургаа оруулж, хэдэн ширхэг хэвлэхээ л сонгоно.',
     en: 'Every price is shown up front. Tap a size, add your photo and choose how many prints you need.',
   },
+  'print.sampleNote': {
+    mn: 'Жишээ зураг — захиалахдаа өөрийн зургаа сонгоно, ижилхэн зураг хэвлэгдэхгүй.',
+    en: 'Sample photo only — you upload your own picture when you order.',
+  },
   'print.categories': { mn: 'Үйлчилгээний төрөл', en: 'Service categories' },
   'print.allCategories': { mn: 'Бүх төрөл', en: 'All categories' },
   'print.categoriesHint': {
@@ -311,6 +315,9 @@ export const STRINGS = {
     mn: '{n} дэх зургийг томоор харах ба тайрах',
     en: 'View and crop photo {n}',
   },
+  'crop.orientation': { mn: 'Чиглэл', en: 'Orientation' },
+  'crop.landscape': { mn: 'Хэвтээ', en: 'Landscape' },
+  'crop.portrait': { mn: 'Босоо', en: 'Portrait' },
   'crop.zoom': { mn: 'Томруулах', en: 'Zoom' },
   'crop.hint': {
     mn: 'Хуруугаараа чирж байрлуулна. Хоёр хуруугаар эсвэл гулсуураар томруулна.',

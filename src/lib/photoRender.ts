@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_CROP, placeCover, type Crop } from './crop';
-import { PRINT_DPI, orientSize, type PhotoSize } from './photoSize';
+import { PRINT_DPI, orientSize, type OrientationChoice, type PhotoSize } from './photoSize';
 
 /** `ImageBitmap` ба `HTMLImageElement` хоёулаа энэ хэлбэрт тохирно. */
 type Source = CanvasImageSource & { width: number; height: number };
@@ -106,12 +106,13 @@ export async function renderPreview(
   paper: PhotoSize,
   maxWidth = 640,
   crop: Crop = DEFAULT_CROP,
+  orientation?: OrientationChoice | null,
 ): Promise<PreviewResult> {
   const decoded = await decodeImage(blob);
   try {
     const natural = { w: decoded.source.width, h: decoded.source.height };
     // Хэвлэх файлтай ИЖИЛ дүрмээр эргүүлнэ — эс тэгвээс дэлгэц худал хэлнэ.
-    const size = orientSize(paper, decoded.source);
+    const size = orientSize(paper, decoded.source, orientation);
     const outW = Math.min(maxWidth, Math.max(160, natural.w || maxWidth));
     const preview =
       drawCover(decoded.source, size, outW, crop)?.toDataURL('image/jpeg', 0.82) ?? '';
@@ -170,6 +171,7 @@ export async function renderPrintBlob(
   blob: Blob,
   paper: PhotoSize,
   crop: Crop = DEFAULT_CROP,
+  orientation?: OrientationChoice | null,
 ): Promise<Blob | null> {
   const decoded = await decodeImage(blob);
   try {
@@ -179,8 +181,11 @@ export async function renderPrintBlob(
      * `renderPreview` ч мөн адил хийдэг тул хэрэглэгчийн дэлгэц дээр харсан
      * хүрээ хэвлэгдэх файлтай яг таарна. Хоёрын нэгэнд нь мартвал дэлгэц
      * дээр бүтэн харагдаад, хэвлэхэд тал нь тасарна.
+     *
+     * `orientation` нь хэрэглэгчийн ГАРААР сонгосон чиглэл байвал автомат
+     * таамаглалыг давхина — `CropStudio`-д сонгосон утга ЯГ энд ирнэ.
      */
-    const size = orientSize(paper, decoded.source);
+    const size = orientSize(paper, decoded.source, orientation);
 
     const target = Math.round((size.w / 2.54) * PRINT_DPI);
     const floor = Math.round((size.w / 2.54) * MIN_DPI);

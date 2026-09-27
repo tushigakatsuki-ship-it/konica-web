@@ -179,7 +179,12 @@ async function preparePhoto(
    * тохируулсан зураг нь хэвлэхдээ автомат төв тайралтаар буцаж очих бөгөөд
    * хэрэглэгч зөвхөн бэлэн хэвлэсний дараа л мэдэх болно.
    */
-  const print = await renderPrintBlob(original, size, item.value.crop ?? DEFAULT_CROP);
+  const print = await renderPrintBlob(
+    original,
+    size,
+    item.value.crop ?? DEFAULT_CROP,
+    item.value.orientation,
+  );
   const files: Planned[] = [];
 
   if (print) {

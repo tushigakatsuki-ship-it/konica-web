@@ -145,6 +145,20 @@ export const IconCrop = (props: IconProps) => (
   </Base>
 );
 
+/** Хэвтээ тэгш өнцөгт — «хэвтээ» чиглэл сонгох товчинд. */
+export const IconLandscape = (props: IconProps) => (
+  <Base {...props}>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+  </Base>
+);
+
+/** Босоо тэгш өнцөгт — «босоо» чиглэл сонгох товчинд. */
+export const IconPortrait = (props: IconProps) => (
+  <Base {...props}>
+    <rect x="6" y="2" width="12" height="20" rx="2" />
+  </Base>
+);
+
 export const IconRuler = (props: IconProps) => (
   <Base {...props}>
     <path d="M21.3 15.3 8.7 2.7a1 1 0 0 0-1.4 0L2.7 7.3a1 1 0 0 0 0 1.4l12.6 12.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4Z" />

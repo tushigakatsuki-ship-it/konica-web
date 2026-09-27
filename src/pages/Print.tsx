@@ -530,6 +530,31 @@ export default function Print() {
               </div>
             )}
 
+            {/*
+              * Жишээ зураг — ЗӨВХӨН ЭНД, торны ДЭЭР нэг л удаа.
+              *
+              * Өмнө нь энэ зургийг хэмжээ БҮРИЙН картан дээр (9 удаа)
+              * давхарлаж харуулдаг байсан. Зураг өөрөө өнгөлөг, том
+              * ваотермарктай тул 9 удаа давхарлахад тор "эреэн", нүдэнд
+              * дуулиантай харагддаг байв. Одоо ГАНЦ жишээг энд харуулаад,
+              * доорх картууд зөвхөн хэмжээ/үнэ + бэлгэдлийн дүрстэй үлдэнэ
+              * (доош хар).
+              */}
+            {PHOTO_TABS.includes(tab as ServiceCategory) && !washImageFailed && (
+              <div className="mb-4 flex items-center gap-3 rounded-lg border border-hairline bg-white p-3">
+                <img
+                  src="/category/ugaalt-poster.jpg"
+                  alt=""
+                  decoding="async"
+                  onError={() => setWashImageFailed(true)}
+                  className="size-14 shrink-0 rounded-md object-cover sm:size-16"
+                />
+                <p className="text-xs leading-relaxed text-muted">
+                  {t('print.sampleNote')}
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               {services.map((service) => {
                 /*
@@ -594,56 +619,20 @@ export default function Print() {
                     {/* Хэмжээтэй бол цаасны харьцааг зурна; үгүй бол зай эзлэхгүй. */}
                     {size && (
                       /*
-                        ⚠️ Хайрцаг нь БҮХ картад ИЖИЛ хэмжээтэй.
-                        Урьд нь `fitBox`-оор хэмжээ тус бүрийн харьцаагаар
-                        зурдаг байсан тул 6×9 нарийхан, 60×40 өргөн гарч,
-                        тор жигд бус харагддаг байв. Одоо зөвхөн ЗУРАГ л
-                        харагдана — харьцааг доорх шошго хэлнэ.
+                        ⚠️ Хайрцаг нь БҮХ картад ИЖИЛ хэмжээтэй (aspect-[6/5]).
+                        Урьд нь энд ЖИШЭЭ ЗУРГИЙГ (ugaalt-poster.jpg) карт
+                        БҮРТ давтдаг байсан — 9 хэмжээ, 9 давхар ижил өнгөлөг
+                        зураг тул тор "эреэн", нүдэнд хэтэрхий дуулиантай
+                        харагддаг байв. Ганц жишээг одоо эдгээр картуудын
+                        ДЭЭР, торны эхэнд нэг л удаа харуулна (дээш хар) —
+                        эндхийн хайрцаг зөвхөн бэлгэдлийн дүрстэй, нам гүм
+                        хэвээрээ.
                       */
                       <span
                         aria-hidden
-                        /* Цаасыг төлөөлнө — харанхуй горимд ч цагаан хэвээр. */
-                        className="block aspect-[6/5] w-full overflow-hidden rounded-md border-2 border-brand-400 bg-white"
+                        className="grid aspect-[6/5] w-full place-items-center overflow-hidden rounded-md border-2 border-brand-400 bg-brand-50"
                       >
-                        {/*
-                          * Жишээ зураг — цагаан хайрцгийг БҮТНЭЭР дүүргэнэ.
-                          *
-                          * Хайрцгийн харьцаа (`6/5`) нь зургийнхтай (480×400)
-                          * бараг ижил тул хажуугаар нь хоосон зурвас гарахгүй.
-                          * Гэхдээ багтаалт нь `object-contain` дээр тулгуурлана
-                          * — зургаа солиход харьцаа зөрсөн ч постер БҮТНЭЭРЭЭ
-                          * харагдсаар байна, зөвхөн жаахан зурвас нэмэгдэнэ.
-                          *
-                          * ⚠️ Файлын нэр `ugaalt-poster.jpg` — `ugaalt-thumb`
-                          * БИШ. Хөгжүүлэлтийн явцад тэр нэрээр ТАЙРСАН
-                          * хувилбарууд дарагдаж байсан тул хэрэглэгчийн хөтөч
-                          * хуучин тайралтыг кэшнээсээ өгдөг байв. Агуулга нь
-                          * үндсээрээ өөрчлөгдсөн зурагт ШИНЭ нэр өгөх нь тэр
-                          * ангийн алдааг бүрмөсөн таслана.
-                          *
-                          * Файл дутуу бол зөвхөн цагаан цаас үлдэнэ — карт
-                          * эвдрэхгүй.
-                          */}
-                        {PHOTO_TABS.includes(tab as ServiceCategory) &&
-                          !washImageFailed && (
-                            <img
-                              src="/category/ugaalt-poster.jpg"
-                              alt=""
-                              decoding="async"
-                              onError={() => setWashImageFailed(true)}
-                              /*
-                               * ⚠️ `object-contain` — `object-cover` БИШ.
-                               *
-                               * `cover` нь хайрцгийг дүүргэхийн тулд ЗААВАЛ
-                               * тайрдаг: хайрцаг (1.2051) ба зураг (1.2000)
-                               * хоёрын харьцаа өчүүхэн ч зөрвөл ирмэгээс
-                               * хаздаг. `contain` нь зургийг БҮТНЭЭР багтаана —
-                               * харьцаа хэрхэн ч зөрсөн нэг ч пиксел
-                               * тайрагдахгүй.
-                               */
-                              className="size-full object-contain"
-                            />
-                          )}
+                        <IconImage className="size-6 text-brand-300 sm:size-7" />
                       </span>
                     )}
 

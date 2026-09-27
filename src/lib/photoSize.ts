@@ -87,19 +87,54 @@ export const sizeOf = (name: string): PhotoSize =>
  *
  * Дөрвөлжин зураг (`w === h`) юу ч өөрчлөхгүй — эргүүлэх утгагүй.
  */
+/**
+ * Хэрэглэгчийн ГАРААР сонгосон чиглэл — автомат тохиргоог давхих.
+ *
+ * `null`/`undefined` бол доорх автомат зан төлөв хэвээр (зургийн чиглэлээр).
+ */
+export type OrientationChoice = 'landscape' | 'portrait';
+
 export const orientSize = (
   size: PhotoSize,
   source: { width: number; height: number } | null | undefined,
+  override?: OrientationChoice | null,
 ): PhotoSize => {
-  if (!source || !source.width || !source.height) return size;
+  /*
+   * ⚠️ Автомат таамаглалаас ӨМНӨ шалгана — override өгөгдсөн бол зургийг
+   * огт харахгүй ч шийдэл гарна («Зураг сонгохоос өмнө хүрээгээ мэдэх»
+   * тохиолдолд хэрэгтэй, доор `CropStudio` үзнэ үү).
+   */
+  let sourceIsWide: boolean;
+  if (override) {
+    sourceIsWide = override === 'landscape';
+  } else {
+    if (!source || !source.width || !source.height) return size;
+    if (source.width === source.height) return size;
+    sourceIsWide = source.width > source.height;
+  }
 
-  const sourceIsWide = source.width > source.height;
   const paperIsWide = size.w > size.h;
 
-  if (source.width === source.height) return size;
   if (sourceIsWide === paperIsWide) return size;
 
   return { w: size.h, h: size.w, label: size.label };
+};
+
+/**
+ * `orientSize`-ийн үр дүнгээс ЗӨВХӨН чиглэлийг («landscape»/«portrait»)
+ * гаргаж авна.
+ *
+ * `CropStudio`-г нээхэд анхны товч аль нь идэвхтэй байхыг мэдэхэд хэрэглэнэ —
+ * хэрэглэгч өмнө нь гараар сонгосон бол ТЭР утга, үгүй бол зургийн жинхэнэ
+ * чиглэлээр автоматаар таамагласан утга.
+ */
+export const orientationOf = (
+  size: PhotoSize,
+  source: { width: number; height: number } | null | undefined,
+  override?: OrientationChoice | null,
+): OrientationChoice => {
+  const oriented = orientSize(size, source, override);
+  return oriented.w >= oriented.h ? 'landscape' : 'portrait';
 };
 
 /** Хэвлэлийн стандарт нягтрал. */

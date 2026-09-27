@@ -9,17 +9,23 @@ import {
   placeCover,
   type Crop,
 } from '../lib/crop';
-import type { PhotoSize } from '../lib/photoSize';
+import { orientSize, type OrientationChoice, type PhotoSize } from '../lib/photoSize';
 import { useLang } from '../state/lang';
-import { IconClose } from './icons';
+import { IconClose, IconLandscape, IconPortrait } from './icons';
 
 interface Props {
   /** ТАЙРААГҮЙ зургийн data URL (`renderSource`-оос). */
   source: string;
+  /** Каталогийн ТҮҮХЭН хэмжээ — эргүүлээгүй. Чиглэлийг доор `orientation` шийднэ. */
   size: PhotoSize;
   initial: Crop;
+  /**
+   * Одоо идэвхтэй чиглэл — дуудаж буй тал (`PhotoEditor`) автоматаар
+   * таамагласан эсвэл хэрэглэгчийн өмнө сонгосон утгыг дамжуулна.
+   */
+  initialOrientation: OrientationChoice;
   onCancel(): void;
-  onApply(crop: Crop): void;
+  onApply(crop: Crop, orientation: OrientationChoice): void;
 }
 
 /**
@@ -42,12 +48,40 @@ interface Props {
  * ашигладаг. Хоёр газар тусад нь томьёо бичих нь «харсан зүйл хэвлэгдсэнээсээ
  * зөрөх» алдааг зайлшгүй төрүүлдэг.
  */
-export default function CropStudio({ source, size, initial, onCancel, onApply }: Props) {
+export default function CropStudio({
+  source,
+  size,
+  initial,
+  initialOrientation,
+  onCancel,
+  onApply,
+}: Props) {
   const { t } = useLang();
 
   const [crop, setCrop] = useState<Crop>(() => normalizeCrop(initial));
+  const [orientation, setOrientation] = useState<OrientationChoice>(initialOrientation);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
+
+  /**
+   * Дөрвөлжин цаасанд («10×10» гэх мэт) хэвтээ/босоо ялгаагүй — товч харуулах
+   * шаардлагагүй.
+   */
+  const canOrient = size.w !== size.h;
+
+  /**
+   * Бодит хэмжээ — ТУХАЙН чиглэлээр эргүүлсэн.
+   *
+   * `orientSize`-д `override`-ыг ЗААВАЛ дамжуулна: эндхийн `size` нь каталогийн
+   * түүхэн (эргүүлээгүй) утга тул `source`-гүйгээр дуудвал ямар ч өөрчлөлтгүй
+   * буцна. Хайрцгийн харьцаа ЗӨВХӨН `orientation`-оор шийдэгдэнэ — зургийн
+   * жинхэнэ чиглэл огт хамаагүй, учир нь хэрэглэгч аль хэдийн (автоматаар
+   * эсвэл гараар) сонгож дууссан байгаа.
+   */
+  const effectiveSize = useMemo(
+    () => (canOrient ? orientSize(size, null, orientation) : size),
+    [canOrient, orientation, size],
+  );
 
   /** Боломжит талбай. Хүрээ нь энэ дотор багтах хамгийн том зөв харьцаат хэсэг. */
   const stageRef = useRef<HTMLDivElement>(null);
@@ -83,7 +117,7 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
       const box = stage.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) return;
 
-      const ratio = size.w / size.h;
+      const ratio = effectiveSize.w / effectiveSize.h;
       const width = Math.min(box.width, box.height * ratio);
       setFrame({ width, height: width / ratio });
     };
@@ -92,7 +126,7 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
     const observer = new ResizeObserver(measure);
     observer.observe(stage);
     return () => observer.disconnect();
-  }, [size.h, size.w]);
+  }, [effectiveSize.h, effectiveSize.w]);
 
   /* Escape — хаах. Дэвсгэрийн гүйлтийг түгжинэ. */
   useEffect(() => {
@@ -270,6 +304,52 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto max-w-[min(88vw,26rem)]">
+          {/*
+            * Чиглэл сонгох — ХЭВТЭЭ/БОСОО.
+            *
+            * Өмнө нь энэ бүрмөсөн автомат байсан: цаасыг зургийн чиглэлээр
+            * (`orientSize`) эргүүлдэг байв. Гэвч зарим зураг хоёр чиглэлд
+            * аль алинд нь «зөв» харагддаг (жишээ нь дөрвөлжинд ойрхон
+            * зохиомж) тул хэрэглэгч өөрөө сонгох боломжийг нэмэв. Хайрцгийн
+            * харьцаа дор нь шууд өөрчлөгдөнө — тайрсан хэсэг хэвлэгдэх
+            * файлтай яг таарсан хэвээр байна.
+            */}
+          {canOrient && (
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs font-semibold text-white/70">
+                {t('crop.orientation')}
+              </span>
+              <div className="ml-auto inline-flex overflow-hidden rounded-md border border-white/25">
+                <button
+                  type="button"
+                  onClick={() => setOrientation('portrait')}
+                  aria-pressed={orientation === 'portrait'}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                    orientation === 'portrait'
+                      ? 'bg-white text-ink'
+                      : 'text-white/80 hover:bg-white/10'
+                  }`}
+                >
+                  <IconPortrait className="size-3.5" />
+                  {t('crop.portrait')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrientation('landscape')}
+                  aria-pressed={orientation === 'landscape'}
+                  className={`flex items-center gap-1.5 border-l border-white/25 px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                    orientation === 'landscape'
+                      ? 'bg-white text-ink'
+                      : 'text-white/80 hover:bg-white/10'
+                  }`}
+                >
+                  <IconLandscape className="size-3.5" />
+                  {t('crop.landscape')}
+                </button>
+              </div>
+            </div>
+          )}
+
           <label className="flex items-center gap-3">
             <span className="text-xs font-semibold text-white/70">{t('crop.zoom')}</span>
             <input
@@ -301,7 +381,7 @@ export default function CropStudio({ source, size, initial, onCancel, onApply }:
             </button>
             <button
               type="button"
-              onClick={() => onApply(crop)}
+              onClick={() => onApply(crop, orientation)}
               className="btn-accent flex-1"
             >
               {t('crop.apply')}

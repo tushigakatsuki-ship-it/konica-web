@@ -4,7 +4,13 @@ import type { ServiceItem } from '../data/catalog';
 import { formatCurrency, parsePrice, vatPortion } from '../lib/price';
 import { DEFAULT_CROP, isDefaultCrop, type Crop } from '../lib/crop';
 import { renderPreview, renderSource } from '../lib/photoRender';
-import { orientSize, recommendedPixels, sizeOf } from '../lib/photoSize';
+import {
+  orientSize,
+  orientationOf,
+  recommendedPixels,
+  sizeOf,
+  type OrientationChoice,
+} from '../lib/photoSize';
 import { MAX_PHOTOS_PER_ORDER } from '../lib/limits';
 import { useLang } from '../state/lang';
 import { useBasket } from '../state/basket';
@@ -26,6 +32,14 @@ export interface EditorValue {
    * төлөв). `preview` нь ҮРГЭЛЖ энэ тайралтыг тусгасан байна.
    */
   crop?: Crop;
+  /**
+   * Хэрэглэгчийн ГАРААР сонгосон хэвтээ/босоо чиглэл.
+   *
+   * Байхгүй бол зургийн жинхэнэ чиглэлээр автоматаар шийднэ (хуучин зан
+   * төлөв) — `lib/photoSize.ts`-ийн `orientSize`-г үз. `preview` нь ҮРГЭЛЖ
+   * энэ чиглэлийг тусгасан байна.
+   */
+  orientation?: OrientationChoice;
 }
 
 interface Props {
@@ -95,10 +109,14 @@ export default function PhotoEditor({
    * харуулна — хайрцаг хоосон байх тэр хэдэн зуун миллисекундэд ямар харьцаа
    * байх нь хамаагүй, харин хэмжээ нь нэг л удаа үсрэх нь дээр.
    */
-  const frameOf = (natural: { w: number; h: number } | null | undefined): string => {
+  const frameOf = (
+    natural: { w: number; h: number } | null | undefined,
+    orientation?: OrientationChoice,
+  ): string => {
     const oriented = orientSize(
       size,
       natural ? { width: natural.w, height: natural.h } : null,
+      orientation,
     );
     return `${oriented.w} / ${oriented.h}`;
   };
@@ -146,7 +164,7 @@ export default function PhotoEditor({
    * харагдсаар байх бөгөөд хэвлэгдэх файл нь өөр болно. Хэрэглэгчийн итгэл
    * бүхэлдээ «харсан зүйл минь хэвлэгдэнэ» гэдэг дээр тогтдог.
    */
-  const applyCrop = async (crop: Crop) => {
+  const applyCrop = async (crop: Crop, orientation: OrientationChoice) => {
     const target = cropping;
     setCropping(null);
     if (!target) return;
@@ -156,10 +174,10 @@ export default function PhotoEditor({
 
     setCropLoading(target.index);
     try {
-      const result = await renderPreview(photo.file, size, 640, crop);
+      const result = await renderPreview(photo.file, size, 640, crop, orientation);
       setPhotos((list) =>
         list.map((item, i) =>
-          i === target.index ? { ...item, crop, preview: result.preview } : item,
+          i === target.index ? { ...item, crop, orientation, preview: result.preview } : item,
         ),
       );
     } catch {
@@ -341,7 +359,7 @@ export default function PhotoEditor({
                 болж, хэрэглэгч буруу тайралт харна.
               */}
               <div
-                style={{ aspectRatio: frameOf(single?.natural) }}
+                style={{ aspectRatio: frameOf(single?.natural, single?.orientation) }}
                 className="relative w-full overflow-hidden rounded-md bg-brand-50"
               >
                 {single?.preview ? (
@@ -435,7 +453,7 @@ export default function PhotoEditor({
                       onClick={() => void openCrop(index)}
                       disabled={cropLoading !== null || loading}
                       aria-label={t('crop.openNth', { n: index + 1 })}
-                      style={{ aspectRatio: frameOf(photo.natural) }}
+                      style={{ aspectRatio: frameOf(photo.natural, photo.orientation) }}
                       className="relative block w-full overflow-hidden rounded-md bg-brand-50"
                     >
                       {photo.preview && (
@@ -699,8 +717,20 @@ export default function PhotoEditor({
           source={cropping.source}
           size={size}
           initial={photos[cropping.index]?.crop ?? DEFAULT_CROP}
+          initialOrientation={
+            photos[cropping.index]?.orientation ??
+            orientationOf(
+              size,
+              photos[cropping.index]?.natural
+                ? {
+                    width: photos[cropping.index]!.natural!.w,
+                    height: photos[cropping.index]!.natural!.h,
+                  }
+                : null,
+            )
+          }
           onCancel={() => setCropping(null)}
-          onApply={(crop) => void applyCrop(crop)}
+          onApply={(crop, orientation) => void applyCrop(crop, orientation)}
         />
       )}
     </div>,
