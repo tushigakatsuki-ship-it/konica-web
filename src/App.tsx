@@ -17,6 +17,9 @@ const Print = lazy(() => import('./pages/Print'));
 const Order = lazy(() => import('./pages/Order'));
 const OrderStatus = lazy(() => import('./pages/OrderStatus'));
 const IdPhoto = lazy(() => import('./pages/IdPhoto'));
+const Medal = lazy(() => import('./pages/Medal'));
+const Stock = lazy(() => import('./pages/Stock'));
+const StockDetail = lazy(() => import('./pages/StockDetail'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /** Хуудас солигдох агшинд харагдах — байрлалаа барьж, үсрэлт үүсгэхгүй. */
@@ -74,6 +77,9 @@ export default function App() {
                 {/* Хуучин линк — шинэ хэвлэлийн хуудас руу шилжүүлнэ. */}
                 <Route path="zurag-ugaalt" element={<Navigate to="/hevlel" replace />} />
                 <Route path="tseej-zurag" element={<IdPhoto />} />
+                <Route path="medal" element={<Medal />} />
+                <Route path="baraa" element={<Stock />} />
+                <Route path="baraa/:id" element={<StockDetail />} />
                 {/* Ажилтны хэрэгсэл — бүрэн офлайн, захиалгын мэдээлэлгүй. */}
                 <Route path="*" element={<NotFound />} />
               </Route>

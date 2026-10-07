@@ -17,6 +17,20 @@ export interface IncomingLine {
   qty: number;
   /** Зөвхөн тохиролцооны категорид хүчинтэй; бусад тохиолдолд үл хэрэгсэнэ. */
   unitPrice?: number;
+  /**
+   * Мөрийн тайлбар — медалийн загвар, сийлэх бичвэр гэх мэт.
+   *
+   * ── Яагаад ХЭРЭГЛЭГЧИЙН тайлбараас тусдаа вэ ─────────────────
+   *
+   * Захиалгын тайлбар нь БҮХ захиалгад нэг. Нэг хүн хоёр өөр медаль
+   * захиалбал («алтлаг, ТЭРГҮҮН БАЙР» ба «мөнгөлөг, ДЭД БАЙР») тэдгээр
+   * нь нэг талбарт хольцолдож, ажилтан алийг нь аль мөрөнд оруулахаа
+   * мэдэхгүй болно.
+   *
+   * ⚠️ Энэ утга нь ТЕКСТ л байна — үнэд нөлөөлөхгүй. Клиентээс ирсэн
+   * зүйл үнэ тогтоох эрхгүй гэдэг зарчим хэвээр.
+   */
+  spec?: string;
 }
 
 export interface IncomingOrder {
@@ -95,6 +109,8 @@ export interface PricedLine {
   unitPrice: number;
   qty: number;
   total: number;
+  /** Мөрийн тайлбар — байхгүй бол огт тавихгүй (Firebase-д хоосон түлхүүр үлдээхгүй). */
+  spec?: string;
 }
 
 export interface BuiltOrder {
@@ -156,6 +172,9 @@ const byId = new Map(SERVICES.map((s) => [s.id, s]));
 
 const isInt = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+
+/** Мөрийн тайлбарын дээд урт — Telegram мэдэгдлийг тасрахаас хамгаална. */
+export const MAX_SPEC = 200;
 
 const clean = (value: unknown, max: number): string =>
   typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -363,7 +382,21 @@ export function buildOrder(
       }
     }
 
-    return { id: service.id, name: service.name, unitPrice, qty, total: unitPrice * qty };
+    /*
+     * Тайлбарыг ЦЭВЭРЛЭЖ, УРТЫГ хязгаарлана. Клиентээс ирсэн текст нь
+     * Telegram-ийн мэдэгдэлд ордог тул хязгааргүй бол мэдэгдэл тасарч,
+     * ажилтан захиалгыг харахгүй өнгөрөх эрсдэлтэй.
+     */
+    const spec = clean((raw as IncomingLine).spec, MAX_SPEC);
+
+    return {
+      id: service.id,
+      name: service.name,
+      unitPrice,
+      qty,
+      total: unitPrice * qty,
+      ...(spec === '' ? {} : { spec }),
+    };
   });
 
   const vat = body.vat === true;
@@ -507,7 +540,13 @@ export const alertText = (
   phone: string,
   email = '',
 ): string => {
-  const jobs = built.lines.map((l) => `• ${l.name} × ${l.qty}`).join('\n');
+  /*
+   * Мөрийн тайлбарыг ЗААВАЛ оруулна. Медалийн загвар, сийлэх бичвэргүйгээр
+   * ажилтан «Медаль төмөр × 10» гэснээс юу хийхээ мэдэхгүй.
+   */
+  const jobs = built.lines
+    .map((l) => `• ${l.name} × ${l.qty}${l.spec ? `\n   ↳ ${l.spec}` : ''}`)
+    .join('\n');
   return (
     `🌐 <b>Вэбээс шинэ захиалга!</b> ${built.orderNumber}\n` +
     `${jobs}\n` +

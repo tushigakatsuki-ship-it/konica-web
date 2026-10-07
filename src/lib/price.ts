@@ -21,6 +21,33 @@ export const formatNumber = (value: number): string =>
 /** `8500` → `8,500₮` */
 export const formatCurrency = (value: number): string => `${formatNumber(value)}₮`;
 
+/**
+ * Тоо ширхэгээс хамаарах үнийн шатлал.
+ *
+ * ── Яагаад каталогийн МӨР солигддог вэ ──────────────────────────
+ *
+ * Каталогт олны хямдралыг тусдаа мөрөөр бичдэг («Медаль шилэн (10
+ * дотор)» 2,500₮ ба «Медаль шилэн олон» 1,500₮). Хямдралыг хувиар
+ * бодох биш, ЗӨВ МӨРИЙГ сонгох нь зөв: ажилтны каталог, вэбийн үнэ
+ * хоёр үргэлж яг ижил үлдэнэ.
+ */
+export interface PriceTier {
+  /** Үндсэн каталогийн мөр. */
+  serviceId: number;
+  /** Олноор захиалахад хямдарсан мөр. */
+  bulk?: { serviceId: number; from: number };
+}
+
+/**
+ * Тухайн тоо ширхэгт харгалзах каталогийн мөрийн `id`.
+ *
+ * ⚠️ Хямдралыг АВТОМАТААР хэрэглэнэ. «11-ээс дээш бол хямд» гэж бичээд
+ * өөрөө бодохгүй байх нь худал үнэ харуулахтай адил — хэрэглэгч үнийг
+ * хараад буцна.
+ */
+export const serviceIdFor = (tier: PriceTier, qty: number): number =>
+  tier.bulk && qty >= tier.bulk.from ? tier.bulk.serviceId : tier.serviceId;
+
 /** НӨАТ-тай нийт дүн. */
 export const withVat = (value: number): number => Math.round(value * (1 + VAT_RATE));
 

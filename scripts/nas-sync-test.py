@@ -96,7 +96,15 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 
 dest = tempfile.mkdtemp(prefix="nas-e2e-")
 env = {**os.environ, "KONICA_API_BASE": base, "KONICA_ADMIN_TOKEN": TOKEN, "KONICA_DEST": dest}
-SCRIPT = "/home/claude/konica-web/scripts/nas-sync.py"
+# ⚠️ ЗАМЫГ ХАТУУ БИЧИХГҮЙ.
+#
+# Урьд нь энд `/home/claude/konica-web/scripts/nas-sync.py` гэж бичсэн
+# байв. Тэр хавтас зөвхөн нэг хөгжүүлэгчийн машин дээр байсан тул
+# `npm run test:py` — улмаар `npm run verify` — бусад хаана ч ажиллахгүй
+# байлаа: скрипт олдохгүй, бүх шалгалт «код 2»-оор унана.
+#
+# Өөрийнхөө хажуугаас олно — хаанаас дуудсанаас үл хамаарна.
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nas-sync.py")
 run = lambda *args: subprocess.run([sys.executable, SCRIPT, *args], env=env,
                                    capture_output=True, text=True)
 

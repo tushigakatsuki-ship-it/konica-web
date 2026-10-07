@@ -111,6 +111,14 @@ export const IconClose = (props: IconProps) => (
   </Base>
 );
 
+/** Хуулах — хоёр давхарласан хуудас. */
+export const IconCopy = (props: IconProps) => (
+  <Base {...props}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Base>
+);
+
 export const IconMenu = (props: IconProps) => (
   <Base {...props}>
     <path d="M3 6h18M3 12h18M3 18h18" />

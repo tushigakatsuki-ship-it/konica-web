@@ -10,6 +10,9 @@ import {
   type IncomingOrder,
 } from '../api/_shared';
 import { isOrderNumber } from '../api/_files';
+import { SERVICES } from '../src/data/catalog';
+import { CUSTOM_PRICE_CATEGORIES } from '../src/lib/order';
+import { parsePrice } from '../src/lib/price';
 
 /**
  * 2026-08-06 14:05 Улаанбаатар.
@@ -28,10 +31,36 @@ const customer = {
   address: 'ХУД 11-р хороо, 120 мянгат, 45-р байр, 2 орц, 42 тоот',
 };
 
-/** 103 = 'Зураг угаалт 10*15' → 500₮ (тогтмол үнэтэй) */
+/** 103 = 'Зураг угаалт 10*15' — тогтмол үнэтэй. */
 const ORDINARY = 103;
-/** 707 = 'Цом' → 5,000₮, категори нь 'Медаль & Цом' (тохиролцоотой) */
-const CUSTOM = 707;
+/**
+ * Тохиролцооны үнэтэй мөр — каталогоос ОЛЖ авна.
+ *
+ * ⚠️ Урьд нь энд `707` («Цом») гэж хатуу бичсэн байв. «Медаль & Цом»-ыг
+ * тохиролцооны жагсаалтаас хассан үед энэ тест хуурамчаар унасан:
+ * сервер зөв ажиллаж байтал тест нь хуучин БИЗНЕСИЙН шийдвэрийг барьж
+ * байсан хэрэг. Жагсаалтаас гаргаж авбал дахин давтагдахгүй.
+ */
+const CUSTOM = (() => {
+  const found = SERVICES.find((s) => CUSTOM_PRICE_CATEGORIES.includes(s.category));
+  if (!found) throw new Error('тохиролцооны үнэтэй үйлчилгээ каталогт алга');
+  return found.id;
+})();
+
+/**
+ * Үнийг КАТАЛОГООС уншина, гараар бичихгүй.
+ *
+ * ⚠️ Эхний хувилбар `500` гэж шууд бичсэн байсан. Дэлгүүр үнээ 700₮ болгож
+ * өөрчлөхөд дөрвөн тест зэрэг унаж, build зогссон — код нь зөв ажиллаж
+ * байсан атал.
+ *
+ * Бизнесийн үнэ бол ӨГӨГДӨЛ, гэрээ биш. Тест нь «каталогийн үнээр
+ * бодогдож байна уу» гэдгийг л шалгах ёстой; тэр үнэ нь хэд болохыг биш.
+ */
+const priceOf = (id: number) =>
+  parsePrice(SERVICES.find((s) => s.id === id)?.price);
+
+const ORDINARY_PRICE = priceOf(ORDINARY);
 
 const order = (over: Partial<IncomingOrder> = {}): IncomingOrder => ({
   customer,
@@ -43,17 +72,20 @@ const order = (over: Partial<IncomingOrder> = {}): IncomingOrder => ({
 
 test('энгийн захиалгын дүн каталогийн үнээр бодогдоно', () => {
   const built = buildOrder(order(), NOW, 0.5);
-  assert.equal(built.base, 1000); // 500₮ × 2
-  assert.equal(built.total, 1000);
+  assert.equal(built.base, ORDINARY_PRICE * 2);
+  assert.equal(built.total, ORDINARY_PRICE * 2);
   assert.equal(built.lines[0]?.name, 'Зураг угаалт 10*15');
 });
 
 test('НӨАТ ба хүргэлт зөв нэмэгдэнэ', () => {
   const built = buildOrder(order({ delivery: true, vat: true }), NOW, 0.5);
-  assert.equal(built.base, 1000);
+  const base = ORDINARY_PRICE * 2;
+
+  assert.equal(built.base, base);
   assert.equal(built.deliveryFee, 5000);
-  assert.equal(built.tax, 600); // (1000 + 5000) × 10%
-  assert.equal(built.total, 6600);
+  // НӨАТ нь суурь + хүргэлтийн НИЙЛБЭР дээр тооцогдоно.
+  assert.equal(built.tax, Math.round((base + 5000) * 0.1));
+  assert.equal(built.total, base + 5000 + Math.round((base + 5000) * 0.1));
 });
 
 test('хүргэлт сонгосон атал хаяггүй бол ТАТГАЛЗАНА', () => {
@@ -197,9 +229,9 @@ test('клиентийн явуулсан үнийг тогтмол үнэтэй
     NOW,
     0.5,
   );
-  // Хэрэв клиентэд итгэвэл 500₮-ийн ажлыг 1₮-өөр захиалж болно.
-  assert.equal(built.lines[0]?.unitPrice, 500);
-  assert.equal(built.total, 500);
+  // Хэрэв клиентэд итгэвэл каталогийн үнэтэй ажлыг 1₮-өөр захиалж болно.
+  assert.equal(built.lines[0]?.unitPrice, ORDINARY_PRICE);
+  assert.equal(built.total, ORDINARY_PRICE);
 });
 
 test('тохиролцооны категорид клиентийн үнийг хүлээж авна', () => {
@@ -545,4 +577,27 @@ test('цагийн хэлбэр нь аппын HH:mm-тэй таарна', () =
   const log = Object.values(built.worklogs)[0];
   assert.match(log?.receivedTime ?? '', /^\d{2}:\d{2}$/, 'доогуур зураас биш, цэг');
   assert.ok(!(log?.receivedTime ?? '').includes('_'));
+});
+
+test('МЕДАЛИЙН үнийг клиент дарж чадахгүй', () => {
+  /*
+   * ⚠️ Урьд нь «Медаль & Цом» нь `CUSTOM_PRICE_CATEGORIES` дотор байв.
+   * Тэр жагсаалтад орсон категорийн үнийг сервер КЛИЕНТЭЭС хүлээж авдаг
+   * тул хүсэлтээ засаад 100 медалийг 0₮-өөр захиалах боломжтой байсан —
+   * QPay-ийн нэхэмжлэх нь серверийн тооцоолсон дүнгээр үүсдэг тул
+   * төлбөр нь ч 0₮ болно.
+   *
+   * Медалийн бүх мөр каталогт тогтсон үнэтэй тул тохирох зүйл байхгүй.
+   */
+  assert.ok(
+    !CUSTOM_PRICE_CATEGORIES.includes('Медаль & Цом'),
+    'медаль тохиролцооны жагсаалтад буцаж орсон',
+  );
+
+  const medal = SERVICES.find((s) => s.category === 'Медаль & Цом');
+  assert.ok(medal, 'медалийн үйлчилгээ алга');
+
+  const built = buildOrder(order({ lines: [{ id: medal.id, qty: 100, unitPrice: 0 }] }), NOW, 0.5);
+  assert.equal(built.lines[0]?.unitPrice, parsePrice(medal.price), 'клиентийн үнэ нэвтэрлээ');
+  assert.ok(built.total > 0, 'медалийн захиалга 0₮-өөр бичигдэв');
 });

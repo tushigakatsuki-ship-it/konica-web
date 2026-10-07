@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { SERVICES } from '../src/data/catalog';
+import { parsePrice } from '../src/lib/price';
 
 /**
  * `/api/order` handler-ийг бүтэн замаар нь шалгана: хуурамч Firebase сервер
@@ -39,6 +41,9 @@ const post = (body: unknown): Request =>
     },
     body: JSON.stringify(body),
   });
+
+/** Каталогийн үнийг гараар бичихгүй — дэлгүүр үнээ солиход тест унах ёсгүй. */
+const ORDINARY_PRICE = parsePrice(SERVICES.find((s) => s.id === 103)?.price);
 
 const validBody = {
   customer: { name: 'Батболд', phone: '99001234', email: '', note: 'Яаралтай' },
@@ -94,7 +99,8 @@ test('амжилттай захиалга 201 буцааж, дугаар өгн�
 
   assert.equal(response.status, 201);
   assert.match(body.orderNumber, /^PMN-\d{6}-\d{5}$/);
-  assert.equal(body.total, 1000); // 500₮ × 2
+  // Үнийг каталогоос уншина — гараар бичвэл үнэ солиход тест унана.
+  assert.equal(body.total, ORDINARY_PRICE * 2);
 });
 
 test('Firebase рүү нэг атомик multi-path PATCH явна', async () => {

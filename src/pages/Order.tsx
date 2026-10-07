@@ -7,6 +7,7 @@ import {
   addLine,
   lineFromService,
   lineTotal,
+  needsPhoto,
   subtotal,
   type CustomerInfo,
   type FieldErrors,
@@ -157,7 +158,8 @@ export default function Order({ variant = 'page', onClose, onEdit }: OrderProps 
   const lines = useMemo(
     () =>
       basket.items.reduce<OrderLine[]>(
-        (acc, item) => addLine(acc, lineFromService(item.service, item.value.qty)),
+        (acc, item) =>
+          addLine(acc, lineFromService(item.service, item.value.qty, item.value.note)),
         [],
       ),
     [basket.items],
@@ -201,8 +203,13 @@ export default function Order({ variant = 'page', onClose, onEdit }: OrderProps 
      * Сүүлчийн хамгаалалт: зураггүй мөр сагсанд орох ёсгүй (`PhotoEditor` үүнийг
      * хаадаг). Хэрэв ямар нэг замаар орсон бол илгээхийн оронд буцаана —
      * ажилтанд хэвлэх юмгүй ажлын мөр очихоос сэргийлнэ.
+     *
+     * ⚠️ БҮХ мөрөөс зураг шаардаж болохгүй. Медалийн голын зураг нь
+     * сонголтоор бөгөөд `Medal.tsx` нь `file: null` илгээдэг — шалгалтыг
+     * ялгалгүй тавьсан үед медалийн захиалга НЭГ Ч УДАА илгээгддэггүй
+     * байв. `needsPhoto` нь аль категорид зураг заавал хэрэгтэйг шийднэ.
      */
-    if (basket.items.some((item) => !item.value.file)) {
+    if (basket.items.some((item) => needsPhoto(item.service) && !item.value.file)) {
       found.lines = 'Зураггүй мөр байна. Түүнийг хасах эсвэл зураг нэмнэ үү.';
     }
 

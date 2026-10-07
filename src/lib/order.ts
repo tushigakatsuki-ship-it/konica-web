@@ -1,14 +1,45 @@
 import type { ServiceCategory, ServiceItem } from '../data/catalog';
 import { parsePrice } from './price';
 
-/** Тогтсон үнэгүй, тохиролцоогоор явдаг категориуд — config.ts дахьтай ижил. */
-export const CUSTOM_PRICE_CATEGORIES: readonly ServiceCategory[] = [
-  'Медаль & Цом',
-  'Хувцас хэвлэл',
-];
+/**
+ * Тогтсон үнэгүй, тохиролцоогоор явдаг категориуд.
+ *
+ * ⚠️ Энэ жагсаалтад орсон категорийн үнийг КЛИЕНТ тогтооно: сервер нь
+ * каталогийн үнийг орхиж, хүсэлтэд ирсэн `unitPrice`-ыг хүлээж авна
+ * (`api/_shared.ts`). Тиймээс энд зөвхөн каталогт ҮНЭГҮЙ мөртэй,
+ * ажилтан биечлэн тохирдог ажил байна.
+ *
+ * ⚠️ «Медаль & Цом» ХАСАГДСАН. Медалийн бүх мөр каталогт тогтсон үнэтэй
+ * (төмөр 1,200₮, шилэн 2,500/1,500₮, цом 5,000₮) тул тохиролцох зүйл
+ * байхгүй. Жагсаалтад үлдээх нь засварласан хүсэлтээр 100 ширхэг
+ * медалийг 0₮-өөр захиалах боломж нээж байв — QPay-ийн нэхэмжлэх нь
+ * серверийн тооцоолсон дүнгээр үүсдэг тул төлбөр нь ч 0₮ болно.
+ */
+export const CUSTOM_PRICE_CATEGORIES: readonly ServiceCategory[] = ['Хувцас хэвлэл'];
 
 export const isCustomPrice = (category: ServiceCategory): boolean =>
   CUSTOM_PRICE_CATEGORIES.includes(category);
+
+/**
+ * Зураг ЗААВАЛ шаардахгүй категориуд.
+ *
+ * ── Яагаад хэрэгтэй вэ ──────────────────────────────────────────
+ *
+ * Захиалга илгээхийн өмнө «зураггүй мөр байна уу» гэж шалгадаг. Тэр
+ * шалгалт нь зөв: хэвлэх зурагт зураг хэрэгтэй, зураггүй мөр ажилтанд
+ * очвол хийх юмгүй ажил болно.
+ *
+ * ⚠️ Гэвч медаль нь ӨӨР. Голын зураг нь СОНГОЛТООР: зөвхөн бичээстэй
+ * медаль нийтлэг бөгөөд сийлбэрийн эхийг ажилтан бэлддэг тул `Medal.tsx`
+ * нь `file: null` илгээдэг. Бүх мөрөөс зураг шаардвал медалийн захиалга
+ * НЭГ Ч УДАА илгээгдэхгүй: хэрэглэгч бүгдийг бөглөөд, «Зураггүй мөр
+ * байна» гэсэн мессежтэй тулгарах бөгөөд засах арга нь ч байхгүй.
+ */
+export const PHOTO_OPTIONAL: readonly ServiceCategory[] = ['Медаль & Цом'];
+
+/** Тухайн үйлчилгээнд зураг заавал хэрэгтэй эсэх. */
+export const needsPhoto = (service: ServiceItem): boolean =>
+  !PHOTO_OPTIONAL.includes(service.category);
 
 export interface OrderLine {
   id: number;
@@ -17,14 +48,25 @@ export interface OrderLine {
   /** Нэгжийн үнэ төгрөгөөр. Тохиролцооны зүйлд хэрэглэгч өөрчилж болно. */
   unitPrice: number;
   qty: number;
+  /**
+   * Мөрийн тайлбар — медалийн загвар, сийлэх бичвэр гэх мэт.
+   *
+   * ⚠️ Энэ нь мөрийн ӨВӨРМӨЦ БАЙДЛЫГ тодорхойлно (`addLine`-ыг үз).
+   */
+  spec?: string;
 }
 
-export const lineFromService = (service: ServiceItem, qty = 1): OrderLine => ({
+export const lineFromService = (
+  service: ServiceItem,
+  qty = 1,
+  spec?: string,
+): OrderLine => ({
   id: service.id,
   name: service.name,
   category: service.category,
   unitPrice: parsePrice(service.price),
   qty,
+  ...(spec === undefined || spec === '' ? {} : { spec }),
 });
 
 export const lineTotal = (line: OrderLine): number => line.unitPrice * line.qty;
@@ -32,14 +74,23 @@ export const lineTotal = (line: OrderLine): number => line.unitPrice * line.qty;
 export const subtotal = (lines: readonly OrderLine[]): number =>
   lines.reduce((sum, line) => sum + lineTotal(line), 0);
 
-/** Мөрийг нэмнэ; аль хэдийн байвал зөвхөн тоог нэмэгдүүлнэ. */
+/**
+ * Мөрийг нэмнэ; аль хэдийн байвал зөвхөн тоог нэмэгдүүлнэ.
+ *
+ * ⚠️ Нэгтгэх түлхүүр нь `id` + `spec` ХОЁУЛАА.
+ *
+ * Зөвхөн `id`-аар нэгтгэвэл ижил үйлчилгээний өөр тохируулгатай мөрүүд
+ * (жишээ нь «алтлаг медаль, ТЭРГҮҮН БАЙР» ба «алтлаг медаль, ДЭД БАЙР»)
+ * нэг мөр болж нийлээд, тайлбаруудын нэг нь ЧИМЭЭГҮЙ алга болно.
+ * Хэрэглэгч сагсандаа хоёр зүйл харсан атлаа ажилтанд нэг нь очно.
+ */
 export const addLine = (
   lines: readonly OrderLine[],
   next: OrderLine,
 ): OrderLine[] => {
-  const existing = lines.find((l) => l.id === next.id);
-  if (!existing) return [...lines, next];
-  return lines.map((l) => (l.id === next.id ? { ...l, qty: l.qty + next.qty } : l));
+  const same = (line: OrderLine) => line.id === next.id && line.spec === next.spec;
+  if (!lines.some(same)) return [...lines, next];
+  return lines.map((l) => (same(l) ? { ...l, qty: l.qty + next.qty } : l));
 };
 
 export const updateLine = (

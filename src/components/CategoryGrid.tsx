@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react';
+import { Link } from 'react-router-dom';
 import type { ServiceCategory } from '../data/catalog';
 import type { StringKey } from '../data/i18n';
 import { useTilt } from '../lib/useTilt';
@@ -90,6 +91,21 @@ const MERGED_INTO_WASH: readonly ServiceCategory[] = ['Засвар', 'Цээж 
  * эсэхээ шийдэхэд хэрэгтэй.
  */
 const READY: readonly ServiceCategory[] = ['Угаалт'];
+
+/**
+ * Түр зогссон ангиллууд — «Тун удахгүй».
+ *
+ * ⚠️ `READY`-ээс ХАСАХГҮЙ, тусад нь тэмдэглэнэ. Хасвал хавтан нь тороос
+ * бүрмөсөн алга болж, тор ХООСОН үлдэнэ (одоогоор цорын ганц бэлэн
+ * ангилал нь Угаалт). Хэрэглэгч буруу хуудсанд ирсэн гэж бодно.
+ *
+ * Идэвхгүй хавтан нь «энэ газар үүнийг хийдэг, гэхдээ одоо биш» гэдгийг
+ * хэлнэ — тэр мэдээлэл нь дэлгүүр рүү залгах эсэхээ шийдэхэд хэрэгтэй.
+ *
+ * ⚠️ `pages/Print.tsx` доторх `SOON` жагсаалттай ЗААВАЛ таарч байх ёстой.
+ * Зөрвөл нэг газар дарагдаж, нөгөөд нь дарагдахгүй болно.
+ */
+const PAUSED: readonly ServiceCategory[] = ['Угаалт'];
 
 /**
  * Тор дээр харагдах БЭЛЭН цонхнууд.
@@ -198,6 +214,73 @@ function Tile({
 }
 
 /**
+ * Түр зогссон ангилал — харагдана, гэхдээ дарагдахгүй.
+ *
+ * `<span>` ашиглаж байгаа шалтгаан нь `MoreTile`-тай ижил: идэвхгүй товч
+ * нь гар, дэлгэц уншигчид «энд товч байна, гэхдээ ажиллахгүй» гэж
+ * мэдэгдэж, табаар дамжихад саад болно.
+ */
+function PausedTile({ tile }: { tile: Omit<Tile, 'count'> }) {
+  const { t, tc } = useLang();
+
+  return (
+    <span aria-disabled="true" className={`${TILE_CLASS} cursor-default opacity-70`}>
+      <span aria-hidden className="glass-tile-sheen" />
+
+      <span className="relative grid size-10 place-items-center rounded-md bg-muted/15 text-muted">
+        <tile.Icon className="size-5" />
+      </span>
+
+      <span className="relative mt-3 block text-sm font-bold leading-snug text-ink-soft sm:text-base">
+        {tc(tile.key)}
+      </span>
+      <span className="relative mt-1 block text-[11px] leading-relaxed text-muted sm:text-xs">
+        {t(tile.hint)}
+      </span>
+
+      <span className="relative mt-auto block pt-3 text-[11px] font-bold">
+        <span className="rounded-md bg-accent/15 px-2 py-0.5 uppercase tracking-wider text-accent-strong">
+          {t('common.soon')}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Өөрийн ХУУДАСТАЙ бүтээгдэхүүн — медаль.
+ *
+ * Ангиллын таб биш, тусдаа урсгал руу ордог тул `onPick` биш `<Link>`.
+ * Медаль нь загвар сонгох, нумаар бичих гэсэн өөрийн алхамтай бөгөөд
+ * тэдгээр нь хэмжээ сонгох урсгалд багтахгүй.
+ */
+function MedalTile({ count }: { count: number }) {
+  const { t } = useLang();
+  const ref = useTilt<HTMLAnchorElement>();
+
+  return (
+    <Link ref={ref} to="/medal" className={TILE_CLASS}>
+      <span aria-hidden className="glass-tile-sheen" />
+
+      <span className="relative grid size-10 place-items-center rounded-md bg-brand-500/10 text-brand-500">
+        <IconAward className="size-5" />
+      </span>
+
+      <span className="relative mt-3 block text-sm font-bold leading-snug text-ink sm:text-base">
+        {t('nav.medal')}
+      </span>
+      <span className="relative mt-1 block text-[11px] leading-relaxed text-muted sm:text-xs">
+        {t('cat.medal')}
+      </span>
+
+      <span className="relative mt-auto block pt-3 text-[11px] font-bold text-brand-500">
+        {count} {t('print.itemCount')}
+      </span>
+    </Link>
+  );
+}
+
+/**
  * Бэлэн бус БҮХ ангиллыг нэгтгэсэн ганц хавтан.
  *
  * ⚠️ Урьд нь ангилал бүр өөрийн «Удахгүй» хавтантай байсан тул тор дээр
@@ -287,14 +370,37 @@ export default function CategoryGrid({ counts, onPick }: Props) {
         </p>
 
         <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {/*
+            Медаль нь ЭХЭНД — одоогоор онлайнаар бүрэн захиалагддаг цорын
+            ганц бүтээгдэхүүн. Түр зогссон хавтангийн ард тавибал хэрэглэгч
+            эхлээд ажиллахгүй зүйл дээр таарна.
+          */}
+          <li className="tile-3d tile-in">
+            <MedalTile count={counts['Медаль & Цом'] ?? 0} />
+          </li>
+
+          {/*
+            * ⚠️ Бараа материал энд БАЙХГҮЙ.
+            *
+            * Энэ тор нь ҮЙЛЧИЛГЭЭний төрлүүд — ажил хийгдэж байж бий
+            * болдог зүйлс. Бэлэн бараа нь худалдаа: хүлээх зүйл,
+            * зураг ч байхгүй. Хоёрыг нэг торонд хольвол хэрэглэгч
+            * аль нь захиалга, аль нь тавиур дээрх бараа болохыг
+            * ялгахаа болино. Нүүрний хоёр дахь товчоор орно.
+            */}
+
           {GRID_TILES.map((tile, index) => (
             <li
               key={tile.key}
               className="tile-3d tile-in"
               /* Ээлжлэн гарах зөрүү — эхнийх нь шууд, сүүлийнх нь 360ms-д. */
-              style={{ animationDelay: `${index * 40}ms` }}
+              style={{ animationDelay: `${(index + 1) * 40}ms` }}
             >
-              <Tile tile={tile} count={counts[tile.key] ?? 0} onPick={onPick} />
+              {PAUSED.includes(tile.key) ? (
+                <PausedTile tile={tile} />
+              ) : (
+                <Tile tile={tile} count={counts[tile.key] ?? 0} onPick={onPick} />
+              )}
             </li>
           ))}
 

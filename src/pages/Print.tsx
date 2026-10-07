@@ -44,6 +44,15 @@ const Order = lazy(() => import('./Order'));
 const QUICK_TABS: readonly ServiceCategory[] = ['Угаалт', 'Засвар', 'Цээж зураг'];
 
 /**
+ * Түр хаасан ангиллууд — «Тун удахгүй».
+ *
+ * ⚠️ Цэснээс ХАСАХГҮЙ, идэвхгүй болгоно. Хасвал тухайн үйлчилгээг
+ * зогсоосон гэж ойлгогдож, хайж ирсэн хүн өөр газар явна. Идэвхгүй
+ * товч нь «энэ газар үүнийг хийдэг, гэхдээ одоо биш» гэдгийг хэлнэ.
+ */
+const SOON: readonly ServiceCategory[] = ['Угаалт'];
+
+/**
  * Хэмжээний картан дээр ЖИШЭЭ ЗУРАГ харуулах ангиллууд.
  *
  * Гурвуулаа зурагтай ажилладаг тул «энэ хэмжээнд зураг яаж багтах вэ»
@@ -416,14 +425,22 @@ export default function Print() {
                   key={category}
                   type="button"
                   onClick={() => setTab(category)}
+                  disabled={SOON.includes(category)}
                   aria-current={category === tab ? 'true' : undefined}
                   className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    category === tab
-                      ? 'bg-brand-500 text-white'
-                      : 'bg-brand-50 text-ink-soft hover:bg-brand-100'
+                    SOON.includes(category)
+                      ? 'cursor-not-allowed bg-sunken text-muted'
+                      : category === tab
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-brand-50 text-ink-soft hover:bg-brand-100'
                   }`}
                 >
                   {tc(category)}
+                  {SOON.includes(category) && (
+                    <span className="ml-2 rounded-sm bg-accent/20 px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                      {t('common.soon')}
+                    </span>
+                  )}
                 </button>
               ),
             )}
@@ -448,11 +465,14 @@ export default function Print() {
           {/*
             * ── ТҮР НУУСАН ────────────────────────────────────────
             *
-            * `/tseej-zurag/avtomat` хуудас ХЭВЭЭР ажиллана: зам нь `App.tsx`
-            * дээр бүртгэлтэй тул ажилтан хаягаар нь шууд орно. Зөвхөн ЛИНК
-            * нь үйлчлүүлэгчийн хуудаснаас түр хасагдсан.
+            * ⚠️ Энд урьд нь «`/tseej-zurag/avtomat` хуудас ХЭВЭЭР
+            * ажиллана, зам нь `App.tsx` дээр бүртгэлтэй» гэж бичсэн
+            * байсан нь ХУДАЛ: тийм маршрут байхгүй, ажилтан тэр хаягаар
+            * орвол 404 хуудас гарна.
             *
-            * Буцааж нэмэхэд доорхийн тайлбарыг авахад хангалттай:
+            * Хэрэгсэл өөрөө ч алга — `CropStudio` нь `PhotoEditor`
+            * дотор амьдардаг. Тиймээс доорх линкийг буцааж нэмэхээс
+            * ӨМНӨ хуудас, маршрут хоёрыг эхлээд үүсгэнэ:
             *
             * <Link
             *   to="/tseej-zurag/avtomat"
@@ -507,10 +527,11 @@ export default function Print() {
               *
               * Одоогийн нөхцөлд хамгийн энгийн бөгөөд найдвартай шийдэл нь:
               * хэрэглэгч зүгээр л зургаа оруулна, ажилтан серверээс эх файлыг
-              * татаж аваад ӨӨРӨӨ бэлтгэнэ. Ажилтны автомат хэрэгсэл
-              * (`/tseej-zurag/avtomat`) хэвээр байгаа — тэнд нүүр илрүүлэлт
-              * эргэлзээтэй үед анхааруулга гардаг, хуудсанд олноор нь
-              * байрлуулж татдаг.
+              * татаж аваад ӨӨРӨӨ бэлтгэнэ.
+              *
+              * ⚠️ Урьд нь энд «ажилтны автомат хэрэгсэл
+              * (`/tseej-zurag/avtomat`) хэвээр байгаа» гэж бичсэн нь
+              * ХУДАЛ — тийм хуудас ч, маршрут ч байхгүй.
               */}
             {idPhoto && (
               <div className="mb-4 rounded-lg bg-brand-50 p-4">

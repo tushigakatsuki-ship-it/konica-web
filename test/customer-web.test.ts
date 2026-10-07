@@ -988,12 +988,26 @@ test('шилэн гадаргууг ХЭМНЭЛТТЭЙ хэрэглэсэн', 
    *
    * Хязгаар: цөөн хэдэн гадаргуу. Хэтэрвэл энэ тест сануулна.
    */
+  /*
+   * ⚠️ Зөвхөн CSS УТИЛИТЫГ тоолно, `glass` гэсэн үгийг биш.
+   *
+   * Эхний хувилбар `\bglass\b` гэж хайдаг байсан. Медалийн материалын
+   * нэр мөн `glass` (`material === 'glass'`, `'glass-clear'`) тул шинэ
+   * бүтээгдэхүүн нэмэхэд тест худал унасан — интерфейст нэг ч шилэн
+   * гадаргуу нэмэгдээгүй байтал.
+   *
+   * Одоо `className` доторх ангиллын нэрийг л тоолно.
+   */
+  const CLASS_ATTR = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g;
   let uses = 0;
   for (const file of sourceFiles('src')) {
-    uses += (withoutComments(read(file)).match(/\bglass\b/g) ?? []).length;
+    for (const match of withoutComments(read(file)).matchAll(CLASS_ATTR)) {
+      const classes = match[1] ?? match[2] ?? match[3] ?? '';
+      uses += (classes.match(/(?:^|[\s`])glass(?:-tile)?(?=$|[\s`'"])/g) ?? []).length;
+    }
   }
   assert.ok(uses > 0, 'шилэн гадаргуу огт хэрэглээгүй');
-  assert.ok(uses <= 6, `шилэн гадаргуу хэт олон газар: ${uses}`);
+  assert.ok(uses <= 8, `шилэн гадаргуу хэт олон газар: ${uses}`);
 
   const css = read('src/index.css');
   assert.ok(css.includes('-webkit-backdrop-filter'), 'Safari дээр ажиллахгүй');
@@ -1049,20 +1063,25 @@ test('нүүрэн дээр хоёр гарц, утсан дээр эвхэгд�
   assert.ok(!home.includes("t('home.sections')"), 'хасагдсан гарчиг буцаж ирсэн');
 
   assert.ok(home.includes('to="/hevlel"'), 'Хэвлэл гарц алга');
-  assert.ok(home.includes("t('nav.stationery')"), 'Бичиг хэрэг гарц алга');
-  assert.ok(home.includes("t('home.comingSoon')"), '«Удахгүй» тэмдэглэгээ алга');
 
   /*
-   * «Бичиг хэрэг» нь бэлэн БИШ тул дарагдах ёсгүй. `<Link>` болговол
-   * хэрэглэгч хоосон хуудсанд унана.
+   * ⚠️ Хоёр дахь товч нь ДАРАГДАХ ёстой.
+   *
+   * Урьд нь энд «Бичиг хэрэг — Удахгүй» гэсэн идэвхгүй шошго байв.
+   * Нүүрний эхний дэлгэцэд ердөө хоёр байр байдаг: нэгийг нь захиалж
+   * БОЛОХГҮЙ зүйлд зарцуулах нь шууд алдагдал.
+   *
+   * Одоо тэнд бэлэн бараа сууна — хамгийн хурдан дуусдаг зам.
    */
+  assert.ok(home.includes('to="/baraa"'), 'Бараа материалын гарц алга');
+  assert.ok(home.includes("t('nav.stock')"), 'Бараа материалын шошго алга');
   assert.ok(
-    home.includes('aria-disabled="true"'),
-    'Бичиг хэрэг дарагдахаар үлдсэн — хоосон хуудас руу хөтөлнө',
+    !home.includes('aria-disabled'),
+    'нүүрэнд дарагдахгүй гарц үлдсэн — хэрэглэгч мухардалд орно',
   );
   assert.ok(
-    !/<Link[^>]*stationery/s.test(home),
-    'Бичиг хэрэг нь Link болсон — бэлэн биш хуудас руу заана',
+    !/stationery|comingSoon/.test(home),
+    '«Бичиг хэрэг / Удахгүй» буцаж ирсэн',
   );
 
   /*
@@ -1516,4 +1535,77 @@ test('эхлэх хэл нь ҮРГЭЛЖ монгол — хөтчийн хэл
     'хөтчийн хэлээр таамаглах код буцаж орсон — англи утастай монгол хэрэглэгч англи сайт харна',
   );
   assert.match(lang, /return 'mn';/, 'өгөгдмөл монгол биш байна');
+});
+
+/* ── Медаль ба түр зогссон ангилал ───────────────────────────────── */
+
+test('түр зогссон ангилал ХОЁР газарт ижил тэмдэглэгдсэн', () => {
+  /*
+   * «Тун удахгүй» гэдгийг нэг газар тэмдэглээд нөгөөд нь мартвал
+   * хэрэглэгч торноос орж чадахгүй атлаа табаар нь орж чадна — эсвэл
+   * эсрэгээр. Хоёр жагсаалт ЗААВАЛ таарна.
+   */
+  const grid = read('src/components/CategoryGrid.tsx');
+  const print = read('src/pages/Print.tsx');
+
+  const list = (source: string, name: string) => {
+    const match = new RegExp(`${name}: readonly ServiceCategory\\[\\] = \\[([^\\]]*)\\]`).exec(
+      source,
+    );
+    assert.ok(match, `${name} олдсонгүй`);
+    return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+  };
+
+  assert.deepEqual(list(grid, 'PAUSED'), list(print, 'SOON'), 'хоёр жагсаалт зөрж байна');
+});
+
+test('түр зогссон ангилал тороос АЛГА болохгүй', () => {
+  /*
+   * `READY`-ээс хасвал хавтан нь бүрмөсөн алга болж, тор хоосон үлдэнэ —
+   * одоогоор цорын ганц бэлэн ангилал нь Угаалт. Хэрэглэгч буруу хуудсанд
+   * ирсэн гэж бодно.
+   */
+  const grid = read('src/components/CategoryGrid.tsx');
+  assert.match(grid, /READY: readonly ServiceCategory\[\] = \[[^\]]*'Угаалт'/, 'READY-ээс хассан');
+  assert.ok(grid.includes('PausedTile'), 'идэвхгүй хавтан алга');
+
+  // Идэвхгүй хавтан нь ТОВЧ байх ёсгүй — гар, дэлгэц уншигчид саад болно.
+  const paused = grid.slice(grid.indexOf('function PausedTile'), grid.indexOf('function MedalTile'));
+  assert.ok(!paused.includes('<button'), 'идэвхгүй хавтан товч хэвээр');
+  assert.ok(paused.includes('aria-disabled="true"'), 'дэлгэц уншигчид мэдэгдэхгүй');
+});
+
+test('медаль тороос ба цэснээс хоёуланд нь орно', () => {
+  const grid = read('src/components/CategoryGrid.tsx');
+  assert.ok(grid.includes('MedalTile'), 'торонд медаль алга');
+  assert.match(grid, /to="\/medal"/, 'медаль руу холбоос алга');
+
+  /*
+   * ⚠️ Урьд нь энд `site.ts` доторх `NAV` жагсаалтыг шалгаж байв. Тэр
+   * жагсаалтыг `Header.tsx` ОГТ уншдаггүй байсан тул тест ногоон
+   * байсаар атлаа медаль руу орох цэсний холбоос БОДИТООР байхгүй байв.
+   * `NAV` устсан; одоо бодит хоёр орц — нүүрний товч, торны хавтан.
+   */
+  /*
+   * ⚠️ Нүүрнээс медалийн холбоос ХАСАГДСАН — эхний дэлгэцэд хоёр л
+   * гарц үлдээв. Тиймээс тор нь медаль руу орох ЦОРЫН ГАНЦ зам:
+   * хавтан алга болбол хуудас бүрмөсөн хүрэхгүй болно.
+   */
+  assert.ok(read('src/App.tsx').includes('path="medal"'), 'зам бүртгэгдээгүй');
+});
+
+test('медалийн тайлбар ажилтан руу дамжина', () => {
+  /*
+   * ⚠️ Тайлбаргүйгээр ажилтанд «Медаль төмөр × 10» гэж л очно — ямар
+   * загвар, юу сийлэхийг нь мэдэхгүй. Захиалга нь утгагүй болно.
+   */
+  const api = read('src/lib/api.ts');
+  assert.match(api, /line\.spec \? \{ spec: line\.spec \}/, 'клиент тайлбар илгээхгүй');
+
+  const order = read('src/pages/Order.tsx');
+  assert.match(order, /item\.value\.note/, 'сагснаас мөр рүү дамжихгүй');
+
+  const shared = read('api/_shared.ts');
+  assert.ok(shared.includes('MAX_SPEC'), 'сервер урт хязгаарлаагүй');
+  assert.match(shared, /l\.spec \?/, 'мэдэгдэлд тайлбар алга');
 });

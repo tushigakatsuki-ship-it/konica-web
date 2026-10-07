@@ -131,6 +131,8 @@ export async function submitOrder(
         id: line.id,
         qty: line.qty,
         ...(isCustomPrice(line.category) ? { unitPrice: line.unitPrice } : {}),
+        // Тайлбар байхгүй бол түлхүүрийг огт илгээхгүй — сервер дээр хоосон мөр үүсгэхгүй.
+        ...(line.spec ? { spec: line.spec } : {}),
       })),
       delivery: options.delivery,
       vat: options.vat,

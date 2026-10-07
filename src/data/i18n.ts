@@ -40,10 +40,12 @@ type Entry = { mn: string; en: string };
 export const STRINGS = {
   /* ── Толгой, цэс ── */
   'nav.print': { mn: 'Хэвлэл', en: 'Printing' },
-  'nav.stationery': { mn: 'Бичиг хэрэг', en: 'Stationery' },
   'nav.idPhoto': { mn: 'Цээж зураг', en: 'ID photos' },
+  'nav.medal': { mn: 'Медаль', en: 'Medals' },
+  'nav.stock': { mn: 'Бараа материал', en: 'In stock' },
   'nav.contact': { mn: 'Холбоо барих', en: 'Contact' },
   'nav.menu': { mn: 'Цэс', en: 'Menu' },
+  'common.soon': { mn: 'Тун удахгүй', en: 'Coming soon' },
   'nav.close': { mn: 'Хаах', en: 'Close' },
   'nav.language': { mn: 'Хэл', en: 'Language' },
   'nav.callAria': { mn: 'руу залгах', en: 'call' },
@@ -63,12 +65,14 @@ export const STRINGS = {
   /*
    * ── Нүүр ──
    *
-   * «Юу хийлгэх вэ?» гарчиг, түүний тайлбар, хоёр картын текст бүгд
-   * хасагдсан: тэдгээр нь эхний дэлгэц дээрх товчтой ижил газар руу
-   * заадаг байсан тул давхардал байв. Үлдсэн нь зөвхөн «Удахгүй» —
-   * Бичиг хэрэг товчны шошго.
+   * Нүүрэнд өөрийн текст бараг үлдээгүй: эхний дэлгэцийн хоёр товч нь
+   * `nav.print`, `nav.medal` хоёрыг дахин ашигладаг.
+   *
+   * ⚠️ `nav.stationery`, `home.comingSoon` хоёр ХАСАГДСАН. Нүүрний хоёр
+   * дахь товч нь «Бичиг хэрэг — Удахгүй» гэсэн ИДЭВХГҮЙ шошго байсныг
+   * ажиллагаатай Медаль холбоос болгосон: нүүрний хамгийн үнэтэй хоёр
+   * байрны нэгийг захиалж болохгүй зүйлд зарцуулах нь алдагдал.
    */
-  'home.comingSoon': { mn: 'Удахгүй', en: 'Coming soon' },
 
   /* ── Нүүр — холбоо барих ── */
   'contact.title': { mn: 'Бидэнтэй холбоо барих', en: 'Get in touch' },

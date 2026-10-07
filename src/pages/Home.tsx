@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../state/lang';
 import LastOrderBanner from '../components/LastOrderBanner';
 import HeroSlideshow from '../components/HeroSlideshow';
-import { IconAward, IconPrinter } from '../components/icons';
+import { IconAward, IconPrinter, IconSparkle } from '../components/icons';
 import PromoVideo from '../components/PromoVideo';
 
 /**
@@ -15,7 +15,7 @@ import PromoVideo from '../components/PromoVideo';
  * байв. Хэрэглэгч нэг зүйлийг хоёр удаа хараад аль нь «жинхэнэ» нь вэ
  * гэж эргэлздэг — сонголт нэмэгдээгүй, зөвхөн гүйлт нэмэгдсэн.
  *
- * Одоо шийдвэр эхний дэлгэц дээрээ дуусна: Хэвлэл эсвэл Бичиг хэрэг.
+ * Одоо шийдвэр эхний дэлгэц дээрээ дуусна: Хэвлэл эсвэл Бараа материал.
  * Холбоо барих мэдээлэл хөлд бүтнээрээ байгаа тул давхардуулаагүй.
  */
 function Hero() {
@@ -77,25 +77,29 @@ function Hero() {
           </Link>
 
           {/*
-            * «Бичиг хэрэг» нь бэлэн БИШ.
+            * Бараа материал — хоёр дахь гарц.
             *
-            * `<Link>` биш `<span>`: дарагдвал хэрэглэгч хоосон хуудсанд
-            * унана. Нуухын оронд ил харуулж байгаа шалтгаан — үйлчлүүлэгч
-            * тэр бараа энд БАЙХ эсэхийг мэдэх нь дэлгүүр рүү залгах эсэхээ
-            * шийдэхэд хэрэгтэй.
+            * ⚠️ Урьд нь энд эхлээд «Бичиг хэрэг — Удахгүй» гэсэн
+            * ИДЭВХГҮЙ шошго, дараа нь Медаль байв. Эхний дэлгэцэд
+            * ердөө хоёр байр байдаг тул хамгийн ХУРДАН дуусдаг замыг
+            * тавина: бэлэн бараа нь зураг оруулах, загвар сонгох,
+            * хүлээх алхамгүй — тоогоо хэлээд авчихна.
             *
-            * Өнгө нь зориуд бүдэг: хажуугийнхаа амбер товчтой өрсөлдвөл
-            * хэрэглэгч эхлээд бэлэн БИШ зүйл рүү гараа сунгана.
+            * ⚠️ Медалийн холбоос нүүрнээс ХАСАГДСАН. Эхний дэлгэц
+            * дээр гурав дахь сонголт нэмэх бүрт эхний хоёрын жин
+            * буурдаг. Медаль руу `/hevlel` доторх ангиллын тороос
+            * орно — тэр ажлыг хийхээр ирсэн хүн хайж олно.
+            *
+            * Өнгө нь хажуугийнхаасаа зориуд намуухан: хоёр тод товч
+            * зэрэгцвэл аль нь ч анхаарал татахгүй.
             */}
-          <span
-            aria-disabled="true"
-            className="inline-flex w-full cursor-default items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-4 text-base font-bold text-white/75 backdrop-blur-sm sm:w-auto sm:px-8"
+          <Link
+            to="/baraa"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-4 text-base font-bold text-white backdrop-blur-sm transition-colors hover:bg-white/20 sm:w-auto sm:px-8"
           >
-            {t('nav.stationery')}
-            <span className="rounded-md bg-white/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white/90">
-              {t('home.comingSoon')}
-            </span>
-          </span>
+            <IconSparkle className="size-5" /> {t('nav.stock')}
+          </Link>
+
         </div>
 
         {/*
