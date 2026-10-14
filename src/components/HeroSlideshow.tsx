@@ -49,6 +49,22 @@ export default function HeroSlideshow() {
    */
   const [ready, setReady] = useState(false);
 
+  /**
+   * Эхний зургийн ойртолтыг асаах түлхүүр.
+   *
+   * ⚠️ Үүнгүй бол ЭХНИЙ зураг хөдөлдөггүй. CSS-ийн шилжилт нь утга
+   * ӨӨРЧЛӨГДӨХӨД л ажилладаг: эхний зурагдалтад `index === 0` тул React
+   * түүнийг шууд эцсийн хэмжээтэй нь буулгаж, шилжих зай үлдэхгүй.
+   *
+   * Нэг кадр хүлээгээд асаахад утга өөрчлөгдөж, ойртолт эхэлнэ. Хуудас
+   * нээх агшин бол хамгийн их харагддаг тул энэ нь чухал.
+   */
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   useEffect(() => {
     if (HERO_IMAGES.length < 2 || prefersReducedMotion()) return;
 
@@ -122,10 +138,50 @@ export default function HeroSlideshow() {
              */
             /*
              * Зураг нь ӨӨРИЙН ЖИНХЭНЭ ӨНГӨӨРӨӨ үлдэнэ — blend, filter байхгүй.
-             * Өнгө засах ажлыг доорх тонгоруулгын давхарга хийнэ.
+             * Доорх давхаргууд зөвхөн текстийн контраст өгнө.
              */
-            className="absolute inset-0 size-full object-cover object-[72%_center] transition-opacity duration-700 sm:object-[66%_center] lg:object-[60%_center] xl:object-center"
-            style={{ opacity: i === index ? 1 : 0 }}
+            className="absolute inset-0 size-full object-cover object-[72%_center] will-change-[opacity,transform] sm:object-[66%_center] lg:object-[60%_center] xl:object-center"
+            /*
+             * ── Ken Burns: удаан ойртолт ──────────────────────────────
+             *
+             * Урьд нь ердөө 700ms бүдгэрэлт байв: зураг солигдоод ЗОГСДОГ
+             * тул дэвсгэр нь хөдөлгөөнгүй зураг мэт мэдрэгддэг байлаа.
+             *
+             * Одоо идэвхтэй зураг 7 секундын турш 1 → 1.06 хүртэл ААЖИМ
+             * ойртоно. Солигдох мөчлөг 5 секунд тул ойртолт дуусахаас өмнө
+             * дараагийнх нь эхэлдэг — хөдөлгөөн ТАСРАЛТГҮЙ мэдрэгдэнэ.
+             *
+             * ⚠️ Чиглэл нь ээлжилнэ (тэгш дугаар ойртоно, сондгой нь
+             * холдоно). Бүгд нэг тийш хөдөлвөл дөрөв дэх зураг дээр хүн
+             * давталтыг нь анзаарч, хямд мэдрэмж төрүүлнэ.
+             *
+             * ⚠️ Идэвхгүй зураг дээр `transform`-ийн үргэлжлэл 0 — дараа
+             * нь эргэж ирэхэд ойртолт ЭХНЭЭСЭЭ эхлэх ёстой. Үүнгүй бол
+             * хоёр дахь удаагаасаа хөдөлгөөнгүй болно.
+             *
+             * `prefers-reduced-motion` үед `index.css`-ийн нэгдсэн дүрэм
+             * бүх үргэлжлэлийг 0.01ms болгодог тул зураг шууд эцсийн
+             * байрлалдаа суух бөгөөд энэ нь зүгээр л бага зэрэг ойрсон
+             * хөдөлгөөнгүй зураг — эвдрэхгүй.
+             */
+            style={{
+              opacity: i === index ? 1 : 0,
+              /*
+               * Тэгш дугаар ОЙРТОНО (1 → 1.06), сондгой нь ХОЛДОНО
+               * (1.06 → 1). `started` хүртэл бүгд эхлэлийн байрлалдаа.
+               */
+              transform:
+                i === index && started
+                  ? i % 2 === 0
+                    ? 'scale(1.06)'
+                    : 'scale(1)'
+                  : i % 2 === 0
+                    ? 'scale(1)'
+                    : 'scale(1.06)',
+              transitionProperty: 'opacity, transform',
+              transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1), linear',
+              transitionDuration: i === index ? '1100ms, 7000ms' : '1100ms, 0ms',
+            }}
           />
         ),
       )}
