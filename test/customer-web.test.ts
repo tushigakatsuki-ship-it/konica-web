@@ -390,9 +390,9 @@ test('дэвсгэр зураг солигдох нь хүртээмж, гүйц
    * Нүдээр шалгахад л мэдэгддэг тул тест нь энэ хамаарлыг барина.
    */
   if (/zIndex/.test(heroCode)) {
-    const layers = heroCode.match(/className="(?:hero-(?:tint|depth)|absolute)[^"]*"/g) ?? [];
+    const layers = heroCode.match(/className="(?:hero-\w+|absolute)[^"]*"/g) ?? [];
     const overlays = layers.filter(
-      (cls) => /hero-(?:tint|depth)/.test(cls) || /bg-gradient-to-[rt]/.test(cls),
+      (cls) => /hero-(?:tint|wash)/.test(cls) || /bg-gradient-to-[rt]/.test(cls),
     );
     assert.ok(
       overlays.length >= 4,
@@ -407,11 +407,33 @@ test('дэвсгэр зураг солигдох нь хүртээмж, гүйц
     }
   }
 
+  /*
+   * ⚠️ Гарчгийн ард ТОДОРХОЙ дэвсгэр байх ёстой — аль нэг аргаар.
+   *
+   * Урьд нь энэ тест «`from-ink` ≥ 60%» гэж шаарддаг байв. Тэр үед
+   * саармаг халхавч нь дэвсгэрийг тогтоодог цорын ганц юм байсан тул
+   * зөв байлаа.
+   *
+   * Гэвч `ink` бол бараан СААРМАГ: хэмжилтээр түүнээс болж зүүн тал
+   * #2b3c72 болж, брэндийн #4472e0-оос бараг хоёр дахин бараан байв.
+   * Одоо дэвсгэрийг `hero-wash` тогтоодог тул халхавч бараг хэрэггүй —
+   * хуучин шаардлага нь брэндийн өнгийг БУЦААЖ идэх байсан.
+   *
+   * Тиймээс шалгалт нь хоёрын аль нэгийг нэхнэ: хүчтэй халхавч, ЭСВЭЛ
+   * хүчтэй будаг. Хоёул сул бол гарчиг нүцгэн зураг дээр сууна.
+   */
   const scrim = heroCode.match(/from-ink\/(\d+)/);
-  assert.ok(scrim, 'текстийн контрастын халхавч алга — гарчиг уншигдахгүй болно');
+  assert.ok(scrim, 'текстийн дэвсгэрийн давхарга алга — гарчиг уншигдахгүй болно');
+
+  const washBlock = tintCss.slice(tintCss.indexOf('@utility hero-wash'));
+  const washBody = washBlock.slice(0, washBlock.indexOf('}') + 1);
+  const washStops = [...washBody.matchAll(/--hero-blue\)\s*(\d+)%/g)].map((m) => Number(m[1]));
+  const strongestWash = washStops.length > 0 ? Math.max(...washStops) : 0;
+
   assert.ok(
-    Number(scrim[1]) >= 60,
-    `халхавч хэт сул: ${scrim[1]}% (≥60 байх ёстой — цагаан гарчиг алга болно)`,
+    Number(scrim[1]) >= 60 || strongestWash >= 85,
+    `гарчгийн ард дэвсгэр алга: халхавч ${scrim[1]}%, будаг ${strongestWash}% ` +
+      '(халхавч ≥60% ЭСВЭЛ будаг ≥85% байх ёстой)',
   );
 });
 
