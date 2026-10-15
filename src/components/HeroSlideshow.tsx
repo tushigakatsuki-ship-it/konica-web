@@ -170,19 +170,50 @@ export default function HeroSlideshow() {
     return () => cancelAnimationFrame(id);
   }, []);
 
+  /**
+   * Таб харагдаж байна уу.
+   *
+   * ⚠️ Урьд нь таймер нь `setInterval` байж, таб нуугдсан үед зүгээр л
+   * АЛГАСДАГ байв. Үр дүнд нь хэмнэл алдагддаг: хүн буцаж ирэхэд
+   * дараагийн солилт 0–5 секундын хооронд дурын мөчид ирнэ.
+   *
+   * Зүгээр үзэхэд мэдэгддэггүй байсан ч цэгэн товч дээрх явцын зураас
+   * үүнийг ИЛ болгоно — зураас дүүрчихээд зураг солигдохгүй зогсоно.
+   * Тиймээс одоо үнэхээр ЗОГСООНО.
+   */
+  const [visible, setVisible] = useState(
+    () => typeof document === 'undefined' || !document.hidden,
+  );
   useEffect(() => {
-    if (HERO_IMAGES.length < 2 || prefersReducedMotion()) return;
+    const sync = () => setVisible(!document.hidden);
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
 
-    const timer = setInterval(() => {
-      if (document.hidden) return;
+  const autoplay = HERO_IMAGES.length > 1 && visible && !prefersReducedMotion();
+
+  /**
+   * Нэг зураг хэр удаан зогсох вэ.
+   *
+   * ⚠️ `setInterval` биш `setTimeout`, бөгөөд `index`-ээс хамаарна: зураг
+   * солигдох бүрт тоолол ШИНЭЭР эхэлнэ. Ингэснээр цэгэн товчийг гараар
+   * дармагц тухайн зураг бүтэн хугацаагаа авна — урьд нь тасралтгүй
+   * явдаг `setInterval`-ийн үлдсэн хэсгийг л авдаг байв.
+   *
+   * Мөн явцын зураас яг энэ тоололтой хамт эхэлнэ.
+   */
+  useEffect(() => {
+    if (!autoplay) return;
+
+    const id = setTimeout(() => {
       setSlide((current) => ({
         index: (current.index + 1) % HERO_IMAGES.length,
         prev: current.index,
       }));
     }, INTERVAL_MS);
 
-    return () => clearInterval(timer);
-  }, []);
+    return () => clearTimeout(id);
+  }, [autoplay, index]);
 
   /*
    * Зураг байхгүй бол градиент руу буцна.
@@ -430,10 +461,33 @@ export default function HeroSlideshow() {
               onClick={() => goTo(i)}
               aria-label={`${i + 1} дэх зураг`}
               aria-current={i === index}
-              className={`h-1.5 rounded-full transition-all ${
-                i === index ? 'w-6 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+              className={`h-1.5 overflow-hidden rounded-full transition-all ${
+                i === index ? 'w-6 bg-white/35' : 'w-1.5 bg-white/50 hover:bg-white/80'
               }`}
-            />
+            >
+              {/*
+               * Идэвхтэй цэг нь дараагийн зураг хүртэлх ЯВЦЫГ дүүргэнэ.
+               *
+               * ⚠️ `key` нь `index` — зураг солигдох бүрт React үүнийг
+               * ШИНЭЭР үүсгэнэ. Үүнгүй бол CSS-ийн хөдөлгөөн нэг л удаа
+               * ажиллаад зогсоно: нэг элемент дээр ижил `animation`
+               * дахин эхэлдэггүй.
+               *
+               * Автомат солилт зогссон үед (таб нуугдсан, эсвэл хөдөлгөөн
+               * хумисан тохиргоотой) зураас нь БҮТЭН зогсоно — худал явц
+               * үзүүлэхээр огт үзүүлэхгүй нь дээр.
+               */}
+              {i === index && (
+                <span
+                  key={index}
+                  aria-hidden
+                  className={`block size-full rounded-full bg-white ${
+                    autoplay ? 'hero-dot-fill' : ''
+                  }`}
+                  style={autoplay ? { animationDuration: `${INTERVAL_MS}ms` } : undefined}
+                />
+              )}
+            </button>
           ))}
         </div>
       )}

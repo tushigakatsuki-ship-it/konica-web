@@ -466,6 +466,36 @@
   animation: skeleton-sheen 1.4s ease-in-out infinite;
 }
 
+/**
+ * Hero-гийн идэвхтэй цэг — дараагийн зураг хүртэлх ЯВЦ.
+ *
+ * Зүгээр нэг чимэглэл биш: «хэзээ солигдох вэ» гэдгийг хэлнэ. Хүн зураг
+ * солигдохыг хүлээж байгаад гэнэт солигдоход гайхдаг — зураас нь түүнийг
+ * урьдчилан мэдэгдэнэ.
+ *
+ * ⚠️ `scaleX` ашиглана, `width` БИШ. Өргөн нь layout-ийг дахин тооцуулж,
+ * 5 секундын турш кадр бүрт хажуугийн цэгүүдийг хөдөлгөнө. `transform` нь
+ * зөвхөн найрлагын шатанд ажилладаг тул үнэгүй.
+ *
+ * ⚠️ Үргэлжлэлийг `HeroSlideshow` нь `INTERVAL_MS`-ээс inline өгнө —
+ * энд тоо бичвэл хоёр газарт тараагдаж, нэг нь хоцорно.
+ */
+@keyframes hero-dot-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@utility hero-dot-fill {
+  transform-origin: left center;
+  animation-name: hero-dot-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 @keyframes skeleton-sheen {
   to {
     transform: translateX(100%);
