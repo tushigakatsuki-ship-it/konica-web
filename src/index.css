@@ -397,7 +397,10 @@
  * өнгө алга болов.
  *
  * Шийдэл: `multiply`-аар гэрэлтүүлгийг нь ЗӨВХӨН дэвсгэр дээр
- * бууруулна. Машин дээрх нүх нь `hero-tint`-тэй ЯГ ижил
+ * бууруулна. Хэмжээ нь эндээс л тохируулагдана: өндөр утга нь гүн,
+ * бараан цэнхэр; бага утга нь цайвар, агаартай цэнхэр. Хальсны өнгө
+ * (`hero-tint`) нь гэрэлтүүлэгт нөлөөлдөггүй тул ТЭНДЭЭС цайруулж
+ * болохгүй — энэ давхаргаас л болно. Машин дээрх нүх нь `hero-tint`-тэй ЯГ ижил
  * (`--hero-subject`) тул машин бүрэн тод хэвээр, эргэн тойрон нь
  * жинхэнэ брэндийн цэнхэр болно.
  *
@@ -409,9 +412,9 @@
     var(--hero-subject),
     transparent 0%,
     transparent 34%,
-    color-mix(in srgb, var(--color-brand-700) 22%, transparent) 60%,
-    color-mix(in srgb, var(--color-brand-700) 52%, transparent) 80%,
-    color-mix(in srgb, var(--color-brand-700) 70%, transparent) 96%
+    color-mix(in srgb, var(--color-brand-700) 16%, transparent) 60%,
+    color-mix(in srgb, var(--color-brand-700) 38%, transparent) 80%,
+    color-mix(in srgb, var(--color-brand-700) 52%, transparent) 96%
   );
   mix-blend-mode: multiply;
 }
