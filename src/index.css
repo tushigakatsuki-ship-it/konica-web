@@ -147,8 +147,15 @@
      *
      * Дөрвөн зураг дээрээ машин нь хүрээний ~72% өргөн, ~60% өндрийн
      * байрлалд зогсдог.
+     *
+     * ⚠️ Радиус нь машинаас ЗОРИУДААР том (50% / 66%). Хоёр градиент хоёулаа
+     * 34% хүртэл БҮРЭН тунгалаг зогсолттой — машин бүхэлдээ тэр тэгш хэсэгт
+     * багтана. Эс бөгөөс машины ирмэг дээр өнгө эхэлж, утсан дээр (машин нь
+     * хүрээний илүү их хувийг эзэлдэг) бүхэлдээ цэнхэр болж живдэг байв.
+     *
+     * Үлдсэн 34→95% нь УРТ уусалт: цэнхэр нь ирмэг рүүгээ аажим хүчээ авна.
      */
-    --hero-subject: ellipse 38% 52% at 74% 58%;
+    --hero-subject: ellipse 50% 66% at 76% 56%;
 
     color-scheme: light;
   }
@@ -367,9 +374,10 @@
   background: radial-gradient(
     var(--hero-subject),
     transparent 0%,
-    color-mix(in srgb, var(--color-brand-500) 30%, transparent) 46%,
-    color-mix(in srgb, var(--color-brand-500) 72%, transparent) 68%,
-    var(--color-brand-500) 88%
+    transparent 34%,
+    color-mix(in srgb, var(--color-brand-500) 34%, transparent) 58%,
+    color-mix(in srgb, var(--color-brand-500) 76%, transparent) 78%,
+    var(--color-brand-500) 95%
   );
   mix-blend-mode: color;
 }
@@ -400,9 +408,10 @@
   background: radial-gradient(
     var(--hero-subject),
     transparent 0%,
-    color-mix(in srgb, var(--color-brand-700) 25%, transparent) 50%,
-    color-mix(in srgb, var(--color-brand-700) 55%, transparent) 72%,
-    color-mix(in srgb, var(--color-brand-700) 72%, transparent) 90%
+    transparent 34%,
+    color-mix(in srgb, var(--color-brand-700) 22%, transparent) 60%,
+    color-mix(in srgb, var(--color-brand-700) 52%, transparent) 80%,
+    color-mix(in srgb, var(--color-brand-700) 70%, transparent) 96%
   );
   mix-blend-mode: multiply;
 }
