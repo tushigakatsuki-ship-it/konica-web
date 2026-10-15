@@ -33,12 +33,98 @@ import { HERO_IMAGES } from '../data/site';
  */
 const INTERVAL_MS = 5000;
 
+/** Хоёр зургийн уусалт хэдэн миллисекунд үргэлжлэх вэ. */
+const FADE_MS = 1100;
+
+/**
+ * Зураг бүрийн КАМЕРЫН ХӨДӨЛГӨӨН.
+ *
+ * ── Яагаад хүснэгт вэ ─────────────────────────────────────────────
+ *
+ * Урьд нь ердөө хоёр хөдөлгөөн ээлжилдэг байв: тэгш дугаар ойртоно,
+ * сондгой нь холдоно. Дөрвөн зурагтай слайд дээр хүн хоёр дахь
+ * эргэлтэд давталтыг нь анзаардаг — «ойртоно, холдоно, ойртоно,
+ * холдоно» нь камерын хөдөлгөөн биш, хэмнэл болж сонсогддог.
+ *
+ * Бодит оператор зураг бүрийг өөрөөр авна: заримыг нь ойртуулж,
+ * заримыг нь холдуулж, заримыг нь хажуу тийш шилжүүлж. Тиймээс
+ * хөдөлгөөн бүр ӨӨР.
+ *
+ * ⚠️ `scale(1)` дээр ИЛҮҮДЭЛ ЗАЙ БАЙХГҮЙ тул тэнд `translate` хийвэл
+ * зургийн ирмэг гарч, хоосон зурвас харагдана. Иймд `scale(1)`-тэй
+ * байрлал үргэлж `translate(0, 0)`. Бусад дээр шилжилт нь
+ * (scale − 1) / 2-оос хэтрэхгүй: 1.06 дээр дээд тал нь 3%.
+ */
+const CAMERA = [
+  /* Аажим ойртолт — зүүн дээш. */
+  { from: 'scale(1) translate(0, 0)', to: 'scale(1.07) translate(-1.2%, -0.8%)' },
+  /* Холдолт — баруун доороос төв рүү. */
+  { from: 'scale(1.07) translate(1.2%, 0.7%)', to: 'scale(1) translate(0, 0)' },
+  /* Цэвэр хажуу шилжилт — ойртолтгүй тул «тавиур дээрх камер» мэдрэмж. */
+  { from: 'scale(1.05) translate(1.4%, -0.4%)', to: 'scale(1.05) translate(-1.4%, 0.4%)' },
+  /* Холдолт — зүүн дээрээс. */
+  { from: 'scale(1.06) translate(-1%, -0.8%)', to: 'scale(1) translate(0, 0)' },
+];
+
 const prefersReducedMotion = (): boolean =>
   typeof matchMedia === 'function' &&
   matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function HeroSlideshow() {
-  const [index, setIndex] = useState(0);
+  /**
+   * Одоогийн ба гарч буй зураг — НЭГ төлөвт.
+   *
+   * ⚠️ Хоёр тусдаа `useState` байж БОЛОХГҮЙ. Солилт нь хоёуланг нь ЗЭРЭГ
+   * өөрчилдөг тул `setIndex`-ийн шинэчлэгч дотроос `setPrev` дуудах
+   * уруу татдаг — гэтэл шинэчлэгч нь ЦЭВЭР функц байх ёстой. React
+   * түүнийг зурагдах үед, бүр хоёр ч удаа дуудаж болдог тул тэнд
+   * хажуугийн үйлдэл хийвэл «өөр бүрэлдэхүүнийг зурж байх үед шинэчлэв»
+   * гэх алдаа гарна.
+   *
+   * Нэг объект болгосноор шинэчлэгч нь цэвэр хэвээр үлдэнэ.
+   */
+  const [slide, setSlide] = useState<{ index: number; prev: number | null }>({
+    index: 0,
+    prev: null,
+  });
+  /**
+   * `prev` — ГАРЧ БУЙ зураг, уусалт дуустал ХАРАГДСАН хэвээр.
+   *
+   * ⚠️ Урьд нь бүх идэвхгүй зураг `opacity: 0` байв. Уусалтын ДУНД цэгт
+   * хоёул 50% тунгалаг болж, доорх `bg-ink` шууд цухуйдаг: нийт
+   * бүрхэлт 0.5 + 0.5×0.5 = 75% л болно. Үр дүнд нь солилт бүр дээр
+   * дэвсгэр бараан руу «цохиж» аваад буцдаг байлаа — энэ нь кино
+   * уусалт биш, анивчилт.
+   *
+   * Одоо гарч буй зураг БҮРЭН тунгалаг бус хэвээр доор нь үлдэж,
+   * шинэ зураг түүний ДЭЭГҮҮР бүдгээс тод руу ирнэ. Бүрхэлт ямагт
+   * 100% тул дэвсгэр хэзээ ч харагдахгүй.
+   */
+  const { index, prev } = slide;
+
+  /**
+   * Уусалт дуусмагц гарсан зургийг ЧӨЛӨӨЛНӨ.
+   *
+   * ⚠️ Үүнгүй бол хоёрхон зурагтай слайд ЗОГСОНО: зураг эргэж ирэхдээ
+   * хөдөлгөөнөө ЭХНЭЭСЭЭ эхлэх ёстой ч «гарч буй» төлөвт байх хугацаандаа
+   * эцсийн байрлалдаа зогссон хэвээр үлдэж, дахин хөдлөхгүй болно.
+   *
+   * Чөлөөлөлт нь хоёр давхар тунгалаг бус зургийн ДОР болдог тул
+   * байрлалын үсрэлт харагдахгүй.
+   */
+  useEffect(() => {
+    if (prev === null) return;
+    const id = setTimeout(
+      () => setSlide((current) => ({ ...current, prev: null })),
+      FADE_MS,
+    );
+    return () => clearTimeout(id);
+  }, [prev]);
+
+  const goTo = (next: number) =>
+    setSlide((current) =>
+      next === current.index ? current : { index: next, prev: current.index },
+    );
 
   /**
    * Эхний зураг гарсны дараа л үлдсэнийг DOM-д нэмнэ.
@@ -70,7 +156,10 @@ export default function HeroSlideshow() {
 
     const timer = setInterval(() => {
       if (document.hidden) return;
-      setIndex((current) => (current + 1) % HERO_IMAGES.length);
+      setSlide((current) => ({
+        index: (current.index + 1) % HERO_IMAGES.length,
+        prev: current.index,
+      }));
     }, INTERVAL_MS);
 
     return () => clearInterval(timer);
@@ -151,58 +240,55 @@ export default function HeroSlideshow() {
              */
             className="absolute inset-0 size-full object-cover object-[72%_center] brightness-110 saturate-[1.18] contrast-[1.05] will-change-[opacity,transform] sm:object-[66%_center] lg:object-[60%_center] xl:object-center"
             /*
-             * ── Ken Burns: удаан ойртолт ──────────────────────────────
+             * ── Камерын хөдөлгөөн ба уусалт ───────────────────────────
              *
              * Урьд нь ердөө 700ms бүдгэрэлт байв: зураг солигдоод ЗОГСДОГ
              * тул дэвсгэр нь хөдөлгөөнгүй зураг мэт мэдрэгддэг байлаа.
              *
-             * Одоо идэвхтэй зураг 7 секундын турш 1 → 1.06 хүртэл ААЖИМ
-             * ойртоно. Солигдох мөчлөг 5 секунд тул ойртолт дуусахаас өмнө
-             * дараагийнх нь эхэлдэг — хөдөлгөөн ТАСРАЛТГҮЙ мэдрэгдэнэ.
+             * Одоо идэвхтэй зураг 7 секундын турш `CAMERA`-гийн замаар
+             * ААЖИМ хөдөлнө. Солигдох мөчлөг 5 секунд тул хөдөлгөөн нь
+             * дуусахаас ӨМНӨ дараагийнх нь эхэлдэг — зогсолт мэдрэгдэхгүй.
              *
-             * ⚠️ Чиглэл нь ээлжилнэ (тэгш дугаар ойртоно, сондгой нь
-             * холдоно). Бүгд нэг тийш хөдөлвөл дөрөв дэх зураг дээр хүн
-             * давталтыг нь анзаарч, хямд мэдрэмж төрүүлнэ.
-             *
-             * ⚠️ Идэвхгүй зураг дээр `transform`-ийн үргэлжлэл 0 — дараа
-             * нь эргэж ирэхэд ойртолт ЭХНЭЭСЭЭ эхлэх ёстой. Үүнгүй бол
-             * хоёр дахь удаагаасаа хөдөлгөөнгүй болно.
+             * ⚠️ Гарч буй зураг ХӨДӨЛСӨӨР уусна. Урьд нь түүний
+             * `transform`-ийн үргэлжлэл 0 болдог байсан: 1.1 секундын
+             * уусалтын турш хараахан харагдаж байхдаа эхлэлийн байрлал
+             * руугаа ҮСЭРДЭГ байв. Энэ нь хамгийн анзаарагддаг
+             * хиймэл мэдрэмж байсан — одоо зөвхөн БҮРЭН далд болсныхоо
+             * дараа (`prev` чөлөөлөгдөхөд) чимээгүй эргэж тавигдана.
              *
              * `prefers-reduced-motion` үед `index.css`-ийн нэгдсэн дүрэм
              * бүх үргэлжлэлийг 0.01ms болгодог тул зураг шууд эцсийн
              * байрлалдаа суух бөгөөд энэ нь зүгээр л бага зэрэг ойрсон
              * хөдөлгөөнгүй зураг — эвдрэхгүй.
              */
-            style={{
-              opacity: i === index ? 1 : 0,
-              /*
-               * ⚠️ Зөвхөн ойртолт биш, ШИЛЖИЛТ ч бий.
-               *
-               * Цэвэр `scale` нь механик мэдрэмж өгдөг — зураг байрандаа
-               * томорч байгаа нь камерын хөдөлгөөн биш, объектив сунаж
-               * байгаа мэт. Бодит камер ойртохдоо бага зэрэг хажуу тийш
-               * ч шилждэг тул `translate` нэмэв.
-               *
-               * ⚠️ ШИЛЖИЛТ нь ЗӨВХӨН ойртсон үед. `scale(1)` дээр
-               * илүүдэл зай БАЙХГҮЙ тул тэнд шилжүүлбэл зургийн ирмэг
-               * гарч, хоосон зурвас харагдана. Тиймээс сондгой зургийн
-               * ТӨГСГӨЛ (scale 1) нь үргэлж `translate(0,0)`.
-               *
-               * Тэгш: ойртоно  (1 → 1.06), зүүн дээш шилжинэ
-               * Сондгой: холдоно (1.06 → 1), баруун доошоос төв рүү
-               */
-              transform:
-                i === index && started
-                  ? i % 2 === 0
-                    ? 'scale(1.06) translate(-1.1%, -0.7%)'
-                    : 'scale(1) translate(0, 0)'
-                  : i % 2 === 0
-                    ? 'scale(1) translate(0, 0)'
-                    : 'scale(1.06) translate(1.1%, 0.6%)',
-              transitionProperty: 'opacity, transform',
-              transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1), linear',
-              transitionDuration: i === index ? '1100ms, 7000ms' : '1100ms, 0ms',
-            }}
+            style={(() => {
+              const camera = CAMERA[i % CAMERA.length];
+              /* Идэвхтэй, эсвэл уусалтын явцад байгаа гарч буй зураг. */
+              const live = i === index || i === prev;
+
+              return {
+                opacity: live ? 1 : 0,
+                /*
+                 * Шинэ зураг хуучныхаа ДЭЭГҮҮР ирнэ — доор нь бүрэн
+                 * тунгалаг бус зураг байгаа тул дэвсгэр цухуйхгүй.
+                 */
+                zIndex: i === index ? 2 : i === prev ? 1 : 0,
+                /*
+                 * `started`-гүй бол ЭХНИЙ зураг хөдөлдөггүй: CSS-ийн
+                 * шилжилт нь утга ӨӨРЧЛӨГДӨХӨД л ажилладаг тул React
+                 * түүнийг анхны зурагдалтад шууд эцсийн байрлалд буулгана.
+                 */
+                transform: live && started ? camera.to : camera.from,
+                transitionProperty: 'opacity, transform',
+                /*
+                 * Уусалт нь зөөлөн эхэлж зөөлөн дуусна (кино уусалт),
+                 * харин камер ТОГТМОЛ хурдтай явна — бодит камер
+                 * хөдөлгөөнийхөө дундуур хурдаа өөрчилдөггүй.
+                 */
+                transitionTimingFunction: 'cubic-bezier(0.37, 0, 0.63, 1), linear',
+                transitionDuration: live ? `${FADE_MS}ms, 7000ms` : `${FADE_MS}ms, 0ms`,
+              };
+            })()}
           />
         ),
       )}
@@ -224,7 +310,14 @@ export default function HeroSlideshow() {
        * Доорх халхавч нь СААРМАГ (`ink`) — цэнхэр байвал хальс дээр
        * хальс давхарлаж, будагдах асуудал буцаж ирнэ.
        */}
-      <div className="hero-tint absolute inset-0" />
+      {/*
+       * ⚠️ `z-10` ЗААВАЛ. Зургууд уусалтын дарааллаа барихын тулд
+       * `z-index` 0/1/2 авдаг — байрлалтай, z-тэй элемент нь z-гүй
+       * (`auto`) элементийн ДЭЭГҮҮР гарна, DOM-д хэдийд ч бичигдсэн
+       * байлаа гэсэн. Энэ давхаргууд z-гүй байвал зургийн ДОР үлдэж,
+       * цэнхэр хальс ч, текстийн халхавч ч, цэгэн товч ч алга болно.
+       */}
+      <div className="hero-tint absolute inset-0 z-10" />
 
       {/*
        * ── 2. ЦЭНХЭРИЙН ГҮН — зөвхөн дэвсгэр дээр ─────────────────────
@@ -237,7 +330,7 @@ export default function HeroSlideshow() {
        * ⚠️ Нүх нь `hero-tint`-тэй ижил (`--hero-subject`) тул машин
        * бүрэн тод хэвээр — гүн нь ЗӨВХӨН эргэн тойронд нэмэгдэнэ.
        */}
-      <div className="hero-depth absolute inset-0" />
+      <div className="hero-depth absolute inset-0 z-10" />
 
       {/*
        * ── 3. Текстийн контраст — өнгө ЗАСАХГҮЙ ───────────────────────
@@ -277,16 +370,16 @@ export default function HeroSlideshow() {
        * хэсэг дээр сууж, амбер текст уншигдахаа болино. Тиймээс нарийн
        * дэлгэцэд халхавчийг жигд гүн болгоно.
        */}
-      <div className="absolute inset-0 bg-gradient-to-r from-ink/72 via-ink/45 to-ink/25 sm:from-ink/62 sm:via-ink/24 sm:to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/28 via-transparent to-transparent" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-r from-ink/72 via-ink/45 to-ink/25 sm:from-ink/62 sm:via-ink/24 sm:to-transparent" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-ink/28 via-transparent to-transparent" />
 
       {HERO_IMAGES.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 sm:bottom-6">
+        <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2 sm:bottom-6">
           {HERO_IMAGES.map((image, i) => (
             <button
               key={image.src}
               type="button"
-              onClick={() => setIndex(i)}
+              onClick={() => goTo(i)}
               aria-label={`${i + 1} дэх зураг`}
               aria-current={i === index}
               className={`h-1.5 rounded-full transition-all ${
