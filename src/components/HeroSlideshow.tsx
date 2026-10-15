@@ -33,8 +33,27 @@ import { HERO_IMAGES } from '../data/site';
  */
 const INTERVAL_MS = 5000;
 
-/** Хоёр зургийн уусалт хэдэн миллисекунд үргэлжлэх вэ. */
-const FADE_MS = 1100;
+/**
+ * Хоёр зургийн уусалт хэдэн миллисекунд үргэлжлэх вэ.
+ *
+ * 1.1 секунд нь цэвэрхэн ч яарсан мэдрэгддэг байв. Киноны уусалт ихэвчлэн
+ * 1–2 секунд байдаг; 1.4 нь мөчлөгийн 28% тул зураг тогтох зав ч хэвээр.
+ */
+const FADE_MS = 1400;
+
+/**
+ * Гарч буй зураг хэр их ФОКУСААС ГАРАХ вэ (пиксел).
+ *
+ * Жинхэнэ камер хоёр кадрын хооронд шилжихдээ фокусаа алддаг. Зөвхөн
+ * тунгалагжилтаар солигдох нь цэвэрхэн ч хавтгай — хоёр зураг нэг
+ * хавтгайд дарсан мэт. Гарч буйг нь бага зэрэг бүдгэрүүлэхэд тэр нь
+ * АРАГШАА ухарч, шинэ нь урагш гарч ирэх мэдрэмж төрнө.
+ *
+ * ⚠️ 3px нь болгоомжтой сонголт. Том утга нь гоё ч `blur` бол дүүргэлтийн
+ * хувьд ХАМГИЙН ҮНЭТЭЙ шүүлтүүр — бүтэн дэлгэцийн зураг дээр сул
+ * утсанд кадр алдагдана.
+ */
+const DEFOCUS_PX = 3;
 
 /**
  * Зураг бүрийн КАМЕРЫН ХӨДӨЛГӨӨН.
@@ -237,8 +256,14 @@ export default function HeroSlideshow() {
              * `brightness`/`saturate` нь өнгөний ӨНЦГИЙГ (hue) хөнддөггүй —
              * зөвхөн тодрол нэмнэ. Утгууд нь болгоомжтой: 1.2-оос дээш
              * бол цагаан хана шатаж, машины цагаан бүрхүүлтэй нийлнэ.
+             *
+             * ⚠️ Эдгээр нь Tailwind-ийн анги байсан ч доорх `style`-руу
+             * зөөгдсөн. `filter` бол НЭГ шинж чанар: inline утга нь ангийн
+             * утгыг бүхэлд нь дарна. Уусалтын бүдгэрэлтийг нэмэхийн тулд
+             * бүгдийг нэг мөрөнд цуглуулахаас өөр аргагүй — эс бөгөөс
+             * тодруулга чимээгүйхэн алга болно.
              */
-            className="absolute inset-0 size-full object-cover object-[72%_center] brightness-110 saturate-[1.18] contrast-[1.05] will-change-[opacity,transform] sm:object-[66%_center] lg:object-[60%_center] xl:object-center"
+            className="absolute inset-0 size-full object-cover object-[72%_center] will-change-[opacity,transform,filter] sm:object-[66%_center] lg:object-[60%_center] xl:object-center"
             /*
              * ── Камерын хөдөлгөөн ба уусалт ───────────────────────────
              *
@@ -279,14 +304,30 @@ export default function HeroSlideshow() {
                  * түүнийг анхны зурагдалтад шууд эцсийн байрлалд буулгана.
                  */
                 transform: live && started ? camera.to : camera.from,
-                transitionProperty: 'opacity, transform',
+                /*
+                 * Зөвхөн ГАРЧ БУЙ зураг фокусаас гарна — идэвхтэй нь
+                 * үргэлж тод. Тодруулгын утгууд энд давтагдаж байгаа нь
+                 * `filter` нэг шинж чанар учраас (дээрх тайлбарыг үз).
+                 */
+                filter: `brightness(1.1) saturate(1.18) contrast(1.05) blur(${
+                  i === prev ? DEFOCUS_PX : 0
+                }px)`,
+                transitionProperty: 'opacity, transform, filter',
                 /*
                  * Уусалт нь зөөлөн эхэлж зөөлөн дуусна (кино уусалт),
                  * харин камер ТОГТМОЛ хурдтай явна — бодит камер
                  * хөдөлгөөнийхөө дундуур хурдаа өөрчилдөггүй.
                  */
-                transitionTimingFunction: 'cubic-bezier(0.37, 0, 0.63, 1), linear',
-                transitionDuration: live ? `${FADE_MS}ms, 7000ms` : `${FADE_MS}ms, 0ms`,
+                transitionTimingFunction:
+                  'cubic-bezier(0.37, 0, 0.63, 1), linear, cubic-bezier(0.37, 0, 0.63, 1)',
+                /*
+                 * ⚠️ Идэвхгүй болмогц `filter`-ийн үргэлжлэл 0 — бүдгэрэлт
+                 * нь ДАЛД байхдаа тэглэгдэх ёстой. Үгүй бол зураг эргэж
+                 * ирэхдээ бүдэг хэвээр гарч ирнэ.
+                 */
+                transitionDuration: live
+                  ? `${FADE_MS}ms, 7000ms, ${FADE_MS}ms`
+                  : `${FADE_MS}ms, 0ms, 0ms`,
               };
             })()}
           />
