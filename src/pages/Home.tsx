@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../state/lang';
 import LastOrderBanner from '../components/LastOrderBanner';
 import HeroSlideshow from '../components/HeroSlideshow';
+import MachineStrip from '../components/MachineStrip';
 import { IconAward, IconPrinter, IconSparkle } from '../components/icons';
 import PromoVideo from '../components/PromoVideo';
 
@@ -126,6 +127,15 @@ export default function Home() {
   return (
     <>
       <Hero />
+
+      {/*
+        * Машинуудын гүйдэг эгнээ — hero-гийн ЯГ ДООР.
+        *
+        * Хуудас урьд нь hero дээр дуусаад хөл хүртэл хоосон үлддэг байв.
+        * Энэ эгнээ нь тэр хоосныг нөхөхөөс гадна гүйлгэж үзэх шалтгаан
+        * өгнө: хөдөлж буй зүйл нүдийг доош татдаг.
+        */}
+      <MachineStrip />
       {/*
         * `empty:hidden` — ЗААВАЛ.
         *
