@@ -77,7 +77,7 @@ export default function PromoVideo() {
         href={PROMO.url || undefined}
         target={PROMO.url ? '_blank' : undefined}
         rel="noreferrer"
-        className="group mt-5 block w-full max-w-[320px] overflow-hidden rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm sm:mt-6"
+        className="group mt-5 block w-full max-w-[360px] overflow-hidden rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm sm:mt-6 sm:max-w-[420px]"
       >
         <span className="relative block">
           <video
@@ -128,8 +128,20 @@ export default function PromoVideo() {
              * `contain` нь бичлэгийг БҮТНЭЭР харуулна: хэвтээ нь хайрцгийг
              * бүрэн дүүргэнэ, босоо нь голлон сууж хажуугаар нь зурвасын
              * өөрийн бүдэг дэвсгэр харагдана.
+             *
+             * ── Яагаад хайрцаг нь ДӨРВӨЛЖИН вэ ───────────────────────
+             *
+             * ⚠️ Хайрцаг 16:9 байхад БОСОО бичлэг гамшиг болдог. Хэмжсэн:
+             * 360×640 бичлэг 318×179 хайрцагт багтахдаа ердөө 101px өргөн
+             * болж, хоёр талдаа хоосон хар зурвас үлдээдэг — өргөний 32%.
+             * Манай дөрвөн бичлэгийн ХОЁР нь босоо тул энэ нь хагас тохиолдол.
+             *
+             * Дөрвөлжин хайрцаг хоёуланд нь шударга: босоо нь өргөний 56%
+             * болж (3 дахин том), хэвтээ нь урьдын адил бүрэн дүүргэнэ.
+             * Бичлэг бүрт хайрцгийн хэлбэрийг нь өөрчилж болох ч тэр үед
+             * бичлэг солигдох бүрд hero-гийн өндөр үсэрнэ.
              */
-            className="block aspect-video w-full object-contain"
+            className="block aspect-square w-full object-contain"
           />
 
           {/*

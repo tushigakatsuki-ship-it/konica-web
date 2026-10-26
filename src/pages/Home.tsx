@@ -21,8 +21,15 @@ import PromoVideo from '../components/PromoVideo';
 function Hero() {
   const { t } = useLang();
 
+  /*
+   * ⚠️ Дэвсгэр нь `--hero-blue` — `bg-brand-600` БИШ.
+   *
+   * Зургийн зурвас 1600px дээр тагтай болсон тул өргөн дэлгэц дээр түүний
+   * хоёр талд энэ дэвсгэр харагдана. Будгийн ирмэгийн өнгөтэй ижил байх
+   * ёстой, эс бөгөөс тагны байрлал дээр босоо шугам гарч ирнэ.
+   */
   return (
-    <section className="aurora relative overflow-hidden bg-brand-600">
+    <section className="aurora relative overflow-hidden bg-[var(--hero-blue)]">
       <HeroSlideshow />
 
       {/*
