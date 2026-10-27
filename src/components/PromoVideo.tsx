@@ -77,7 +77,7 @@ export default function PromoVideo() {
         href={PROMO.url || undefined}
         target={PROMO.url ? '_blank' : undefined}
         rel="noreferrer"
-        className="group mt-5 block w-full max-w-[360px] overflow-hidden rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm sm:mt-6 sm:max-w-[420px]"
+        className="group mt-5 block w-full max-w-[200px] overflow-hidden rounded-xl border border-white/25 bg-black/20 backdrop-blur-sm sm:mt-6 sm:max-w-[420px]"
       >
         <span className="relative block">
           <video

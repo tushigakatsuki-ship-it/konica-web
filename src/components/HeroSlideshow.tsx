@@ -466,7 +466,23 @@ export default function HeroSlideshow() {
        * хэсэг дээр сууж, амбер текст уншигдахаа болино. Тиймээс нарийн
        * дэлгэцэд халхавчийг жигд гүн болгоно.
        */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-r from-ink/30 via-ink/18 to-ink/8 sm:from-ink/4 sm:via-transparent sm:to-transparent" />
+      {/*
+       * ⚠️ Утсан дээр халхавч нь БОСОО, ширээн дээр ХЭВТЭЭ.
+       *
+       * Ширээн дээр бичиг зүүн талд багтдаг тул халхавч зүүнээс баруун
+       * тийш бүдгэрэх нь зөв — машин баруун талд цэвэр үлдэнэ.
+       *
+       * Утсан дээр энэ нь АЖИЛЛАХГҮЙ: хүрээ нарийн тул бичиг ч, машин ч
+       * нэг л багананд байдаг. Хэвтээ халхавч нь хоёуланг нь зэрэг дардаг
+       * буюу хоёуланг нь зэрэг нээдэг. Хэмжсэн: зургийг харагдуулах
+       * хэмжээнд сулруулахад цагаан гарчгийн ард хамгийн тод цэг #ced1e0
+       * болж, контраст 1.36:1 — уншигдахаа болино.
+       *
+       * Босоо халхавч нь хоёрыг ӨНДРӨӨР нь тусгаарлана: дээд тал (бичиг)
+       * гүн, доод тал (машин) цэвэр. Хэмжсэн: цагаан гарчиг 8.51:1,
+       * амбер мөр 3.96:1, машин нь тодорхой харагдана.
+       */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-ink/58 via-ink/30 to-transparent sm:bg-gradient-to-r sm:from-ink/4 sm:via-transparent sm:to-transparent" />
       <div className="absolute inset-0 z-10 bg-gradient-to-t from-ink/14 via-transparent to-transparent" />
 
       {HERO_IMAGES.length > 1 && (
