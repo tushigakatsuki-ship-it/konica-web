@@ -6,6 +6,7 @@
  */
 
 import type { StockItem } from '../data/stock';
+import type { PriceTier } from './price';
 import { serviceIdFor } from './price';
 import { SERVICES } from '../data/catalog';
 import { parsePrice } from './price';
@@ -39,8 +40,17 @@ export function quantityChoices(stock: number): number[] {
   return fit.includes(stock) ? [...fit] : [...fit, stock];
 }
 
+/**
+ * Захиалж БОЛОХ бараа — үнэтэй нь.
+ *
+ * ⚠️ Үнэгүй бараа энэ урсгалд орж ирэх ЁСГҮЙ. Төрлөөр нь хаахгүй бол
+ * `serviceId` нь `undefined` байж, үнэ чимээгүйхэн 0 болно — хэрэглэгч
+ * «0₮» гэж харж, дэлгүүр мөнгөгүй захиалга хүлээж авна.
+ */
+export type PricedStockItem = StockItem & PriceTier;
+
 /** Тухайн тоонд харгалзах нэгж үнэ — олны хямдралыг тооцно. */
-export const unitPriceFor = (item: StockItem, qty: number): number =>
+export const unitPriceFor = (item: PricedStockItem, qty: number): number =>
   parsePrice(SERVICES.find((s) => s.id === serviceIdFor(item, qty))?.price);
 
 export interface Quote {
@@ -62,7 +72,7 @@ export interface Quote {
  * хэрэглэгч дэлгэц дээр нэг тоо хараад данс руу өөр дүн шилжүүлнэ.
  */
 export function quote(
-  item: StockItem,
+  item: PricedStockItem,
   qty: number,
   options: { delivery: boolean; vat: boolean; deliveryFee: number; vatRate: number },
 ): Quote {

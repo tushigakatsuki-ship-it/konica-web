@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom';
 import { IconAlert, IconCheck, IconClose, IconCopy } from './icons';
 import { SERVICES } from '../data/catalog';
 import { BANK_ACCOUNT } from '../data/site';
-import type { StockItem } from '../data/stock';
+
 import { submitOrder } from '../lib/api';
 import { lineFromService } from '../lib/order';
 import { formatCurrency, isValidEmail, isValidPhone } from '../lib/price';
-import { plainAccount, type Quote } from '../lib/stockOrder';
+import { plainAccount, type Quote, type PricedStockItem } from '../lib/stockOrder';
 import { serviceIdFor } from '../lib/price';
 
 /**
@@ -36,7 +36,7 @@ import { serviceIdFor } from '../lib/price';
  */
 
 interface Props {
-  item: StockItem;
+  item: PricedStockItem;
   qty: number;
   vat: boolean;
   note: string;

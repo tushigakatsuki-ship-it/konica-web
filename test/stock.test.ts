@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { STOCK, stockById } from '../src/data/stock';
+import { STOCK, STOCK_GROUPS, hasPrice, stockById } from '../src/data/stock';
 import { SERVICES } from '../src/data/catalog';
 import { needsPhoto } from '../src/lib/order';
 import { parsePrice, serviceIdFor } from '../src/lib/price';
@@ -28,7 +28,14 @@ test('барааны үнэ каталогоос уншигдана', () => {
   assert.ok(!/₮/.test(source), 'stock.ts дотор үнэ хатуу бичигдсэн');
 
   const ids = new Set(SERVICES.map((s) => s.id));
+  /*
+   * ⚠️ Зөвхөн ҮНЭТЭЙ бараа. Үнэ нь хараахан тогтоогдоогүй бараа
+   * жагсаалтад байж БОЛНО — тэр нь үзэсгэлэн болж харагдаж, захиалгын
+   * товчны оронд утас гарна. `hasPrice` нь төрлийг нарийсгадаг тул
+   * доорх `serviceIdFor` дуудлагууд аюулгүй болно.
+   */
   for (const item of STOCK) {
+    if (!hasPrice(item)) continue;
     assert.ok(ids.has(item.serviceId), `${item.id}: serviceId каталогт алга`);
     assert.ok(parsePrice(SERVICES.find((s) => s.id === item.serviceId)?.price) > 0,
       `${item.id}: каталогийн үнэ 0`);
@@ -54,6 +61,7 @@ test('бэлэн бараа ЗУРАГГҮЙ захиалагдана', () => {
    * бүгдийг бөглөөд «Зураггүй мөр байна» гэж уншина.
    */
   for (const item of STOCK) {
+    if (!hasPrice(item)) continue;
     const service = SERVICES.find((s) => s.id === item.serviceId);
     assert.ok(service, `${item.id}: үйлчилгээ алга`);
     assert.equal(
@@ -66,6 +74,8 @@ test('бэлэн бараа ЗУРАГГҮЙ захиалагдана', () => {
 
 test('үлдэгдэл нь эерэг БҮХЭЛ тоо', () => {
   for (const item of STOCK) {
+    /* Тодорхойгүй үлдэгдэл зөвшөөрөгдөнө — тоо нь амлалт, таамаг биш. */
+    if (item.stock === undefined) continue;
     assert.ok(Number.isInteger(item.stock), `${item.id}: үлдэгдэл бүхэл биш`);
     assert.ok(item.stock >= 0, `${item.id}: үлдэгдэл сөрөг`);
   }
@@ -119,7 +129,8 @@ test('дүн нь НӨАТ, хүргэлтийг СЕРВЕРТЭЙ ижил д�
   const { VAT_RATE } = await import('../src/lib/price');
   const { DELIVERY_FEE } = await import('../src/lib/order');
 
-  const item = STOCK[0];
+  const item = STOCK.find(hasPrice);
+  if (!item) return; /* Үнэтэй бараа байхгүй бол тооцоолох юм алга. */
   const opts = { deliveryFee: DELIVERY_FEE, vatRate: VAT_RATE };
 
   const plain = quote(item, 2, { ...opts, delivery: false, vat: false });
@@ -318,5 +329,35 @@ test('зураг дутуу байсан ч карт ЭВДРЭХГҮЙ', () => 
   for (const page of ['src/pages/Stock.tsx', 'src/pages/StockDetail.tsx']) {
     assert.ok(!read(page).includes('<img'), `${page}: нөхөлтгүй зураг бичсэн`);
     assert.ok(read(page).includes('StockImage'), `${page}: StockImage ашиглаагүй`);
+  }
+});
+
+test('бараа бүрийн бүлэг БОДИТ', () => {
+  /*
+   * ⚠️ Бүлэг нь зөвхөн шошго биш — дэлгүүрийн хуудас бүлгээр нь
+   * давтаж хэвлэдэг. `STOCK_GROUPS`-д байхгүй бүлэгтэй бараа нь
+   * алдаа өгөхгүй, зүгээр л ХЭЗЭЭ Ч харагдахгүй болно.
+   */
+  const known = new Set(STOCK_GROUPS.map((g) => g.id));
+  for (const item of STOCK) {
+    assert.ok(known.has(item.group), `${item.id}: «${item.group}» бүлэг STOCK_GROUPS-д алга`);
+  }
+
+  const ids = STOCK_GROUPS.map((g) => g.id);
+  assert.equal(new Set(ids).size, ids.length, 'давхардсан бүлэг');
+});
+
+test('нэг зургийг хоёр бараа хуваалцахгүй', () => {
+  /*
+   * ⚠️ Хуулж буулгахад амархан гардаг алдаа: шинэ бараа нэмэхдээ
+   * өмнөхийн зургийн замыг мартаж үлдээх. Хоёр өөр загвар нэг зурагтай
+   * бол хэрэглэгч ялгааг нь хэзээ ч харахгүй.
+   */
+  const seen = new Map<string, string>();
+  for (const item of STOCK) {
+    if (!item.image) continue;
+    const owner = seen.get(item.image);
+    assert.equal(owner, undefined, `${item.id}: зургийг «${owner}»-тэй хуваалцаж байна`);
+    seen.set(item.image, item.id);
   }
 });

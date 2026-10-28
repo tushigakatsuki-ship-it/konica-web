@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero';
 import StockImage from '../components/StockImage';
 import { SERVICES } from '../data/catalog';
-import { STOCK, type StockItem } from '../data/stock';
+import { STOCK_GROUPS, hasPrice, stockByGroup, type StockItem } from '../data/stock';
 import { formatCurrency, parsePrice, serviceIdFor } from '../lib/price';
 import { useLang } from '../state/lang';
 
@@ -25,13 +25,22 @@ import { useLang } from '../state/lang';
  * тоо огт харуулаагүйгээс дор.
  */
 
-const priceFor = (item: StockItem, qty: number) =>
-  parsePrice(SERVICES.find((s) => s.id === serviceIdFor(item, qty))?.price);
+/**
+ * Үнэ — эсвэл `null`.
+ *
+ * ⚠️ `null` нь «үнэгүй» ГЭСЭН ҮГ БИШ: «үнэ хараахан тогтоогдоогүй».
+ * Тоо буцаавал карт 0₮ харуулна — тэр нь худал.
+ */
+const priceFor = (item: StockItem, qty: number): number | null =>
+  hasPrice(item)
+    ? parsePrice(SERVICES.find((s) => s.id === serviceIdFor(item, qty))?.price)
+    : null;
 
 function StockCard({ item }: { item: StockItem }) {
   const { lang } = useLang();
 
-  const soldOut = item.stock <= 0;
+  /* Үлдэгдэл мэдэгдэхгүй бол «дууссан» ч биш, «байгаа» ч биш — чимээгүй. */
+  const soldOut = item.stock !== undefined && item.stock <= 0;
   const from = priceFor(item, 1);
 
   return (
@@ -48,7 +57,7 @@ function StockCard({ item }: { item: StockItem }) {
               * яарах шалтгаан биш, ҮНЭН мэдээлэл: 3 ширхэг үлдсэн үед
               * 10 захиалах гэсэн хүн шууд мэдэх ёстой.
               */}
-            {soldOut ? (
+            {item.stock === undefined ? null : soldOut ? (
               <span className="rounded-md bg-muted/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-muted">
                 Дууссан
               </span>
@@ -68,10 +77,14 @@ function StockCard({ item }: { item: StockItem }) {
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{item.blurb[lang]}</p>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xl font-black text-brand-500">
-              {formatCurrency(from)}
-              <span className="ml-1 text-xs font-semibold text-muted">/ ширхэг</span>
-            </p>
+            {from === null ? (
+              <p className="text-sm font-bold text-muted">Үнийг утсаар лавлана уу</p>
+            ) : (
+              <p className="text-xl font-black text-brand-500">
+                {formatCurrency(from)}
+                <span className="ml-1 text-xs font-semibold text-muted">/ ширхэг</span>
+              </p>
+            )}
 
             {/*
               * ⚠️ Товч БИШ, ХОЛБООС.
@@ -85,7 +98,7 @@ function StockCard({ item }: { item: StockItem }) {
               <span className="text-xs font-semibold text-muted">Нөөц дуусcан</span>
             ) : (
               <Link to={`/baraa/${item.id}`} className="btn-brand">
-                Захиалах
+                {from === null ? 'Дэлгэрэнгүй' : 'Захиалах'}
               </Link>
             )}
           </div>
@@ -105,11 +118,39 @@ export default function Stock() {
       />
 
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-14">
-        <ul className="space-y-4">
-          {STOCK.map((item) => (
-            <StockCard key={item.id} item={item} />
-          ))}
-        </ul>
+        {/*
+          * ⚠️ Спортоор нь БҮЛЭГЛЭНЭ.
+          *
+          * Хорь гаруй медалийг нэг жагсаалтаар цувуулбал хүн эрэлхийлэх
+          * биш гүйлгэх болно: сагсан, волейбол, шатар нь хольцолдож,
+          * хэрэгтэйгээ олоход бүгдийг нь үзэх шаардлагатай болно.
+          *
+          * Хоосон бүлэг хэвлэгдэхгүй — бараа нь дуусвал гарчиг нь ч
+          * хамт алга болно.
+          */}
+        <div className="space-y-10">
+          {STOCK_GROUPS.map((group) => {
+            const items = stockByGroup(group.id);
+            if (items.length === 0) return null;
+
+            return (
+              <section key={group.id}>
+                <h2 className="text-sm font-black uppercase tracking-wider text-muted">
+                  {group.name.mn}
+                  <span className="ml-2 font-bold normal-case tracking-normal">
+                    {items.length} загвар
+                  </span>
+                </h2>
+
+                <ul className="mt-3 space-y-4">
+                  {items.map((item) => (
+                    <StockCard key={item.id} item={item} />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
 
         {/*
           * ⚠️ Үлдэгдэл нь ГАРААР шинэчлэгддэг гэдгийг ил хэлнэ.

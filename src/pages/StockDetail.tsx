@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import StockPayment from '../components/StockPayment';
 import StockImage from '../components/StockImage';
 import { IconCheck } from '../components/icons';
-import { stockById } from '../data/stock';
+import { hasPrice, stockById } from '../data/stock';
+import { PRIMARY_PHONE } from '../data/site';
 import { DELIVERY_FEE } from '../lib/order';
 import { formatCurrency, VAT_RATE } from '../lib/price';
 import { quantityChoices, quote } from '../lib/stockOrder';
@@ -57,13 +58,24 @@ export default function StockDetail() {
     );
   }
 
-  const soldOut = item.stock <= 0;
-  const bill = quote(item, qty, {
-    delivery,
-    vat,
-    deliveryFee: DELIVERY_FEE,
-    vatRate: VAT_RATE,
-  });
+  const soldOut = item.stock !== undefined && item.stock <= 0;
+
+  /*
+   * ⚠️ Үнэгүй бараанд тооцоо хийхгүй.
+   *
+   * `quote` нь каталогоос үнэ олдохгүй бол 0 буцаана — тэгвэл хуудас
+   * «0₮» гэж харуулж, хүн үнэгүй гэж ойлгоно. Үнэ тогтоогүй бол
+   * тооцооны самбарын оронд утасны холбоос гарна.
+   */
+  const priced = hasPrice(item);
+  const bill = priced
+    ? quote(item, qty, {
+        delivery,
+        vat,
+        deliveryFee: DELIVERY_FEE,
+        vatRate: VAT_RATE,
+      })
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
@@ -87,23 +99,39 @@ export default function StockDetail() {
           <h1 className="mt-5 text-2xl font-black">{item.name[lang]}</h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">{item.blurb[lang]}</p>
 
-          <p className="mt-4 text-sm">
-            <span className="text-muted">Нөөц: </span>
-            {soldOut ? (
-              <span className="font-bold text-muted">Дууссан</span>
-            ) : (
-              <span
-                className={`font-bold ${item.stock <= 5 ? 'text-accent-strong' : 'text-brand-500'}`}
-              >
-                {item.stock} ширхэг
-              </span>
-            )}
-          </p>
+          {/* Үлдэгдэл мэдэгдэхгүй бол мөрийг огт гаргахгүй — тоо нь амлалт. */}
+          {item.stock !== undefined && (
+            <p className="mt-4 text-sm">
+              <span className="text-muted">Нөөц: </span>
+              {soldOut ? (
+                <span className="font-bold text-muted">Дууссан</span>
+              ) : (
+                <span
+                  className={`font-bold ${
+                    item.stock <= 5 ? 'text-accent-strong' : 'text-brand-500'
+                  }`}
+                >
+                  {item.stock} ширхэг
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         {/* ── Захиалгын самбар ────────────────────────────────── */}
         <div className="card h-fit p-5 lg:sticky lg:top-24">
-          {soldOut ? (
+          {!priced ? (
+            <>
+              <p className="text-sm font-bold">Үнийг утсаар лавлана уу</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                Энэ загварын үнэ вэб дээр хараахан тавигдаагүй байна. Тоо
+                ширхэгээ хэлэхэд яг үнийг нь шууд хэлнэ.
+              </p>
+              <a href={PRIMARY_PHONE.href} className="btn-brand mt-4 w-full">
+                {PRIMARY_PHONE.label}
+              </a>
+            </>
+          ) : soldOut ? (
             <p className="text-sm leading-relaxed text-muted">
               Энэ бараа одоогоор дууссан байна. Хэзээ орохыг мэдэхийн тулд
               залгаарай — эсвэл захиалгаар хийлгэж болно.
@@ -186,19 +214,19 @@ export default function StockDetail() {
               <dl className="mt-5 space-y-1.5 border-t border-hairline pt-4 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-muted">
-                    {formatCurrency(bill.unit)} × {qty}
+                    {formatCurrency(bill!.unit)} × {qty}
                   </dt>
-                  <dd>{formatCurrency(bill.subtotal)}</dd>
+                  <dd>{formatCurrency(bill!.subtotal)}</dd>
                 </div>
-                {bill.tax > 0 && (
+                {bill!.tax > 0 && (
                   <div className="flex justify-between">
                     <dt className="text-muted">НӨАТ</dt>
-                    <dd>{formatCurrency(bill.tax)}</dd>
+                    <dd>{formatCurrency(bill!.tax)}</dd>
                   </div>
                 )}
                 <div className="flex justify-between pt-1.5 text-base font-black">
                   <dt>Нийт</dt>
-                  <dd className="text-brand-500">{formatCurrency(bill.total)}</dd>
+                  <dd className="text-brand-500">{formatCurrency(bill!.total)}</dd>
                 </div>
               </dl>
 
@@ -215,7 +243,7 @@ export default function StockDetail() {
         </div>
       </div>
 
-      {open && (
+      {open && priced && bill && (
         <StockPayment
           item={item}
           qty={qty}
